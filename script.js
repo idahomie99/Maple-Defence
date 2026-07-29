@@ -1,5 +1,9 @@
+// --- 최고 기록 및 도감 데이터 불러오기 ---
 let bestWave = localStorage.getItem('mapleDefenseBestWave') || 0;
 document.getElementById('best-record').innerText = `최고 기록: ${bestWave} 웨이브`;
+
+let cardData = JSON.parse(localStorage.getItem('mapleDefenseCards')) || {};
+const CARD_REQ = [1, 2, 4, 8, 12, 16, 20, 24, 28, 32]; // 0~9번 인덱스 (1~10등급 요구량)
 
 const GRADES = [
     { name: "초보자", prob: 50.0, sell: 3, mult: 1, rangeMul: 1 },
@@ -27,6 +31,18 @@ const BOSS_WAVES = {
     90: { hp: 1000000, meso: 100, ticket: 5, name: "자쿰" },
     100: { hp: 4000000, meso: 100, ticket: 5, name: "혼테일" }
 };
+
+// 100층 이후 무한 보스 로직
+function getBossInfo(w) {
+    if (BOSS_WAVES[w]) return BOSS_WAVES[w];
+    if (w > 100 && w % 5 === 0) {
+        return {
+            hp: Math.floor(4000000 * Math.pow(1.4, (w - 100) / 5)), // 체력 기하급수적 증가
+            meso: 150, ticket: 5, name: `심연의 보스 (${w}층)`
+        };
+    }
+    return null;
+}
 
 let state = {
     status: 'TITLE',
@@ -56,22 +72,127 @@ function initGrid() {
 }
 initGrid();
 
-function startGame() {
+// 세이브 감지 및 로드
+function checkSave() {
+    if (localStorage.getItem('mapleDefenseSave')) {
+        document.getElementById('btn-continue').style.display = 'block';
+    }
+}
+checkSave();
+
+function saveGameData() {
+    if (state.status === 'GAMEOVER' || state.status === 'TITLE') return;
+    let saveObj = {
+        wave: state.wave, meso: state.meso, mp: state.mp, mpTotal: state.mpTotal, kills: state.kills,
+        upgrades: state.upgrades, tickets: state.tickets,
+        gridData: grid.map(u => u ? { idx: u.idx, gradeIdx: u.gradeIdx, clsName: u.cls.type } : null)
+    };
+    localStorage.setItem('mapleDefenseSave', JSON.stringify(saveObj));
+}
+
+function loadAndStartGame() {
+    let saved = JSON.parse(localStorage.getItem('mapleDefenseSave'));
+    if(!saved) { startNewGame(); return; }
+    
+    state.wave = saved.wave; state.meso = saved.meso; state.mp = saved.mp;
+    state.mpTotal = saved.mpTotal; state.kills = saved.kills;
+    state.upgrades = saved.upgrades; state.tickets = saved.tickets;
+    
+    grid = new Array(25).fill(null);
+    towers = [];
+    saved.gridData.forEach((u) => {
+        if(u) addUnit(u.idx, u.gradeIdx, u.clsName, true);
+    });
+    
     document.getElementById('start-screen').style.display = 'none';
-    state.status = 'PREP'; 
-    state.time = 30;
+    state.status = 'PREP'; state.time = 5; // 이어하기는 대기시간 5초
     lastTime = performance.now();
-    showMessage("30초 후 1웨이브가 시작됩니다!");
+    state.isBoss = !!getBossInfo(state.wave);
+    updateUI();
     requestAnimationFrame(loop);
 }
 
-function getGradeByProb() {
-    let rand = Math.random() * 100;
-    let acc = 0;
-    for(let i=0; i<GRADES.length; i++) {
-        acc += GRADES[i].prob;
-        if(rand <= acc) return i;
+function startNewGame() {
+    localStorage.removeItem('mapleDefenseSave');
+    document.getElementById('start-screen').style.display = 'none';
+    state.status = 'PREP'; state.time = 30;
+    lastTime = performance.now();
+    requestAnimationFrame(loop);
+}
+
+function goToLobby() {
+    saveGameData();
+    location.reload();
+}
+
+// 3초마다 자동 저장
+setInterval(() => {
+    if(state.status === 'PLAY' || state.status === 'PREP') saveGameData();
+}, 3000);
+
+// --- 도감 시스템 ---
+function getTotalCardBonus() {
+    let bonus = 0;
+    for(let k in cardData) {
+        let g = cardData[k].grade;
+        if(g > 0) bonus += 1 + (g - 1) * 0.5;
     }
+    return bonus;
+}
+
+function openBookModal() {
+    document.getElementById('overlay').style.display = 'block';
+    document.getElementById('book-modal').style.display = 'block';
+    renderBook();
+}
+
+function renderBook() {
+    let list = document.getElementById('book-list');
+    list.innerHTML = '';
+    
+    let allBosses = Object.keys(BOSS_WAVES).map(k => BOSS_WAVES[k].name);
+    for(let k in cardData) {
+        if(!allBosses.includes(k)) allBosses.push(k);
+    }
+    
+    allBosses.forEach(bName => {
+        let data = cardData[bName] || { owned: 0, grade: 0 };
+        let req = data.grade < 10 ? CARD_REQ[data.grade] : 'Max';
+        let canUpgrade = data.grade < 10 && data.owned >= req;
+        let effectStr = data.grade > 0 ? `+${(1 + (data.grade-1)*0.5).toFixed(1)}%` : `0%`;
+        
+        let btnText = data.grade === 0 ? `등록 (${req}장)` : (data.grade === 10 ? 'MAX' : `강화 (${req}장)`);
+        
+        let html = `
+        <div style="background:#fff; border:2px solid #8d6e63; border-radius:6px; padding:8px; text-align:left; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <div style="font-weight:900; color:#3e2723; font-size:14px;">${bName} (등급: ${data.grade})</div>
+                <div style="font-size:12px; color:#666; margin-top:2px;">효과: ${effectStr} / 보유: <b style="color:#e65100">${data.owned}장</b></div>
+            </div>
+            <button class="maple-btn small ${canUpgrade ? 'primary' : ''}" ${!canUpgrade ? 'disabled' : ''} onclick="upgradeCard('${bName}')">
+                ${btnText}
+            </button>
+        </div>`;
+        list.innerHTML += html;
+    });
+    
+    document.getElementById('book-total-bonus').innerText = `총 보유 효과: 공격력 +${getTotalCardBonus().toFixed(1)}%`;
+}
+
+function upgradeCard(bName) {
+    let data = cardData[bName];
+    let req = CARD_REQ[data.grade];
+    if(data.grade < 10 && data.owned >= req) {
+        data.owned -= req;
+        data.grade++;
+        localStorage.setItem('mapleDefenseCards', JSON.stringify(cardData));
+        renderBook();
+    }
+}
+
+function getGradeByProb() {
+    let rand = Math.random() * 100; let acc = 0;
+    for(let i=0; i<GRADES.length; i++) { acc += GRADES[i].prob; if(rand <= acc) return i; }
     return 0;
 }
 
@@ -93,9 +214,9 @@ function summonUnit() {
 function showSummonToast(gradeName, gradeIdx, clsName, color) {
     let toast = document.getElementById('summon-toast');
     let fontSize = 16 + (gradeIdx * 2); 
-    
     toast.innerHTML = `<span style="color:${color}">${gradeName}</span> ${clsName}!`;
     toast.style.fontSize = fontSize + 'px';
+    toast.style.color = '#fff';
     toast.className = 'toast-show';
     setTimeout(() => { toast.className = ''; }, 1500);
 
@@ -106,25 +227,30 @@ function showSummonToast(gradeName, gradeIdx, clsName, color) {
     }
 }
 
-function showBossToast(name) {
+function showBossToast(name, isDrop = false) {
     let toast = document.getElementById('boss-toast');
-    toast.innerHTML = `⚠️ 보스 출현: ${name} ⚠️`;
+    if (isDrop) {
+        toast.innerHTML = `🃏 ${name} 카드 획득! 🃏`;
+        toast.style.color = '#ffca28';
+    } else {
+        toast.innerHTML = `⚠️ 보스 출현: ${name} ⚠️`;
+        toast.style.color = '#ff5252';
+    }
     toast.className = 'toast-show';
-    setTimeout(() => { toast.className = ''; }, 2000);
+    setTimeout(() => { toast.className = ''; }, 2500);
 }
 
-function addUnit(idx, gradeIdx, clsName) {
+function addUnit(idx, gradeIdx, clsName, isLoad = false) {
     let grade = GRADES[gradeIdx];
     let cls = CLASSES[clsName];
     let unit = {
         idx: idx, gradeIdx: gradeIdx, grade: grade, cls: cls,
-        x: 75 + (idx % 5) * 70 + 35, y: 75 + Math.floor(idx / 5) * 70 + 35, lastAttack: 0,
-        bindCooldown: 0 
+        x: 75 + (idx % 5) * 70 + 35, y: 75 + Math.floor(idx / 5) * 70 + 35, lastAttack: 0, bindCooldown: 0 
     };
     grid[idx] = unit;
     towers.push(unit);
     
-    showSummonToast(grade.name, gradeIdx, clsName, cls.color);
+    if(!isLoad) showSummonToast(grade.name, gradeIdx, clsName, cls.color);
     renderGrid();
 }
 
@@ -149,8 +275,7 @@ function onCellClick(idx) {
             }
             selectedUnitIdx = -1; 
         }
-    } 
-    else {
+    } else {
         if (grid[idx]) selectedUnitIdx = idx;
     }
     renderGrid(); updateUI();
@@ -185,8 +310,7 @@ function executeBulkSell(type, value) {
         if(match) {
             earnedMeso += u.grade.sell;
             towers = towers.filter(t => t !== u);
-            grid[i] = null;
-            soldCount++;
+            grid[i] = null; soldCount++;
         }
     }
     
@@ -195,9 +319,7 @@ function executeBulkSell(type, value) {
         showMessage(`${soldCount}마리 판매 (+${earnedMeso} 메소)`);
         selectedUnitIdx = -1; 
         renderGrid(); updateUI();
-    } else {
-        showMessage("조건에 맞는 유닛이 없습니다.");
-    }
+    } else { showMessage("조건에 맞는 유닛이 없습니다."); }
     closeAllModals();
 }
 
@@ -205,6 +327,7 @@ function closeAllModals() {
     document.getElementById('overlay').style.display = 'none';
     document.getElementById('bulk-sell-modal').style.display = 'none';
     document.getElementById('ticket-modal').style.display = 'none';
+    document.getElementById('book-modal').style.display = 'none';
 }
 
 function renderGrid() {
@@ -222,7 +345,6 @@ function renderGrid() {
                     <div id="bind-bar-${u.idx}" style="width: 0%; height: 100%; background: #00e5ff;"></div>
                 </div>`;
             }
-
             cells[i].innerHTML = `
                 <div style="font-size:20px; text-shadow:1px 1px 2px rgba(0,0,0,0.5);">${u.cls.icon}</div>
                 <div style="color:${u.cls.color}; font-size:10px; margin-top:2px;">${u.grade.name}</div>
@@ -233,11 +355,11 @@ function renderGrid() {
 }
 
 function spawnMonster() {
-    let hpBase = state.isBoss ? BOSS_WAVES[state.wave].hp : Math.floor(state.wave * 45 + Math.pow(state.wave, 1.4) * 8);
+    let bInfo = getBossInfo(state.wave);
+    let hpBase = bInfo ? bInfo.hp : Math.floor(state.wave * 45 + Math.pow(state.wave, 1.4) * 8);
     monsters.push({
         hp: hpBase, maxHp: hpBase, x: PATH[0].x, y: PATH[0].y,
-        targetNode: 1, speed: state.isBoss ? 25 : 50, isBoss: state.isBoss,
-        bindTimer: 0 
+        targetNode: 1, speed: bInfo ? 25 : 50, isBoss: !!bInfo, bindTimer: 0 
     });
 }
 
@@ -263,7 +385,9 @@ function nextWave() {
     
     if(state.isBoss && monsters.some(m => m.isBoss)) { gameOver("보스 처치 실패!"); return; }
     state.wave++; waveTimer = 0; spawnTimer = 0;
-    state.isBoss = !!BOSS_WAVES[state.wave];
+    
+    let bInfo = getBossInfo(state.wave);
+    state.isBoss = !!bInfo;
     
     if (state.wave > bestWave) {
         bestWave = state.wave;
@@ -271,7 +395,7 @@ function nextWave() {
     }
     
     if(state.isBoss) {
-        showBossToast(BOSS_WAVES[state.wave].name);
+        showBossToast(bInfo.name);
         spawnMonster();
     }
     updateUI();
@@ -286,9 +410,6 @@ function showUpgradeToast(idChar, amt) {
     setTimeout(() => floatEl.remove(), 1000);
 }
 
-// ------------------------------------------------------------------
-// 핵심 변경 사항: 메포 요구량 인플레이션 방지를 위한 강화 비용 복리 상승
-// ------------------------------------------------------------------
 function upgrade(type) {
     if(state.status !== 'PREP' && state.status !== 'PLAY') return;
     let u = state.upgrades[type];
@@ -297,20 +418,15 @@ function upgrade(type) {
         state.mp -= u.cost;
         let amt = Math.floor(Math.random() * 6) + 1; 
         u.val += amt;
-        
-        // 기존 1씩 증가하던 방식을 버리고, (현재 비용의 20% + 3) 만큼 크게 상승시킴
         u.cost += Math.floor(u.cost * 0.2) + 3;
         
         let idChar = type === '전사' ? 'w' : (type === '법사' ? 'm' : 't');
-        
         showUpgradeToast(idChar, amt);
 
         document.getElementById(`upg-${idChar}-val`).innerText = u.val;
         document.getElementById(`upg-${idChar}-cost`).innerText = u.cost;
         updateUI();
-    } else { 
-        showMessage("메포가 부족합니다."); 
-    }
+    } else { showMessage("메포가 부족합니다."); }
 }
 
 let currentTicketTier = 0;
@@ -355,8 +471,8 @@ function loop() {
         
         if (state.time <= 0) {
             state.status = 'PLAY';
-            state.wave = 1; waveTimer = 0; spawnTimer = 0;
-            showMessage("1웨이브 시작!");
+            state.wave = state.wave || 1; waveTimer = 0; spawnTimer = 0;
+            showMessage(state.wave + "웨이브 시작!");
             updateUI();
         }
         draw();
@@ -368,11 +484,7 @@ function loop() {
     
     for(let i=monsters.length-1; i>=0; i--) {
         let m = monsters[i];
-        
-        if (m.bindTimer > 0) {
-            m.bindTimer -= dt;
-            continue; 
-        }
+        if (m.bindTimer > 0) { m.bindTimer -= dt; continue; }
 
         let t = PATH[m.targetNode];
         let dx = t.x - m.x, dy = t.y - m.y;
@@ -389,6 +501,9 @@ function loop() {
     
     if(monsters.length >= 200) { gameOver("몬스터 200마리 초과! 게임 오버"); return; }
     
+    // 도감 카드 전체 데미지 증가율 (ex: 5%면 1.05)
+    let cardMulti = 1 + (getTotalCardBonus() / 100);
+
     towers.forEach(t => {
         if (t.gradeIdx === 6) {
             t.bindCooldown -= dt * 1000;
@@ -397,18 +512,11 @@ function loop() {
                 let pct = Math.max(0, Math.min(100, ((60000 - t.bindCooldown) / 60000) * 100));
                 bar.style.width = pct + '%';
             }
-            
             if (t.bindCooldown <= 0 && monsters.length > 0) {
                 let target = null;
-                for (let m of monsters) {
-                    if (m.bindTimer <= 0) { target = m; break; }
-                }
+                for (let m of monsters) { if (m.bindTimer <= 0) { target = m; break; } }
                 if (!target) target = monsters[0]; 
-                
-                if (target) {
-                    target.bindTimer = 10; 
-                    t.bindCooldown = 60000; 
-                }
+                if (target) { target.bindTimer = 10; t.bindCooldown = 60000; }
             }
         }
 
@@ -421,7 +529,8 @@ function loop() {
                 if(d <= minDist) { minDist = d; target = m; }
             }
             if(target) {
-                let dmg = (t.cls.baseDmg + (state.upgrades[t.cls.type].val * 0.15)) * t.grade.mult;
+                // 혼줌 수치(15% 적용) + 도감 카드 데미지 계수 반영
+                let dmg = (t.cls.baseDmg + (state.upgrades[t.cls.type].val * 0.15)) * t.grade.mult * cardMulti;
                 projectiles.push({
                     type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y,
                     dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash,
@@ -457,10 +566,20 @@ function loop() {
         if(monsters[i].hp <= 0) {
             state.kills++; state.mp++; state.mpTotal++;
             if(state.mpTotal >= 10) { state.meso += 5; state.mpTotal -= 10; }
+            
             if(monsters[i].isBoss) {
-                let b = BOSS_WAVES[state.wave];
-                state.meso += b.meso; state.tickets.push(b.ticket);
+                let bInfo = getBossInfo(state.wave);
+                state.meso += bInfo.meso; state.tickets.push(bInfo.ticket);
                 showMessage(`${state.wave}라운드 보스 처치!`);
+                
+                // 보스 카드 드롭 확률 (20%에서 시작해 10층마다 2%씩 감소, 최소 1%)
+                let dropRate = Math.max(1, 20 - Math.floor(state.wave / 10) * 2);
+                if (Math.random() * 100 <= dropRate) {
+                    cardData[bInfo.name] = cardData[bInfo.name] || { owned: 0, grade: 0 };
+                    cardData[bInfo.name].owned++;
+                    localStorage.setItem('mapleDefenseCards', JSON.stringify(cardData));
+                    showBossToast(bInfo.name, true);
+                }
             }
             monsters.splice(i, 1);
             updateUI();
@@ -503,8 +622,7 @@ function draw() {
         if (m.bindTimer > 0) {
             ctx.fillStyle = "rgba(0, 200, 255, 0.5)"; 
             ctx.fillRect(m.x - size - 4, m.y - size - 4, (size + 4) * 2, (size + 4) * 2);
-            ctx.fillStyle = "#fff";
-            ctx.font = "12px NanumSquare";
+            ctx.fillStyle = "#fff"; ctx.font = "12px NanumSquare";
             ctx.fillText("❄️", m.x - 7, m.y + 4); 
         }
 
@@ -567,6 +685,7 @@ function showMessage(msg) {
 
 function gameOver(msg) {
     state.status = 'GAMEOVER';
+    localStorage.removeItem('mapleDefenseSave'); // 죽으면 세이브 파일 삭제
     showMessage(msg);
 }
 
