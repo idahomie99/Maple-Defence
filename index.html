@@ -13,14 +13,20 @@
         <button class="pulse-btn" onclick="startGame()">Touch to Start</button>
     </div>
 
+    <!-- 각종 토스트 알림창 -->
     <div id="summon-toast"></div>
+    <div id="boss-toast"></div>
 
     <div id="game-container">
         <div id="header" class="maple-panel">
             <div class="stat-row">
                 <div>웨이브: <span id="ui-wave" class="highlight">1</span></div>
-                <div>타이머: <span id="ui-timer" class="highlight">30</span>초</div>
-                <div><button id="btn-speed" class="maple-btn small" onclick="toggleSpeed()">1배속</button></div>
+                <div>타이머: <span id="ui-timer" class="highlight">60</span>초</div>
+                <div style="display:flex; gap:5px;">
+                    <button id="btn-speed" class="maple-btn small" onclick="toggleSpeed()">1배속</button>
+                    <!-- 로비로 가기 버튼 추가 -->
+                    <button class="maple-btn small danger-btn" onclick="location.reload()">로비로</button>
+                </div>
             </div>
             <div class="stat-row">
                 <div>몹: <span id="ui-mobs" class="danger">0 / 200</span></div>
@@ -35,32 +41,38 @@
         <div id="board-area">
             <canvas id="gameCanvas" width="500" height="500"></canvas>
             <div id="grid-container"></div>
+            <!-- 보스 클리어 시 스킵 버튼 -->
+            <button id="btn-skip-boss" class="pulse-btn" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index:50;" onclick="skipBossRound()">다음 라운드 시작</button>
         </div>
         
         <div id="controls" class="maple-panel">
-            <!-- 메인 액션 버튼 3개 -->
-            <div style="display: flex; gap: 5px; margin-bottom: 5px;">
+            <div style="display: flex; gap: 5px; margin-bottom: 10px;">
                 <button id="btn-summon" class="maple-btn primary huge" style="flex: 1.5;" onclick="summonUnit()">소환 (10)</button>
                 <button id="btn-sell-single" class="maple-btn huge danger-btn" style="flex: 1;" onclick="sellSelectedUnit()" disabled>판매</button>
                 <button class="maple-btn secondary huge" style="flex: 1;" onclick="openBulkSellModal()">일괄판매</button>
             </div>
             
+            <!-- 혼돈의 주문서 강화 타이틀 -->
+            <div style="text-align:center; font-weight:bold; font-size:14px; color:#5a3c22; margin-bottom: 5px; border-top: 1px dashed #8b5a2b; padding-top: 5px;">
+                📜 혼돈의 주문서 강화 📜
+            </div>
             <div class="upgrade-container">
-                <div class="upgrade-box" onclick="upgrade('전사')">
+                <div class="upgrade-box" id="upg-w-box" onclick="upgrade('전사')">
                     <div class="job-title warrior">전사 (+<span id="upg-w-val">0</span>)</div>
                     <div class="cost"><span id="upg-w-cost">10</span> 메포</div>
                 </div>
-                <div class="upgrade-box" onclick="upgrade('법사')">
+                <div class="upgrade-box" id="upg-m-box" onclick="upgrade('법사')">
                     <div class="job-title mage">법사 (+<span id="upg-m-val">0</span>)</div>
                     <div class="cost"><span id="upg-m-cost">10</span> 메포</div>
                 </div>
-                <div class="upgrade-box" onclick="upgrade('도적')">
+                <div class="upgrade-box" id="upg-t-box" onclick="upgrade('도적')">
                     <div class="job-title thief">도적 (+<span id="upg-t-val">0</span>)</div>
                     <div class="cost"><span id="upg-t-cost">10</span> 메포</div>
                 </div>
             </div>
+            <div style="text-align:center; font-size:11px; color:#666; margin-top:2px;">(+1~+6 랜덤 적용, 공격력에 미세하게 합산됨)</div>
             
-            <div class="ticket-row" style="margin-top: 5px;">
+            <div class="ticket-row" style="margin-top: 10px;">
                 <span>선택권: <span id="ui-tickets" class="highlight">0</span>장</span>
                 <button class="maple-btn secondary" onclick="openTicketModal()">사용하기</button>
             </div>
@@ -73,14 +85,12 @@
     <div id="bulk-sell-modal" class="maple-modal">
         <h3>일괄 판매 선택</h3>
         <p style="font-size:12px; margin-bottom:10px;">(5차 이상은 판매되지 않습니다)</p>
-        
         <div style="text-align: left; font-size: 14px; font-weight: bold; color: #5a3c22; margin-bottom: 5px;">▶ 직업별 전체 판매</div>
         <div style="display: flex; gap: 5px; margin-bottom: 15px;">
             <button class="maple-btn" style="flex:1; color:#c62828;" onclick="executeBulkSell('class', '전사')">전사</button>
             <button class="maple-btn" style="flex:1; color:#1565c0;" onclick="executeBulkSell('class', '법사')">법사</button>
             <button class="maple-btn" style="flex:1; color:#6a1b9a;" onclick="executeBulkSell('class', '도적')">도적</button>
         </div>
-
         <div style="text-align: left; font-size: 14px; font-weight: bold; color: #5a3c22; margin-bottom: 5px;">▶ 등급별 전체 판매</div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
             <button class="maple-btn" onclick="executeBulkSell('grade', 0)">초보자 전체</button>
@@ -88,7 +98,6 @@
             <button class="maple-btn" onclick="executeBulkSell('grade', 2)">2차 이하</button>
             <button class="maple-btn" onclick="executeBulkSell('grade', 3)">3차 이하</button>
         </div>
-        
         <button class="maple-btn" onclick="closeAllModals()" style="margin-top:15px; width:100%;">취소</button>
     </div>
 
