@@ -35,15 +35,24 @@
                 <div>킬수: <span id="ui-kills">0</span></div>
             </div>
             <div class="resource-row">
-                <div class="meso-box">메소 <span id="ui-meso">25</span></div>
-                <div class="mp-box">메포 <span id="ui-mp">0</span></div>
+                <div class="meso-box">
+                    <img src="image/meso.png" alt="Meso" style="height: 16px; vertical-align: middle; margin-right: 4px;">
+                    메소 <span id="ui-meso">25</span>
+                </div>
+                <div class="mp-box">
+                    <img src="image/mepo.png" alt="Mepo" style="height: 16px; vertical-align: middle; margin-right: 4px;">
+                    메포 <span id="ui-mp">0</span>
+                </div>
             </div>
         </div>
         
         <div id="board-area">
             <canvas id="gameCanvas" width="500" height="500"></canvas>
             <div id="grid-container"></div>
-            <button id="btn-skip-boss" class="pulse-btn" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index:50;" onclick="skipBossRound()">다음 라운드 시작</button>
+            <!-- 스킵 버튼 중앙 정렬을 위한 래퍼 추가 -->
+            <div id="boss-skip-wrapper" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; justify-content:center; align-items:center; z-index:50;">
+                <button id="btn-skip-boss" class="pulse-btn" onclick="skipBossRound()">다음 라운드 시작</button>
+            </div>
         </div>
         
         <div id="controls" class="maple-panel">
@@ -54,7 +63,7 @@
             </div>
             
             <div style="text-align:center; font-weight:bold; font-size:14px; color:#5a3c22; margin-bottom: 5px; border-top: 1px dashed #8b5a2b; padding-top: 5px;">
-                📜 혼돈의 주문서 강화 📜
+                <img src="image/chaosscroll.png" style="height: 20px; vertical-align: middle;"> 혼돈의 주문서 강화 <img src="image/chaosscroll.png" style="height: 20px; vertical-align: middle;">
             </div>
             <div class="upgrade-container">
                 <div class="upgrade-box" id="upg-w-box" onclick="upgrade('전사')">
@@ -81,17 +90,13 @@
     
     <div id="overlay" onclick="closeAllModals()"></div>
 
-    <!-- 몬스터 도감 모달 (초기 상태 숨김 display: none) -->
     <div id="book-modal" class="maple-modal" style="max-height: 85vh; display: none; flex-direction: column;">
         <h3>📖 몬스터 도감 📖</h3>
         <div id="book-total-bonus" style="font-weight:900; color:#c62828; margin-bottom:10px; font-size: 16px;">총 보유 효과: 공격력 +0%</div>
-        <div id="book-list" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 8px; padding-right: 5px;">
-            <!-- 스크립트에서 자동 생성됨 -->
-        </div>
+        <div id="book-list" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 8px; padding-right: 5px;"></div>
         <button class="maple-btn" onclick="closeAllModals()" style="margin-top:15px; width:100%;">닫기</button>
     </div>
     
-    <!-- 일괄 판매 모달 -->
     <div id="bulk-sell-modal" class="maple-modal">
         <h3>일괄 판매 선택</h3>
         <p style="font-size:12px; margin-bottom:10px;">(5차 이상은 판매되지 않습니다)</p>
@@ -111,7 +116,6 @@
         <button class="maple-btn" onclick="closeAllModals()" style="margin-top:15px; width:100%;">취소</button>
     </div>
 
-    <!-- 선택권 모달 -->
     <div id="ticket-modal" class="maple-modal">
         <h3>선택권 사용 (<span id="ticket-tier" class="highlight"></span>차)</h3>
         <div class="ticket-btns">
@@ -123,7 +127,6 @@
         <button class="maple-btn" onclick="closeAllModals()" style="margin-top:15px; width:100%;">닫기</button>
     </div>
 
-    <!-- 게임 오버 팝업창 -->
     <div id="gameover-modal" class="maple-modal">
         <h3 style="color:#c62828; font-size:24px; border-bottom:none;">💀 게임 오버 💀</h3>
         <p id="gameover-msg" style="font-size: 16px; margin-bottom: 20px; font-weight: bold;"></p>

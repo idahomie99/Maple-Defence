@@ -1,10 +1,27 @@
-// --- 최고 기록 및 도감 데이터 불러오기 ---
 let bestWave = localStorage.getItem('mapleDefenseBestWave') || 0;
 document.getElementById('best-record').innerText = `최고 기록: ${bestWave} 웨이브`;
 
 let cardData = JSON.parse(localStorage.getItem('mapleDefenseCards')) || {};
 const CARD_REQ = [1, 2, 4, 8, 12, 16, 20, 24, 28, 32]; 
 
+// 보스 이미지 파일 로드 (이름 매칭)
+const bossImages = {
+    "킹 슬라임": new Image(), "알리샤르": new Image(), "파풀라투스": new Image(),
+    "피아누스": new Image(), "자쿰": new Image(), "혼테일": new Image(),
+    "시그너스": new Image(), "반반": new Image(), "피에르": new Image(),
+    "블러드퀸": new Image(), "벨룸": new Image()
+};
+bossImages["킹 슬라임"].src = "image/kingslime.jpg";
+bossImages["알리샤르"].src = "image/alishar.jpg";
+bossImages["파풀라투스"].src = "image/papulatus.jpg";
+bossImages["피아누스"].src = "image/pianus.jpg";
+bossImages["시그너스"].src = "image/signus.jpg";
+bossImages["반반"].src = "image/banban.jpg";
+bossImages["피에르"].src = "image/pierr.jpg";
+bossImages["블러드퀸"].src = "image/bloodqueen.jpg";
+bossImages["벨룸"].src = "image/velroom.jpg";
+
+// 6차 이상은 모두 splash 속성을 true로 부여
 const GRADES = [
     { name: "초보자", prob: 50.0, sell: 3, mult: 1, rangeMul: 1 },
     { name: "1차", prob: 33.1, sell: 6, mult: 2, rangeMul: 1 },
@@ -12,19 +29,17 @@ const GRADES = [
     { name: "3차", prob: 5.1, sell: 16, mult: 8, rangeMul: 1.2, speedMul: 0.8 },
     { name: "4차", prob: 0.8, sell: 30, mult: 16, rangeMul: 1.2 },
     { name: "5차", prob: 0.5, sell: 0, mult: 32, rangeMul: 1.2, splash: true },
-    { name: "6차", prob: 0.2, sell: 0, mult: 64, rangeMul: 4 },
-    { name: "제네시스", prob: 0.08, sell: 0, mult: 128, rangeMul: 4 },
-    { name: "데스티니", prob: 0.019, sell: 0, mult: 256, rangeMul: 6 }
+    { name: "6차", prob: 0.2, sell: 0, mult: 64, rangeMul: 4, splash: true },
+    { name: "제네시스", prob: 0.08, sell: 0, mult: 128, rangeMul: 4, splash: true },
+    { name: "데스티니", prob: 0.019, sell: 0, mult: 256, rangeMul: 6, splash: true }
 ];
 
-// 전사 기본 공격력 상향 (20 -> 26) 및 아이콘 변경 (쌍검 -> 한손검)
 const CLASSES = {
     '전사': { type: '전사', icon: '🗡️', color: '#c62828', baseDmg: 26, range: 100, cd: 1000, splash: 40 },
     '법사': { type: '법사', icon: '🪄', color: '#1565c0', baseDmg: 10, range: 160, cd: 1000, splash: 60 },
     '도적': { type: '도적', icon: '✦', color: '#6a1b9a', baseDmg: 18, range: 200, cd: 800, splash: 0 }
 };
 
-// 150층까지의 보스 명단
 const BOSS_WAVES = {
     24: { hp: 10000, meso: 50, ticket: 3, name: "킹 슬라임" },
     37: { hp: 30000, meso: 50, ticket: 4, name: "알리샤르" },
@@ -39,7 +54,6 @@ const BOSS_WAVES = {
     150: { hp: 128000000, meso: 150, ticket: 5, name: "벨룸" }
 };
 
-// 100층 이후 5층 단위 보스 (정해진 네임드 외에는 심연의 보스)
 function getBossInfo(w) {
     if (BOSS_WAVES[w]) return BOSS_WAVES[w];
     if (w > 100 && w % 5 === 0) {
@@ -60,6 +74,7 @@ let state = {
 
 let grid = new Array(25).fill(null);
 let monsters = [], projectiles = [], towers = [];
+let hitEffects = []; // 피격 폭발 이펙트 관리 배열
 let lastTime = 0, waveTimer = 0, spawnTimer = 0;
 let selectedUnitIdx = -1; 
 
@@ -99,23 +114,19 @@ function saveGameData() {
 function loadAndStartGame() {
     let saved = JSON.parse(localStorage.getItem('mapleDefenseSave'));
     if(!saved) { startNewGame(); return; }
-    
     state.wave = saved.wave; state.meso = saved.meso; state.mp = saved.mp;
     state.mpTotal = saved.mpTotal; state.kills = saved.kills;
     state.upgrades = saved.upgrades; state.tickets = saved.tickets;
     
     grid = new Array(25).fill(null);
     towers = [];
-    saved.gridData.forEach((u) => {
-        if(u) addUnit(u.idx, u.gradeIdx, u.clsName, true);
-    });
+    saved.gridData.forEach((u) => { if(u) addUnit(u.idx, u.gradeIdx, u.clsName, true); });
     
     document.getElementById('start-screen').style.display = 'none';
     state.status = 'PREP'; state.time = 5; 
     lastTime = performance.now();
     state.isBoss = !!getBossInfo(state.wave);
-    updateUI();
-    requestAnimationFrame(loop);
+    updateUI(); requestAnimationFrame(loop);
 }
 
 function startNewGame() {
@@ -126,14 +137,9 @@ function startNewGame() {
     requestAnimationFrame(loop);
 }
 
-function goToLobby() {
-    saveGameData();
-    location.reload();
-}
+function goToLobby() { saveGameData(); location.reload(); }
 
-setInterval(() => {
-    if(state.status === 'PLAY' || state.status === 'PREP') saveGameData();
-}, 3000);
+setInterval(() => { if(state.status === 'PLAY' || state.status === 'PREP') saveGameData(); }, 3000);
 
 function getTotalCardBonus() {
     let bonus = 0;
@@ -153,34 +159,25 @@ function openBookModal() {
 function renderBook() {
     let list = document.getElementById('book-list');
     list.innerHTML = '';
-    
     let allBosses = Object.keys(BOSS_WAVES).map(k => BOSS_WAVES[k].name);
-    // 심연의 보스는 종류별로 저장
-    for(let k in cardData) {
-        if(!allBosses.includes(k)) allBosses.push(k);
-    }
+    for(let k in cardData) { if(!allBosses.includes(k)) allBosses.push(k); }
     
     allBosses.forEach(bName => {
         let data = cardData[bName] || { owned: 0, grade: 0 };
         let req = data.grade < 10 ? CARD_REQ[data.grade] : 'Max';
         let canUpgrade = data.grade < 10 && data.owned >= req;
         let effectStr = data.grade > 0 ? `+${(1 + (data.grade-1)*0.5).toFixed(1)}%` : `0%`;
-        
         let btnText = data.grade === 0 ? `등록 (${req}장)` : (data.grade === 10 ? 'MAX' : `강화 (${req}장)`);
         
-        let html = `
+        list.innerHTML += `
         <div style="background:#fff; border:2px solid #8d6e63; border-radius:6px; padding:8px; text-align:left; display:flex; justify-content:space-between; align-items:center;">
             <div>
                 <div style="font-weight:900; color:#3e2723; font-size:14px;">${bName} (등급: ${data.grade})</div>
                 <div style="font-size:12px; color:#666; margin-top:2px;">효과: ${effectStr} / 보유: <b style="color:#e65100">${data.owned}장</b></div>
             </div>
-            <button class="maple-btn small ${canUpgrade ? 'primary' : ''}" ${!canUpgrade ? 'disabled' : ''} onclick="upgradeCard('${bName}')">
-                ${btnText}
-            </button>
+            <button class="maple-btn small ${canUpgrade ? 'primary' : ''}" ${!canUpgrade ? 'disabled' : ''} onclick="upgradeCard('${bName}')">${btnText}</button>
         </div>`;
-        list.innerHTML += html;
     });
-    
     document.getElementById('book-total-bonus').innerText = `총 보유 효과: 공격력 +${getTotalCardBonus().toFixed(1)}%`;
 }
 
@@ -188,8 +185,7 @@ function upgradeCard(bName) {
     let data = cardData[bName];
     let req = CARD_REQ[data.grade];
     if(data.grade < 10 && data.owned >= req) {
-        data.owned -= req;
-        data.grade++;
+        data.owned -= req; data.grade++;
         localStorage.setItem('mapleDefenseCards', JSON.stringify(cardData));
         renderBook();
     }
@@ -206,12 +202,10 @@ function summonUnit() {
     if(state.meso < 10) return;
     let emptyIdx = grid.findIndex(v => v === null);
     if(emptyIdx === -1) { showMessage("배치 공간이 부족합니다!"); return; }
-    
     state.meso -= 10;
     let gradeIdx = getGradeByProb();
     let clsNames = Object.keys(CLASSES);
     let clsName = clsNames[Math.floor(Math.random() * clsNames.length)];
-    
     addUnit(emptyIdx, gradeIdx, clsName);
     updateUI();
 }
@@ -234,13 +228,8 @@ function showSummonToast(gradeName, gradeIdx, clsName, color) {
 
 function showBossToast(name, isDrop = false) {
     let toast = document.getElementById('boss-toast');
-    if (isDrop) {
-        toast.innerHTML = `🃏 ${name} 카드 획득! 🃏`;
-        toast.style.color = '#ffca28';
-    } else {
-        toast.innerHTML = `⚠️ 보스 출현: ${name} ⚠️`;
-        toast.style.color = '#ff5252';
-    }
+    if (isDrop) { toast.innerHTML = `🃏 ${name} 카드 획득! 🃏`; toast.style.color = '#ffca28'; } 
+    else { toast.innerHTML = `⚠️ 보스 출현: ${name} ⚠️`; toast.style.color = '#ff5252'; }
     toast.className = 'toast-show';
     setTimeout(() => { toast.className = ''; }, 2500);
 }
@@ -254,35 +243,23 @@ function addUnit(idx, gradeIdx, clsName, isLoad = false) {
     };
     grid[idx] = unit;
     towers.push(unit);
-    
     if(!isLoad) showSummonToast(grade.name, gradeIdx, clsName, cls.color);
     renderGrid();
 }
 
 function onCellClick(idx) {
     if(state.status !== 'PREP' && state.status !== 'PLAY') return;
-    
     if (selectedUnitIdx !== -1) {
-        if (selectedUnitIdx === idx) {
-            selectedUnitIdx = -1;
-        } else {
+        if (selectedUnitIdx === idx) { selectedUnitIdx = -1; } 
+        else {
             let target = grid[idx];
             grid[idx] = grid[selectedUnitIdx];
-            grid[idx].idx = idx;
-            grid[idx].x = 75 + (idx % 5) * 70 + 35;
-            grid[idx].y = 75 + Math.floor(idx / 5) * 70 + 35;
-
+            grid[idx].idx = idx; grid[idx].x = 75 + (idx % 5) * 70 + 35; grid[idx].y = 75 + Math.floor(idx / 5) * 70 + 35;
             grid[selectedUnitIdx] = target;
-            if(target) {
-                target.idx = selectedUnitIdx;
-                target.x = 75 + (selectedUnitIdx % 5) * 70 + 35;
-                target.y = 75 + Math.floor(selectedUnitIdx / 5) * 70 + 35;
-            }
+            if(target) { target.idx = selectedUnitIdx; target.x = 75 + (selectedUnitIdx % 5) * 70 + 35; target.y = 75 + Math.floor(selectedUnitIdx / 5) * 70 + 35; }
             selectedUnitIdx = -1; 
         }
-    } else {
-        if (grid[idx]) selectedUnitIdx = idx;
-    }
+    } else { if (grid[idx]) selectedUnitIdx = idx; }
     renderGrid(); updateUI();
 }
 
@@ -290,11 +267,8 @@ function sellSelectedUnit() {
     if(selectedUnitIdx === -1) return;
     let u = grid[selectedUnitIdx];
     if(u && u.grade.sell > 0) {
-        state.meso += u.grade.sell;
-        towers = towers.filter(t => t !== u);
-        grid[selectedUnitIdx] = null;
-        selectedUnitIdx = -1;
-        renderGrid(); updateUI();
+        state.meso += u.grade.sell; towers = towers.filter(t => t !== u);
+        grid[selectedUnitIdx] = null; selectedUnitIdx = -1; renderGrid(); updateUI();
     }
 }
 
@@ -311,19 +285,11 @@ function executeBulkSell(type, value) {
         let match = false;
         if(type === 'class' && u.cls.type === value) match = true;
         if(type === 'grade' && u.gradeIdx <= value) match = true;
-        
-        if(match) {
-            earnedMeso += u.grade.sell;
-            towers = towers.filter(t => t !== u);
-            grid[i] = null; soldCount++;
-        }
+        if(match) { earnedMeso += u.grade.sell; towers = towers.filter(t => t !== u); grid[i] = null; soldCount++; }
     }
-    
     if(soldCount > 0) {
-        state.meso += earnedMeso;
-        showMessage(`${soldCount}마리 판매 (+${earnedMeso} 메소)`);
-        selectedUnitIdx = -1; 
-        renderGrid(); updateUI();
+        state.meso += earnedMeso; showMessage(`${soldCount}마리 판매 (+${earnedMeso} 메소)`);
+        selectedUnitIdx = -1; renderGrid(); updateUI();
     } else { showMessage("조건에 맞는 유닛이 없습니다."); }
     closeAllModals();
 }
@@ -340,10 +306,15 @@ function renderGrid() {
     let cells = gridContainer.children;
     for(let i=0; i<25; i++) {
         let u = grid[i];
+        cells[i].className = 'grid-cell'; // 초기화
         if (i === selectedUnitIdx) cells[i].classList.add('selected');
-        else cells[i].classList.remove('selected');
-
+        
         if(u) {
+            // 6차 이상 테두리 은은한 글로우
+            if (u.gradeIdx === 6) cells[i].classList.add('glow-6');
+            if (u.gradeIdx === 7) cells[i].classList.add('glow-7');
+            if (u.gradeIdx === 8) cells[i].classList.add('glow-8');
+
             let bindHtml = '';
             if (u.gradeIdx === 6) {
                 bindHtml = `
@@ -365,70 +336,55 @@ function spawnMonster() {
     let hpBase = bInfo ? bInfo.hp : Math.floor(state.wave * 45 + Math.pow(state.wave, 1.4) * 8);
     monsters.push({
         hp: hpBase, maxHp: hpBase, x: PATH[0].x, y: PATH[0].y,
-        targetNode: 1, speed: bInfo ? 25 : 50, isBoss: !!bInfo, bindTimer: 0, stunTimer: 0 
+        targetNode: 1, speed: bInfo ? 25 : 50, isBoss: !!bInfo, bindTimer: 0, stunTimer: 0, name: bInfo ? bInfo.name : null
     });
 }
 
 function skipBossRound() {
     waveTimer = 150; 
-    document.getElementById('btn-skip-boss').style.display = 'none';
+    document.getElementById('boss-skip-wrapper').style.display = 'none';
 }
 
 function updateWave(dt) {
     waveTimer += dt; spawnTimer += dt;
     let limit = state.isBoss ? 150 : 60; 
-    
     if(waveTimer >= limit) { nextWave(); return; }
-    
-    if(!state.isBoss && spawnTimer >= 1.5) {
-        spawnMonster(); spawnTimer = 0;
-    }
+    if(!state.isBoss && spawnTimer >= 1.5) { spawnMonster(); spawnTimer = 0; }
     document.getElementById('ui-timer').innerText = Math.max(0, limit - Math.floor(waveTimer));
 }
 
 function nextWave() {
-    document.getElementById('btn-skip-boss').style.display = 'none';
-    
+    document.getElementById('boss-skip-wrapper').style.display = 'none';
     if(state.isBoss && monsters.some(m => m.isBoss)) { gameOver("보스 처치 실패!"); return; }
-    state.wave++; waveTimer = 0; spawnTimer = 0;
     
+    state.wave++; waveTimer = 0; spawnTimer = 0;
     let bInfo = getBossInfo(state.wave);
     state.isBoss = !!bInfo;
     
     if (state.wave > bestWave) {
-        bestWave = state.wave;
-        localStorage.setItem('mapleDefenseBestWave', bestWave);
+        bestWave = state.wave; localStorage.setItem('mapleDefenseBestWave', bestWave);
     }
     
-    if(state.isBoss) {
-        showBossToast(bInfo.name);
-        spawnMonster();
-    }
+    if(state.isBoss) { showBossToast(bInfo.name); spawnMonster(); }
     updateUI();
 }
 
 function showUpgradeToast(idChar, amt) {
     let box = document.getElementById(`upg-${idChar}-box`);
     let floatEl = document.createElement('div');
-    floatEl.className = 'upgrade-toast';
-    floatEl.innerText = '+' + amt;
-    box.appendChild(floatEl);
-    setTimeout(() => floatEl.remove(), 1000);
+    floatEl.className = 'upgrade-toast'; floatEl.innerText = '+' + amt;
+    box.appendChild(floatEl); setTimeout(() => floatEl.remove(), 1000);
 }
 
 function upgrade(type) {
     if(state.status !== 'PREP' && state.status !== 'PLAY') return;
     let u = state.upgrades[type];
-    
     if(state.mp >= u.cost) {
         state.mp -= u.cost;
         let amt = Math.floor(Math.random() * 6) + 1; 
-        u.val += amt;
-        u.cost += Math.floor(u.cost * 0.2) + 3;
-        
+        u.val += amt; u.cost += Math.floor(u.cost * 0.2) + 3;
         let idChar = type === '전사' ? 'w' : (type === '법사' ? 'm' : 't');
         showUpgradeToast(idChar, amt);
-
         document.getElementById(`upg-${idChar}-val`).innerText = u.val;
         document.getElementById(`upg-${idChar}-cost`).innerText = u.cost;
         updateUI();
@@ -449,16 +405,11 @@ function openTicketModal() {
 function useTicket(choice) {
     let emptyIdx = grid.findIndex(v => v === null);
     if(emptyIdx === -1) { showMessage("공간 부족!"); return; }
-    
     state.tickets.shift(); 
-    
     let tier = currentTicketTier;
     let cls = choice === '랜덤' ? Object.keys(CLASSES)[Math.floor(Math.random()*3)] : choice;
     if(choice === '랜덤' && Math.random() < 0.2) tier++;
-    
-    addUnit(emptyIdx, tier, cls);
-    closeAllModals();
-    updateUI();
+    addUnit(emptyIdx, tier, cls); closeAllModals(); updateUI();
 }
 
 function toggleSpeed() {
@@ -476,19 +427,20 @@ function loop() {
     if (dt > 0.1) dt = 0.1;
     lastTime = now;
     
+    // 피격 폭발 이펙트 업데이트
+    for (let i = hitEffects.length - 1; i >= 0; i--) {
+        hitEffects[i].timer -= dt;
+        if (hitEffects[i].timer <= 0) hitEffects.splice(i, 1);
+    }
+    
     if (state.status === 'PREP') {
         state.time -= dt;
         document.getElementById('ui-timer').innerText = Math.ceil(state.time);
-        
         if (state.time <= 0) {
-            state.status = 'PLAY';
-            state.wave = state.wave || 1; waveTimer = 0; spawnTimer = 0;
-            showMessage(state.wave + "웨이브 시작!");
-            updateUI();
+            state.status = 'PLAY'; state.wave = state.wave || 1; waveTimer = 0; spawnTimer = 0;
+            showMessage(state.wave + "웨이브 시작!"); updateUI();
         }
-        draw();
-        requestAnimationFrame(loop);
-        return;
+        draw(); requestAnimationFrame(loop); return;
     }
     
     updateWave(dt);
@@ -496,7 +448,7 @@ function loop() {
     for(let i=monsters.length-1; i>=0; i--) {
         let m = monsters[i];
         if (m.bindTimer > 0) { m.bindTimer -= dt; continue; }
-        if (m.stunTimer > 0) { m.stunTimer -= dt; continue; } // 스턴 상태 이동 멈춤
+        if (m.stunTimer > 0) { m.stunTimer -= dt; continue; }
 
         let t = PATH[m.targetNode];
         let dx = t.x - m.x, dy = t.y - m.y;
@@ -504,15 +456,11 @@ function loop() {
         let move = m.speed * dt;
         
         if(dist <= move) {
-            m.x = t.x; m.y = t.y;
-            m.targetNode = (m.targetNode + 1) % PATH.length;
-        } else {
-            m.x += (dx/dist)*move; m.y += (dy/dist)*move;
-        }
+            m.x = t.x; m.y = t.y; m.targetNode = (m.targetNode + 1) % PATH.length;
+        } else { m.x += (dx/dist)*move; m.y += (dy/dist)*move; }
     }
     
     if(monsters.length >= 200) { gameOver("몬스터 200마리 초과! 게임 오버"); return; }
-    
     let cardMulti = 1 + (getTotalCardBonus() / 100);
 
     towers.forEach(t => {
@@ -544,7 +492,7 @@ function loop() {
                 projectiles.push({
                     type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y,
                     dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash,
-                    color: t.cls.color, target: target, angle: 0
+                    color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx
                 });
                 t.lastAttack = t.cls.cd * (t.grade.speedMul || 1);
             }
@@ -560,12 +508,15 @@ function loop() {
         if(p.type === '도적') p.angle += 15 * dt; 
         
         if(dist <= speed) {
+            // 적중 시 폭발 이펙트 등록 (6차 이상)
+            if (p.gradeIdx >= 6) {
+                hitEffects.push({ x: p.tx, y: p.ty, timer: 0.2, color: p.color });
+            }
+
             if(monsters.includes(p.target)) {
                 let hitDmg = p.dmg;
-                // 전사 보스 추가 대미지 50%
                 if (p.type === '전사' && p.target.isBoss) hitDmg *= 1.5;
                 p.target.hp -= hitDmg;
-                // 전사 20% 확률로 1초 스턴 부여
                 if (p.type === '전사' && Math.random() < 0.2) p.target.stunTimer = 1;
             }
             
@@ -595,7 +546,6 @@ function loop() {
                 state.meso += bInfo.meso; state.tickets.push(bInfo.ticket);
                 showMessage(`${state.wave}라운드 보스 처치!`);
                 
-                // 모든 보스 도감 카드 확률 10% 고정
                 if (Math.random() * 100 <= 10) {
                     cardData[bInfo.name] = cardData[bInfo.name] || { owned: 0, grade: 0 };
                     cardData[bInfo.name].owned++;
@@ -631,17 +581,26 @@ function draw() {
     
     monsters.forEach(m => {
         let size = m.isBoss ? 16 : 10; 
-        if (!m.isBoss) {
-            ctx.fillStyle = "#81c784";
-            ctx.beginPath(); ctx.arc(m.x, m.y + 2, size, Math.PI, 0);
-            ctx.fillRect(m.x - size, m.y + 2, size*2, size/2); ctx.fill();
+        
+        if (m.isBoss && bossImages[m.name] && bossImages[m.name].complete && bossImages[m.name].naturalWidth > 0) {
+            // 보스 이미지 원형 자르기 렌더링
+            ctx.save();
+            ctx.beginPath(); ctx.arc(m.x, m.y, size * 1.5, 0, Math.PI * 2); ctx.clip();
+            ctx.drawImage(bossImages[m.name], m.x - size * 1.5, m.y - size * 1.5, size * 3, size * 3);
+            ctx.restore();
         } else {
-            ctx.fillStyle = "#ff8a65"; 
-            ctx.beginPath(); ctx.arc(m.x, m.y - 2, size, Math.PI, 0); ctx.fill();
-            ctx.fillStyle = "#ffe0b2"; ctx.fillRect(m.x - size/2, m.y - 2, size, size - 2);
+            // 일반 몹 및 이미지 미로드 시 대체 렌더링
+            if (!m.isBoss) {
+                ctx.fillStyle = "#81c784";
+                ctx.beginPath(); ctx.arc(m.x, m.y + 2, size, Math.PI, 0);
+                ctx.fillRect(m.x - size, m.y + 2, size*2, size/2); ctx.fill();
+            } else {
+                ctx.fillStyle = "#ff8a65"; 
+                ctx.beginPath(); ctx.arc(m.x, m.y - 2, size, Math.PI, 0); ctx.fill();
+                ctx.fillStyle = "#ffe0b2"; ctx.fillRect(m.x - size/2, m.y - 2, size, size - 2);
+            }
         }
         
-        // 얼음 이펙트
         if (m.bindTimer > 0) {
             ctx.fillStyle = "rgba(0, 200, 255, 0.5)"; 
             ctx.fillRect(m.x - size - 4, m.y - size - 4, (size + 4) * 2, (size + 4) * 2);
@@ -649,7 +608,6 @@ function draw() {
             ctx.fillText("❄️", m.x - 7, m.y + 4); 
         }
 
-        // 스턴 이펙트 (어지러움 아이콘)
         if (m.stunTimer > 0) {
             ctx.fillStyle = "#fff"; ctx.font = "14px NanumSquare";
             ctx.fillText("💫", m.x - 7, m.y - size - 12); 
@@ -659,12 +617,17 @@ function draw() {
         ctx.fillStyle = "#4caf50"; ctx.fillRect(m.x-10, m.y-size-8, 20 * (m.hp/m.maxHp), 3);
     });
     
+    // 공격 이펙트 렌더링
     projectiles.forEach(p => {
         ctx.save();
         ctx.translate(p.x, p.y);
         let dx = p.tx - p.x; let dy = p.ty - p.y;
         let dir = Math.atan2(dy, dx);
         
+        // 6차 이상일 경우 공격 크기 1.5배 확대
+        let scale = p.gradeIdx >= 6 ? 1.5 : 1;
+        ctx.scale(scale, scale);
+
         if (p.type === '전사') {
             ctx.rotate(dir); ctx.fillStyle = "rgba(229, 57, 53, 0.8)";
             ctx.beginPath(); ctx.arc(0, 0, 15, -Math.PI/2, Math.PI/2);
@@ -679,6 +642,21 @@ function draw() {
             ctx.lineTo(0, 10); ctx.lineTo(-3, 3); ctx.lineTo(-10, 0); ctx.lineTo(-3, -3);
             ctx.closePath(); ctx.fill();
         }
+        ctx.restore();
+    });
+
+    // 6차 이상 피격(폭발) 이펙트 렌더링
+    hitEffects.forEach(h => {
+        let alpha = h.timer / 0.2; // 0.2초 타이머 기준
+        let radius = 5 + (0.2 - h.timer) * 100; // 작게 시작해서 커짐
+        
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = h.color;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(h.x, h.y, radius, 0, Math.PI * 2);
+        ctx.stroke();
         ctx.restore();
     });
 }
@@ -698,11 +676,11 @@ function updateUI() {
         sellBtn.disabled = true;
     }
     
-    let skipBtn = document.getElementById('btn-skip-boss');
+    let skipWrapper = document.getElementById('boss-skip-wrapper');
     if (state.isBoss && monsters.length === 0 && waveTimer > 0) {
-        skipBtn.style.display = 'block';
+        skipWrapper.style.display = 'flex';
     } else {
-        skipBtn.style.display = 'none';
+        skipWrapper.style.display = 'none';
     }
 }
 
