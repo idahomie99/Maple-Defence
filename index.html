@@ -7,15 +7,17 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- 1. 시작 타이틀 화면 -->
+    <!-- 시작 타이틀 화면 -->
     <div id="start-screen">
         <h1 class="game-title">🍁 메이플 디펜스 🍁</h1>
         <div id="best-record">최고 기록: 0 웨이브</div>
         <button class="pulse-btn" onclick="startGame()">Touch to Start</button>
     </div>
 
+    <!-- 유닛 소환 시 중앙 알림창 -->
+    <div id="summon-toast"></div>
+
     <div id="game-container">
-        <!-- 상단 정보 패널 -->
         <div id="header" class="maple-panel">
             <div class="stat-row">
                 <div>웨이브: <span id="ui-wave" class="highlight">1</span></div>
@@ -32,13 +34,13 @@
             </div>
         </div>
         
-        <!-- 게임 보드 (정사각형 반응형) -->
+        <!-- 게임 보드 -->
         <div id="board-area">
             <canvas id="gameCanvas" width="500" height="500"></canvas>
             <div id="grid-container"></div>
         </div>
         
-        <!-- 하단 컨트롤 패널 -->
+        <!-- 하단 컨트롤 -->
         <div id="controls" class="maple-panel">
             <button id="btn-summon" class="maple-btn primary huge" onclick="summonUnit()">유닛 소환 (10 메소)</button>
             

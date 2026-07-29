@@ -1,13 +1,5 @@
-// --- 최고 기록 불러오기 ---
 let bestWave = localStorage.getItem('mapleDefenseBestWave') || 0;
 document.getElementById('best-record').innerText = `최고 기록: ${bestWave} 웨이브`;
-
-// --- 몬스터 이미지 불러오기 ---
-const imgNormal = new Image();
-const imgBoss = new Image();
-// ※ 여기에 원하시는 실제 메이플 몬스터 이미지 URL이나 파일 경로를 넣으면 됩니다.
-imgNormal.src = 'https://i.imgur.com/k91203O.png'; // 기본 몹 (예시: 슬라임)
-imgBoss.src = 'https://i.imgur.com/71239O9.png'; // 보스 몹 (예시: 주황버섯)
 
 const GRADES = [
     { name: "초보자", prob: 50.0, sell: 3, mult: 1, rangeMul: 1 },
@@ -21,25 +13,22 @@ const GRADES = [
     { name: "데스티니", prob: 0.019, sell: 0, mult: 256, rangeMul: 6 }
 ];
 
+// 직업별 아이콘(icon) 추가
 const CLASSES = {
-    '전사': { type: '전사', color: '#c62828', baseDmg: 20, range: 100, cd: 1000, splash: 40 },
-    '법사': { type: '법사', color: '#1565c0', baseDmg: 10, range: 160, cd: 1000, splash: 60 },
-    '도적': { type: '도적', color: '#6a1b9a', baseDmg: 18, range: 200, cd: 800, splash: 0 }
+    '전사': { type: '전사', icon: '⚔️', color: '#c62828', baseDmg: 20, range: 100, cd: 1000, splash: 40 },
+    '법사': { type: '법사', icon: '🪄', color: '#1565c0', baseDmg: 10, range: 160, cd: 1000, splash: 60 },
+    '도적': { type: '도적', icon: '✦', color: '#6a1b9a', baseDmg: 18, range: 200, cd: 800, splash: 0 }
 };
 
 const BOSS_WAVES = {
-    24: { hp: 5000, meso: 50, ticket: 3 },
-    37: { hp: 15000, meso: 50, ticket: 4 },
-    58: { hp: 50000, meso: 50, ticket: 4 },
-    79: { hp: 150000, meso: 70, ticket: 5 },
-    90: { hp: 500000, meso: 100, ticket: 5 },
-    100: { hp: 2000000, meso: 100, ticket: 5 }
+    24: { hp: 5000, meso: 50, ticket: 3 }, 37: { hp: 15000, meso: 50, ticket: 4 },
+    58: { hp: 50000, meso: 50, ticket: 4 }, 79: { hp: 150000, meso: 70, ticket: 5 },
+    90: { hp: 500000, meso: 100, ticket: 5 }, 100: { hp: 2000000, meso: 100, ticket: 5 }
 };
 
 let state = {
-    status: 'TITLE', // TITLE, PREP, PLAY, GAMEOVER
-    meso: 25, mp: 0, mpTotal: 0, kills: 0, wave: 1, time: 30,
-    speed: 1, isBoss: false,
+    status: 'TITLE',
+    meso: 25, mp: 0, mpTotal: 0, kills: 0, wave: 1, time: 30, speed: 1, isBoss: false,
     upgrades: { '전사': {val: 0, cost: 10}, '법사': {val: 0, cost: 10}, '도적': {val: 0, cost: 10} },
     tickets: []
 };
@@ -47,11 +36,12 @@ let state = {
 let grid = new Array(25).fill(null);
 let monsters = [], projectiles = [], towers = [];
 let lastTime = 0, waveTimer = 0, spawnTimer = 0;
+let selectedUnitIdx = -1; // 선택된 유닛 위치 저장
+let isMoving = false; // 이동 모드 상태
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const gridContainer = document.getElementById('grid-container');
-
 const PATH = [ {x:25,y:25}, {x:475,y:25}, {x:475,y:475}, {x:25,y:475} ];
 
 function initGrid() {
@@ -67,7 +57,7 @@ initGrid();
 
 function startGame() {
     document.getElementById('start-screen').style.display = 'none';
-    state.status = 'PREP'; // 30초 대기열 시작
+    state.status = 'PREP'; 
     state.time = 30;
     lastTime = performance.now();
     showMessage("30초 후 1웨이브가 시작됩니다!");
@@ -99,6 +89,13 @@ function summonUnit() {
     updateUI();
 }
 
+function showSummonToast(gradeName, clsName, color) {
+    let toast = document.getElementById('summon-toast');
+    toast.innerHTML = `<span style="color:${color}">${gradeName}</span> ${clsName}!`;
+    toast.className = 'toast-show';
+    setTimeout(() => { toast.className = ''; }, 1500);
+}
+
 function addUnit(idx, gradeIdx, clsName) {
     let grade = GRADES[gradeIdx];
     let cls = CLASSES[clsName];
@@ -113,36 +110,42 @@ function addUnit(idx, gradeIdx, clsName) {
     grid[idx] = unit;
     towers.push(unit);
     
-    if(gradeIdx >= 5) showMessage(`[전체] ${grade.name} ${clsName} 등장!`);
+    // 유닛 소환 시 중앙 Fade 애니메이션 알림창
+    showSummonToast(grade.name, clsName, cls.color);
+    
     renderGrid();
 }
 
-let selectedUnitIdx = -1;
-let isMoving = false;
-
 function onCellClick(idx) {
     if(state.status !== 'PREP' && state.status !== 'PLAY') return;
+    
+    // 위치 이동 처리 로직
     if(isMoving) {
         let target = grid[idx];
+        
+        // 현재 자리로 옮김
         grid[idx] = grid[selectedUnitIdx];
         grid[idx].idx = idx;
         grid[idx].x = 75 + (idx % 5) * 70 + 35;
         grid[idx].y = 75 + Math.floor(idx / 5) * 70 + 35;
 
+        // 타겟(원래 있던 유닛)을 이전 자리로 밀어냄 (Swap)
         grid[selectedUnitIdx] = target;
         if(target) {
             target.idx = selectedUnitIdx;
             target.x = 75 + (selectedUnitIdx % 5) * 70 + 35;
             target.y = 75 + Math.floor(selectedUnitIdx / 5) * 70 + 35;
         }
+        
         isMoving = false;
+        selectedUnitIdx = -1; // 이동이 끝났으므로 선택 해제
         renderGrid();
         showMessage("이동 완료!");
         return;
     }
     
     if(grid[idx]) {
-        selectedUnitIdx = idx;
+        selectedUnitIdx = idx; // 사거리 원을 그리기 위해 선택된 유닛 기록
         let u = grid[idx];
         document.getElementById('popup-title').innerText = `${u.grade.name} ${u.cls.type}`;
         document.getElementById('popup-desc').innerText = `판매 시 ${u.grade.sell} 메소 획득`;
@@ -156,7 +159,11 @@ function closeAllModals() {
     document.getElementById('overlay').style.display = 'none';
     document.getElementById('popup').style.display = 'none';
     document.getElementById('ticket-modal').style.display = 'none';
-    isMoving = false;
+    
+    // 이동 버튼을 눌러서 창을 닫은게 아니라면 선택 해제 (사거리 원 끄기)
+    if (!isMoving) {
+        selectedUnitIdx = -1;
+    }
 }
 
 function sellUnit() {
@@ -168,6 +175,7 @@ function sellUnit() {
         grid[selectedUnitIdx] = null;
         renderGrid(); updateUI();
     }
+    isMoving = false;
     closeAllModals();
 }
 
@@ -182,7 +190,11 @@ function renderGrid() {
     for(let i=0; i<25; i++) {
         let u = grid[i];
         if(u) {
-            cells[i].innerHTML = `<span style="color:${u.cls.color}">${u.cls.type[0]}</span><br>${u.grade.name}`;
+            // 아이콘(검, 지팡이, 표창)과 등급 텍스트로 렌더링
+            cells[i].innerHTML = `
+                <div style="font-size:20px; text-shadow:1px 1px 2px rgba(0,0,0,0.5);">${u.cls.icon}</div>
+                <div style="color:${u.cls.color}; font-size:10px; margin-top:2px;">${u.grade.name}</div>
+            `;
         } else { cells[i].innerHTML = ''; }
     }
 }
@@ -199,10 +211,8 @@ function updateWave(dt) {
     waveTimer += dt; spawnTimer += dt;
     let limit = state.isBoss ? 300 : 120;
     
-    // 라운드 제한 시간이 끝나면 대기시간 없이 바로 다음 라운드로
     if(waveTimer >= limit) { nextWave(); return; }
     
-    // 일반 라운드는 주기적으로 스폰
     if(!state.isBoss && spawnTimer >= (120/40)) {
         spawnMonster(); spawnTimer = 0;
     }
@@ -214,7 +224,6 @@ function nextWave() {
     state.wave++; waveTimer = 0; spawnTimer = 0;
     state.isBoss = !!BOSS_WAVES[state.wave];
     
-    // 최고 기록 갱신
     if (state.wave > bestWave) {
         bestWave = state.wave;
         localStorage.setItem('mapleDefenseBestWave', bestWave);
@@ -263,16 +272,23 @@ function useTicket(choice) {
     closeAllModals();
 }
 
+// 1배속 -> 3배속 -> 5배속 -> 1배속 반복
+function toggleSpeed() {
+    if (state.speed === 1) state.speed = 3;
+    else if (state.speed === 3) state.speed = 5;
+    else state.speed = 1;
+    
+    document.getElementById('btn-speed').innerText = state.speed + "배속";
+}
+
 function loop() {
     if(state.status === 'GAMEOVER' || state.status === 'TITLE') return;
     
     let now = performance.now();
-    // 탭 전환 등 잠수 시 시간이 너무 크게 누적되어 즉시 게임오버 되는 버그 방지 (최대 0.1초씩만 처리)
     let dt = ((now - lastTime) / 1000) * state.speed;
     if (dt > 0.1) dt = 0.1;
     lastTime = now;
     
-    // 준비 시간 로직
     if (state.status === 'PREP') {
         state.time -= dt;
         document.getElementById('ui-timer').innerText = Math.ceil(state.time);
@@ -289,7 +305,6 @@ function loop() {
         return;
     }
     
-    // 본 게임 플레이 로직
     updateWave(dt);
     
     for(let i=monsters.length-1; i>=0; i--) {
@@ -321,9 +336,11 @@ function loop() {
             if(target) {
                 let dmg = (t.cls.baseDmg + state.upgrades[t.cls.type].val) * t.grade.mult;
                 projectiles.push({
+                    type: t.cls.type, // 직업 정보 저장 (공격 이펙트용)
                     x: t.x, y: t.y, tx: target.x, ty: target.y,
                     dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash,
-                    color: t.cls.color, target: target
+                    color: t.cls.color, target: target,
+                    angle: 0 // 회전이 필요한 도적 표창용
                 });
                 t.lastAttack = t.cls.cd * (t.grade.speedMul || 1);
             }
@@ -335,6 +352,8 @@ function loop() {
         let dx = p.tx - p.x, dy = p.ty - p.y;
         let dist = Math.hypot(dx, dy);
         let speed = 400 * dt;
+        
+        if(p.type === '도적') p.angle += 15 * dt; // 도적 표창 회전 업데이트
         
         if(dist <= speed) {
             if(monsters.includes(p.target)) p.target.hp -= p.dmg;
@@ -371,22 +390,43 @@ function loop() {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
+    // 경로 선
     ctx.strokeStyle = "rgba(0,0,0,0.15)";
     ctx.lineWidth = 35;
     ctx.beginPath(); ctx.rect(25, 25, 450, 450); ctx.stroke();
     
-    // 몬스터 그리기 (이미지 렌더링)
+    // 사거리 원 (클릭된 유닛이 있을 때만 렌더링)
+    if (selectedUnitIdx !== -1 && grid[selectedUnitIdx]) {
+        let u = grid[selectedUnitIdx];
+        let range = u.cls.range * u.grade.rangeMul;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.beginPath();
+        ctx.arc(u.x, u.y, range, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+    
+    // 몬스터 그리기 (직접 코드로 그려서 엑스박스 방지)
     monsters.forEach(m => {
-        let currentImg = m.isBoss ? imgBoss : imgNormal;
-        let size = m.isBoss ? 20 : 14; 
+        let size = m.isBoss ? 16 : 10; 
         
-        if (currentImg.complete && currentImg.naturalWidth !== 0) {
-            // 정상적으로 이미지를 로드한 경우
-            ctx.drawImage(currentImg, m.x - size, m.y - size, size * 2, size * 2);
+        if (!m.isBoss) {
+            // 일반몹: 슬라임 (초록색 물방울)
+            ctx.fillStyle = "#81c784";
+            ctx.beginPath();
+            ctx.arc(m.x, m.y + 2, size, Math.PI, 0);
+            ctx.fillRect(m.x - size, m.y + 2, size*2, size/2);
+            ctx.fill();
         } else {
-            // 이미지가 없을 때를 대비한 둥근 모양 (방어 코드)
-            ctx.fillStyle = m.isBoss ? "#d32f2f" : "#fff";
-            ctx.beginPath(); ctx.arc(m.x, m.y, size/2, 0, Math.PI*2); ctx.fill();
+            // 보스몹: 주황버섯 (주황색 갓 + 베이지색 몸통)
+            ctx.fillStyle = "#ff8a65"; // 버섯 머리
+            ctx.beginPath();
+            ctx.arc(m.x, m.y - 2, size, Math.PI, 0);
+            ctx.fill();
+            ctx.fillStyle = "#ffe0b2"; // 몸통
+            ctx.fillRect(m.x - size/2, m.y - 2, size, size - 2);
         }
         
         // 체력바
@@ -394,9 +434,46 @@ function draw() {
         ctx.fillStyle = "#4caf50"; ctx.fillRect(m.x-10, m.y-size-8, 20 * (m.hp/m.maxHp), 3);
     });
     
+    // 공격 투사체 이펙트 그리기
     projectiles.forEach(p => {
-        ctx.fillStyle = p.color;
-        ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill();
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        let dx = p.tx - p.x; let dy = p.ty - p.y;
+        let dir = Math.atan2(dy, dx);
+        
+        if (p.type === '전사') {
+            // 전사: 붉은색 검기 (초승달 모양 잔상)
+            ctx.rotate(dir);
+            ctx.fillStyle = "rgba(229, 57, 53, 0.8)";
+            ctx.beginPath();
+            ctx.arc(0, 0, 15, -Math.PI/2, Math.PI/2);
+            ctx.arc(6, 0, 15, Math.PI/2, -Math.PI/2, true);
+            ctx.fill();
+        } else if (p.type === '법사') {
+            // 법사: 푸른색 번개 (지그재그 모양)
+            ctx.rotate(dir);
+            ctx.strokeStyle = "#00e5ff";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(-12, 0);
+            ctx.lineTo(-6, -6);
+            ctx.lineTo(0, 6);
+            ctx.lineTo(6, -6);
+            ctx.lineTo(12, 0);
+            ctx.stroke();
+        } else if (p.type === '도적') {
+            // 도적: 회전하는 표창 (4각 별모양)
+            ctx.rotate(p.angle);
+            ctx.fillStyle = "#4a148c";
+            ctx.beginPath();
+            ctx.moveTo(0, -10); ctx.lineTo(3, -3);
+            ctx.lineTo(10, 0); ctx.lineTo(3, 3);
+            ctx.lineTo(0, 10); ctx.lineTo(-3, 3);
+            ctx.lineTo(-10, 0); ctx.lineTo(-3, -3);
+            ctx.closePath();
+            ctx.fill();
+        }
+        ctx.restore();
     });
 }
 
@@ -407,11 +484,6 @@ function updateUI() {
     document.getElementById('ui-kills').innerText = state.kills.toLocaleString();
     document.getElementById('ui-tickets').innerText = state.tickets.length;
     document.getElementById('btn-summon').disabled = (state.meso < 10);
-}
-
-function toggleSpeed() {
-    state.speed = state.speed === 1 ? 3 : 1;
-    document.getElementById('btn-speed').innerText = state.speed + "배속";
 }
 
 function showMessage(msg) {
