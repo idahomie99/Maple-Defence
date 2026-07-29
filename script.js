@@ -135,9 +135,10 @@ function getTotalCardBonus() {
     return bonus;
 }
 
+// 모달 오픈 시 레이아웃 속성을 flex로 변경 (안보이던 창을 띄움)
 function openBookModal() {
     document.getElementById('overlay').style.display = 'block';
-    document.getElementById('book-modal').style.display = 'block';
+    document.getElementById('book-modal').style.display = 'flex';
     renderBook();
 }
 
@@ -319,7 +320,7 @@ function executeBulkSell(type, value) {
 }
 
 function closeAllModals() {
-    if (state.status === 'GAMEOVER') return; // 게임오버 시 오버레이 클릭 방지
+    if (state.status === 'GAMEOVER') return; 
     document.getElementById('overlay').style.display = 'none';
     document.getElementById('bulk-sell-modal').style.display = 'none';
     document.getElementById('ticket-modal').style.display = 'none';
@@ -427,22 +428,19 @@ function upgrade(type) {
 
 let currentTicketTier = 0;
 
-// 선택권 소모 버그 수정: 여기서 shift() 하지 않고 읽기만 합니다.
 function openTicketModal() {
     if(state.tickets.length === 0) { showMessage("보유한 선택권이 없습니다."); return; }
-    currentTicketTier = state.tickets[0]; // 단순히 첫 번째 티켓을 확인만 함
+    currentTicketTier = state.tickets[0]; 
     document.getElementById('ticket-tier').innerText = currentTicketTier;
     document.getElementById('overlay').style.display = 'block';
     document.getElementById('ticket-modal').style.display = 'block';
     updateUI();
 }
 
-// 실제로 사용할 때 배열에서 뺍니다.
 function useTicket(choice) {
     let emptyIdx = grid.findIndex(v => v === null);
     if(emptyIdx === -1) { showMessage("공간 부족!"); return; }
     
-    // 유닛 소환이 확정되었으므로 배열에서 제거
     state.tickets.shift(); 
     
     let tier = currentTicketTier;
@@ -684,7 +682,6 @@ function showMessage(msg) {
     setTimeout(() => { ov.style.display = 'none'; }, 2000);
 }
 
-// 게임오버 시 세이브 삭제 및 모달 팝업 표시
 function gameOver(msg) {
     state.status = 'GAMEOVER';
     localStorage.removeItem('mapleDefenseSave'); 
