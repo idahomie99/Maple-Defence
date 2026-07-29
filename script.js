@@ -1,3 +1,14 @@
+// --- 최고 기록 불러오기 ---
+let bestWave = localStorage.getItem('mapleDefenseBestWave') || 0;
+document.getElementById('best-record').innerText = `최고 기록: ${bestWave} 웨이브`;
+
+// --- 몬스터 이미지 불러오기 ---
+const imgNormal = new Image();
+const imgBoss = new Image();
+// ※ 여기에 원하시는 실제 메이플 몬스터 이미지 URL이나 파일 경로를 넣으면 됩니다.
+imgNormal.src = 'https://i.imgur.com/k91203O.png'; // 기본 몹 (예시: 슬라임)
+imgBoss.src = 'https://i.imgur.com/71239O9.png'; // 보스 몹 (예시: 주황버섯)
+
 const GRADES = [
     { name: "초보자", prob: 50.0, sell: 3, mult: 1, rangeMul: 1 },
     { name: "1차", prob: 33.1, sell: 6, mult: 2, rangeMul: 1 },
@@ -26,22 +37,21 @@ const BOSS_WAVES = {
 };
 
 let state = {
-    meso: 25, mp: 0, mpTotal: 0, kills: 0, wave: 1, time: 120,
-    speed: 1, isBoss: false, gameOver: false,
+    status: 'TITLE', // TITLE, PREP, PLAY, GAMEOVER
+    meso: 25, mp: 0, mpTotal: 0, kills: 0, wave: 1, time: 30,
+    speed: 1, isBoss: false,
     upgrades: { '전사': {val: 0, cost: 10}, '법사': {val: 0, cost: 10}, '도적': {val: 0, cost: 10} },
     tickets: []
 };
 
 let grid = new Array(25).fill(null);
 let monsters = [], projectiles = [], towers = [];
-let lastTime = performance.now(), waveTimer = 0, spawnTimer = 0;
+let lastTime = 0, waveTimer = 0, spawnTimer = 0;
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const gridContainer = document.getElementById('grid-container');
 
-// 모바일 500x500 논리 캔버스 기준 경로설정
-// 보드 15% 마진 = 75px. 5x5 그리드 사이즈 = 350px. 셀당 70px.
 const PATH = [ {x:25,y:25}, {x:475,y:25}, {x:475,y:475}, {x:25,y:475} ];
 
 function initGrid() {
@@ -55,15 +65,35 @@ function initGrid() {
 }
 initGrid();
 
+function startGame() {
+    document.getElementById('start-screen').style.display = 'none';
+    state.status = 'PREP'; // 30초 대기열 시작
+    state.time = 30;
+    lastTime = performance.now();
+    showMessage("30초 후 1웨이브가 시작됩니다!");
+    requestAnimationFrame(loop);
+}
+
 function getGradeByProb() {
     let rand = Math.random() * 100;
     let acc = 0;
-    for(let i=0; i v === null);
+    for(let i=0; i<GRADES.length; i++) {
+        acc += GRADES[i].prob;
+        if(rand <= acc) return i;
+    }
+    return 0;
+}
+
+function summonUnit() {
+    if(state.status !== 'PREP' && state.status !== 'PLAY') return;
+    if(state.meso < 10) return;
+    let emptyIdx = grid.findIndex(v => v === null);
     if(emptyIdx === -1) { showMessage("배치 공간이 부족합니다!"); return; }
     
     state.meso -= 10;
     let gradeIdx = getGradeByProb();
-    let clsName = Object.keys(CLASSES)[Math.floor(Math.random() * 3)];
+    let clsNames = Object.keys(CLASSES);
+    let clsName = clsNames[Math.floor(Math.random() * clsNames.length)];
     
     addUnit(emptyIdx, gradeIdx, clsName);
     updateUI();
@@ -75,7 +105,6 @@ function addUnit(idx, gradeIdx, clsName) {
     
     let unit = {
         idx: idx, gradeIdx: gradeIdx, grade: grade, cls: cls,
-        // 75(오프셋) + 셀위치 * 70(셀크기) + 35(셀중앙)
         x: 75 + (idx % 5) * 70 + 35,
         y: 75 + Math.floor(idx / 5) * 70 + 35,
         lastAttack: 0
@@ -92,6 +121,7 @@ let selectedUnitIdx = -1;
 let isMoving = false;
 
 function onCellClick(idx) {
+    if(state.status !== 'PREP' && state.status !== 'PLAY') return;
     if(isMoving) {
         let target = grid[idx];
         grid[idx] = grid[selectedUnitIdx];
@@ -152,7 +182,7 @@ function renderGrid() {
     for(let i=0; i<25; i++) {
         let u = grid[i];
         if(u) {
-            cells[i].innerHTML = `${u.cls.type[0]}${u.grade.name}`;
+            cells[i].innerHTML = `<span style="color:${u.cls.color}">${u.cls.type[0]}</span><br>${u.grade.name}`;
         } else { cells[i].innerHTML = ''; }
     }
 }
@@ -169,7 +199,10 @@ function updateWave(dt) {
     waveTimer += dt; spawnTimer += dt;
     let limit = state.isBoss ? 300 : 120;
     
+    // 라운드 제한 시간이 끝나면 대기시간 없이 바로 다음 라운드로
     if(waveTimer >= limit) { nextWave(); return; }
+    
+    // 일반 라운드는 주기적으로 스폰
     if(!state.isBoss && spawnTimer >= (120/40)) {
         spawnMonster(); spawnTimer = 0;
     }
@@ -181,6 +214,12 @@ function nextWave() {
     state.wave++; waveTimer = 0; spawnTimer = 0;
     state.isBoss = !!BOSS_WAVES[state.wave];
     
+    // 최고 기록 갱신
+    if (state.wave > bestWave) {
+        bestWave = state.wave;
+        localStorage.setItem('mapleDefenseBestWave', bestWave);
+    }
+    
     if(state.isBoss) {
         showMessage(`[보스 라운드] ${state.wave}라운드 보스 출현!`);
         spawnMonster();
@@ -189,6 +228,7 @@ function nextWave() {
 }
 
 function upgrade(type) {
+    if(state.status !== 'PREP' && state.status !== 'PLAY') return;
     let u = state.upgrades[type];
     if(state.mp >= u.cost) {
         state.mp -= u.cost;
@@ -198,7 +238,7 @@ function upgrade(type) {
         document.getElementById(`upg-${idChar}-val`).innerText = u.val;
         document.getElementById(`upg-${idChar}-cost`).innerText = u.cost;
         updateUI();
-    } else { showMessage("MP가 부족합니다."); }
+    } else { showMessage("메포가 부족합니다."); }
 }
 
 let currentTicketTier = 0;
@@ -224,14 +264,34 @@ function useTicket(choice) {
 }
 
 function loop() {
-    if(state.gameOver) return;
+    if(state.status === 'GAMEOVER' || state.status === 'TITLE') return;
+    
     let now = performance.now();
+    // 탭 전환 등 잠수 시 시간이 너무 크게 누적되어 즉시 게임오버 되는 버그 방지 (최대 0.1초씩만 처리)
     let dt = ((now - lastTime) / 1000) * state.speed;
+    if (dt > 0.1) dt = 0.1;
     lastTime = now;
     
+    // 준비 시간 로직
+    if (state.status === 'PREP') {
+        state.time -= dt;
+        document.getElementById('ui-timer').innerText = Math.ceil(state.time);
+        
+        if (state.time <= 0) {
+            state.status = 'PLAY';
+            state.wave = 1;
+            waveTimer = 0; spawnTimer = 0;
+            showMessage("1웨이브 시작!");
+            updateUI();
+        }
+        draw();
+        requestAnimationFrame(loop);
+        return;
+    }
+    
+    // 본 게임 플레이 로직
     updateWave(dt);
     
-    // 몹 이동
     for(let i=monsters.length-1; i>=0; i--) {
         let m = monsters[i];
         let t = PATH[m.targetNode];
@@ -249,7 +309,6 @@ function loop() {
     
     if(monsters.length >= 200) { gameOver("몬스터 200마리 초과! 게임 오버"); return; }
     
-    // 공격
     towers.forEach(t => {
         t.lastAttack -= dt * 1000;
         if(t.lastAttack <= 0) {
@@ -271,7 +330,6 @@ function loop() {
         }
     });
     
-    // 투사체
     for(let i=projectiles.length-1; i>=0; i--) {
         let p = projectiles[i];
         let dx = p.tx - p.x, dy = p.ty - p.y;
@@ -291,7 +349,6 @@ function loop() {
         }
     }
     
-    // 사망
     for(let i=monsters.length-1; i>=0; i--) {
         if(monsters[i].hp <= 0) {
             state.kills++; state.mp++; state.mpTotal++;
@@ -314,23 +371,29 @@ function loop() {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // 경로 라인
     ctx.strokeStyle = "rgba(0,0,0,0.15)";
     ctx.lineWidth = 35;
     ctx.beginPath(); ctx.rect(25, 25, 450, 450); ctx.stroke();
     
-    // 몬스터
+    // 몬스터 그리기 (이미지 렌더링)
     monsters.forEach(m => {
-        ctx.fillStyle = m.isBoss ? "#d32f2f" : "#fff";
-        let size = m.isBoss ? 12 : 6;
-        ctx.beginPath(); ctx.arc(m.x, m.y, size, 0, Math.PI*2); ctx.fill();
+        let currentImg = m.isBoss ? imgBoss : imgNormal;
+        let size = m.isBoss ? 20 : 14; 
+        
+        if (currentImg.complete && currentImg.naturalWidth !== 0) {
+            // 정상적으로 이미지를 로드한 경우
+            ctx.drawImage(currentImg, m.x - size, m.y - size, size * 2, size * 2);
+        } else {
+            // 이미지가 없을 때를 대비한 둥근 모양 (방어 코드)
+            ctx.fillStyle = m.isBoss ? "#d32f2f" : "#fff";
+            ctx.beginPath(); ctx.arc(m.x, m.y, size/2, 0, Math.PI*2); ctx.fill();
+        }
         
         // 체력바
         ctx.fillStyle = "#000"; ctx.fillRect(m.x-10, m.y-size-8, 20, 3);
         ctx.fillStyle = "#4caf50"; ctx.fillRect(m.x-10, m.y-size-8, 20 * (m.hp/m.maxHp), 3);
     });
     
-    // 투사체
     projectiles.forEach(p => {
         ctx.fillStyle = p.color;
         ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill();
@@ -358,9 +421,8 @@ function showMessage(msg) {
 }
 
 function gameOver(msg) {
-    state.gameOver = true;
+    state.status = 'GAMEOVER';
     showMessage(msg);
 }
 
 updateUI();
-requestAnimationFrame(loop);
