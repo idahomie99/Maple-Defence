@@ -1,3 +1,4 @@
+// --- 최고 기록 및 도감 데이터 불러오기 ---
 let bestWave = localStorage.getItem('mapleDefenseBestWave') || 0;
 document.getElementById('best-record').innerText = `최고 기록: ${bestWave} 웨이브`;
 
@@ -16,21 +17,29 @@ const GRADES = [
     { name: "데스티니", prob: 0.019, sell: 0, mult: 256, rangeMul: 6 }
 ];
 
+// 전사 기본 공격력 상향 (20 -> 26) 및 아이콘 변경 (쌍검 -> 한손검)
 const CLASSES = {
-    '전사': { type: '전사', icon: '⚔️', color: '#c62828', baseDmg: 20, range: 100, cd: 1000, splash: 40 },
+    '전사': { type: '전사', icon: '🗡️', color: '#c62828', baseDmg: 26, range: 100, cd: 1000, splash: 40 },
     '법사': { type: '법사', icon: '🪄', color: '#1565c0', baseDmg: 10, range: 160, cd: 1000, splash: 60 },
     '도적': { type: '도적', icon: '✦', color: '#6a1b9a', baseDmg: 18, range: 200, cd: 800, splash: 0 }
 };
 
+// 150층까지의 보스 명단
 const BOSS_WAVES = {
     24: { hp: 10000, meso: 50, ticket: 3, name: "킹 슬라임" },
     37: { hp: 30000, meso: 50, ticket: 4, name: "알리샤르" },
     58: { hp: 100000, meso: 50, ticket: 4, name: "파풀라투스" },
     79: { hp: 300000, meso: 70, ticket: 5, name: "피아누스" },
     90: { hp: 1000000, meso: 100, ticket: 5, name: "자쿰" },
-    100: { hp: 4000000, meso: 100, ticket: 5, name: "혼테일" }
+    100: { hp: 4000000, meso: 100, ticket: 5, name: "혼테일" },
+    110: { hp: 8000000, meso: 150, ticket: 5, name: "시그너스" },
+    120: { hp: 16000000, meso: 150, ticket: 5, name: "반반" },
+    130: { hp: 32000000, meso: 150, ticket: 5, name: "피에르" },
+    140: { hp: 64000000, meso: 150, ticket: 5, name: "블러드퀸" },
+    150: { hp: 128000000, meso: 150, ticket: 5, name: "벨룸" }
 };
 
+// 100층 이후 5층 단위 보스 (정해진 네임드 외에는 심연의 보스)
 function getBossInfo(w) {
     if (BOSS_WAVES[w]) return BOSS_WAVES[w];
     if (w > 100 && w % 5 === 0) {
@@ -135,7 +144,6 @@ function getTotalCardBonus() {
     return bonus;
 }
 
-// 모달 오픈 시 레이아웃 속성을 flex로 변경 (안보이던 창을 띄움)
 function openBookModal() {
     document.getElementById('overlay').style.display = 'block';
     document.getElementById('book-modal').style.display = 'flex';
@@ -147,6 +155,7 @@ function renderBook() {
     list.innerHTML = '';
     
     let allBosses = Object.keys(BOSS_WAVES).map(k => BOSS_WAVES[k].name);
+    // 심연의 보스는 종류별로 저장
     for(let k in cardData) {
         if(!allBosses.includes(k)) allBosses.push(k);
     }
@@ -356,7 +365,7 @@ function spawnMonster() {
     let hpBase = bInfo ? bInfo.hp : Math.floor(state.wave * 45 + Math.pow(state.wave, 1.4) * 8);
     monsters.push({
         hp: hpBase, maxHp: hpBase, x: PATH[0].x, y: PATH[0].y,
-        targetNode: 1, speed: bInfo ? 25 : 50, isBoss: !!bInfo, bindTimer: 0 
+        targetNode: 1, speed: bInfo ? 25 : 50, isBoss: !!bInfo, bindTimer: 0, stunTimer: 0 
     });
 }
 
@@ -487,6 +496,7 @@ function loop() {
     for(let i=monsters.length-1; i>=0; i--) {
         let m = monsters[i];
         if (m.bindTimer > 0) { m.bindTimer -= dt; continue; }
+        if (m.stunTimer > 0) { m.stunTimer -= dt; continue; } // 스턴 상태 이동 멈춤
 
         let t = PATH[m.targetNode];
         let dx = t.x - m.x, dy = t.y - m.y;
@@ -550,10 +560,23 @@ function loop() {
         if(p.type === '도적') p.angle += 15 * dt; 
         
         if(dist <= speed) {
-            if(monsters.includes(p.target)) p.target.hp -= p.dmg;
+            if(monsters.includes(p.target)) {
+                let hitDmg = p.dmg;
+                // 전사 보스 추가 대미지 50%
+                if (p.type === '전사' && p.target.isBoss) hitDmg *= 1.5;
+                p.target.hp -= hitDmg;
+                // 전사 20% 확률로 1초 스턴 부여
+                if (p.type === '전사' && Math.random() < 0.2) p.target.stunTimer = 1;
+            }
+            
             if(p.splash > 0) {
                 monsters.forEach(m => {
-                    if(m !== p.target && Math.hypot(m.x - p.tx, m.y - p.ty) <= p.splash) m.hp -= p.dmg;
+                    if(m !== p.target && Math.hypot(m.x - p.tx, m.y - p.ty) <= p.splash) {
+                        let splashDmg = p.dmg;
+                        if (p.type === '전사' && m.isBoss) splashDmg *= 1.5;
+                        m.hp -= splashDmg;
+                        if (p.type === '전사' && Math.random() < 0.2) m.stunTimer = 1;
+                    }
                 });
             }
             projectiles.splice(i, 1);
@@ -572,8 +595,8 @@ function loop() {
                 state.meso += bInfo.meso; state.tickets.push(bInfo.ticket);
                 showMessage(`${state.wave}라운드 보스 처치!`);
                 
-                let dropRate = Math.max(1, 20 - Math.floor(state.wave / 10) * 2);
-                if (Math.random() * 100 <= dropRate) {
+                // 모든 보스 도감 카드 확률 10% 고정
+                if (Math.random() * 100 <= 10) {
                     cardData[bInfo.name] = cardData[bInfo.name] || { owned: 0, grade: 0 };
                     cardData[bInfo.name].owned++;
                     localStorage.setItem('mapleDefenseCards', JSON.stringify(cardData));
@@ -618,11 +641,18 @@ function draw() {
             ctx.fillStyle = "#ffe0b2"; ctx.fillRect(m.x - size/2, m.y - 2, size, size - 2);
         }
         
+        // 얼음 이펙트
         if (m.bindTimer > 0) {
             ctx.fillStyle = "rgba(0, 200, 255, 0.5)"; 
             ctx.fillRect(m.x - size - 4, m.y - size - 4, (size + 4) * 2, (size + 4) * 2);
             ctx.fillStyle = "#fff"; ctx.font = "12px NanumSquare";
             ctx.fillText("❄️", m.x - 7, m.y + 4); 
+        }
+
+        // 스턴 이펙트 (어지러움 아이콘)
+        if (m.stunTimer > 0) {
+            ctx.fillStyle = "#fff"; ctx.font = "14px NanumSquare";
+            ctx.fillText("💫", m.x - 7, m.y - size - 12); 
         }
 
         ctx.fillStyle = "#000"; ctx.fillRect(m.x-10, m.y-size-8, 20, 3);
