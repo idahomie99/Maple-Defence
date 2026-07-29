@@ -8,7 +8,7 @@ const GRADES = [
     { name: "3차", prob: 5.1, sell: 16, mult: 8, rangeMul: 1.2, speedMul: 0.8 },
     { name: "4차", prob: 0.8, sell: 30, mult: 16, rangeMul: 1.2 },
     { name: "5차", prob: 0.5, sell: 0, mult: 32, rangeMul: 1.2, splash: true },
-    { name: "6차", prob: 0.2, sell: 0, mult: 64, rangeMul: 4 }, // 바인드는 로직에서 등급 인덱스(6)로 체크합니다
+    { name: "6차", prob: 0.2, sell: 0, mult: 64, rangeMul: 4 },
     { name: "제네시스", prob: 0.08, sell: 0, mult: 128, rangeMul: 4 },
     { name: "데스티니", prob: 0.019, sell: 0, mult: 256, rangeMul: 6 }
 ];
@@ -119,7 +119,7 @@ function addUnit(idx, gradeIdx, clsName) {
     let unit = {
         idx: idx, gradeIdx: gradeIdx, grade: grade, cls: cls,
         x: 75 + (idx % 5) * 70 + 35, y: 75 + Math.floor(idx / 5) * 70 + 35, lastAttack: 0,
-        bindCooldown: 0 // 바인드 쿨타임 추가 (0이면 즉시 사용 가능)
+        bindCooldown: 0 
     };
     grid[idx] = unit;
     towers.push(unit);
@@ -215,7 +215,6 @@ function renderGrid() {
         else cells[i].classList.remove('selected');
 
         if(u) {
-            // 6차 유닛 전용 바인드 게이지 바 (UI에만 추가)
             let bindHtml = '';
             if (u.gradeIdx === 6) {
                 bindHtml = `
@@ -238,7 +237,7 @@ function spawnMonster() {
     monsters.push({
         hp: hpBase, maxHp: hpBase, x: PATH[0].x, y: PATH[0].y,
         targetNode: 1, speed: state.isBoss ? 25 : 50, isBoss: state.isBoss,
-        bindTimer: 0 // 바인드 걸린 시간 초기화
+        bindTimer: 0 
     });
 }
 
@@ -287,14 +286,21 @@ function showUpgradeToast(idChar, amt) {
     setTimeout(() => floatEl.remove(), 1000);
 }
 
+// ------------------------------------------------------------------
+// 핵심 변경 사항: 메포 요구량 인플레이션 방지를 위한 강화 비용 복리 상승
+// ------------------------------------------------------------------
 function upgrade(type) {
     if(state.status !== 'PREP' && state.status !== 'PLAY') return;
     let u = state.upgrades[type];
+    
     if(state.mp >= u.cost) {
         state.mp -= u.cost;
         let amt = Math.floor(Math.random() * 6) + 1; 
         u.val += amt;
-        u.cost += 1;
+        
+        // 기존 1씩 증가하던 방식을 버리고, (현재 비용의 20% + 3) 만큼 크게 상승시킴
+        u.cost += Math.floor(u.cost * 0.2) + 3;
+        
         let idChar = type === '전사' ? 'w' : (type === '법사' ? 'm' : 't');
         
         showUpgradeToast(idChar, amt);
@@ -302,7 +308,9 @@ function upgrade(type) {
         document.getElementById(`upg-${idChar}-val`).innerText = u.val;
         document.getElementById(`upg-${idChar}-cost`).innerText = u.cost;
         updateUI();
-    } else { showMessage("메포가 부족합니다."); }
+    } else { 
+        showMessage("메포가 부족합니다."); 
+    }
 }
 
 let currentTicketTier = 0;
@@ -361,10 +369,9 @@ function loop() {
     for(let i=monsters.length-1; i>=0; i--) {
         let m = monsters[i];
         
-        // 몬스터 바인드 체크 (바인드 상태면 이동 안 함)
         if (m.bindTimer > 0) {
             m.bindTimer -= dt;
-            continue; // 이동 생략
+            continue; 
         }
 
         let t = PATH[m.targetNode];
@@ -383,28 +390,24 @@ function loop() {
     if(monsters.length >= 200) { gameOver("몬스터 200마리 초과! 게임 오버"); return; }
     
     towers.forEach(t => {
-        // 6차 전용 바인드 스킬 체크
         if (t.gradeIdx === 6) {
             t.bindCooldown -= dt * 1000;
             let bar = document.getElementById(`bind-bar-${t.idx}`);
             if (bar) {
-                // 남은 시간을 백분율로 계산해 게이지 바 시각화 (0부터 차오름)
                 let pct = Math.max(0, Math.min(100, ((60000 - t.bindCooldown) / 60000) * 100));
                 bar.style.width = pct + '%';
             }
             
-            // 쿨타임이 찼다면 스킬 발동
             if (t.bindCooldown <= 0 && monsters.length > 0) {
                 let target = null;
-                // 가급적 얼어있지 않은 몹을 찾음
                 for (let m of monsters) {
                     if (m.bindTimer <= 0) { target = m; break; }
                 }
-                if (!target) target = monsters[0]; // 다 얼어있으면 그냥 아무나 묶음
+                if (!target) target = monsters[0]; 
                 
                 if (target) {
-                    target.bindTimer = 10; // 10초간 정지
-                    t.bindCooldown = 60000; // 60초 쿨타임 리셋
+                    target.bindTimer = 10; 
+                    t.bindCooldown = 60000; 
                 }
             }
         }
@@ -497,13 +500,12 @@ function draw() {
             ctx.fillStyle = "#ffe0b2"; ctx.fillRect(m.x - size/2, m.y - 2, size, size - 2);
         }
         
-        // 몬스터 바인드 시 얼어붙은 이펙트
         if (m.bindTimer > 0) {
-            ctx.fillStyle = "rgba(0, 200, 255, 0.5)"; // 반투명한 시안색 얼음
+            ctx.fillStyle = "rgba(0, 200, 255, 0.5)"; 
             ctx.fillRect(m.x - size - 4, m.y - size - 4, (size + 4) * 2, (size + 4) * 2);
             ctx.fillStyle = "#fff";
-            ctx.font = "12px sans-serif";
-            ctx.fillText("❄️", m.x - 7, m.y + 4); // 얼음 결정 모양 마크
+            ctx.font = "12px NanumSquare";
+            ctx.fillText("❄️", m.x - 7, m.y + 4); 
         }
 
         ctx.fillStyle = "#000"; ctx.fillRect(m.x-10, m.y-size-8, 20, 3);
