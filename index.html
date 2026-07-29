@@ -7,14 +7,12 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- 시작 타이틀 화면 -->
     <div id="start-screen">
         <h1 class="game-title">🍁 메이플 디펜스 🍁</h1>
         <div id="best-record">최고 기록: 0 웨이브</div>
         <button class="pulse-btn" onclick="startGame()">Touch to Start</button>
     </div>
 
-    <!-- 유닛 소환 시 중앙 알림창 -->
     <div id="summon-toast"></div>
 
     <div id="game-container">
@@ -34,15 +32,18 @@
             </div>
         </div>
         
-        <!-- 게임 보드 -->
         <div id="board-area">
             <canvas id="gameCanvas" width="500" height="500"></canvas>
             <div id="grid-container"></div>
         </div>
         
-        <!-- 하단 컨트롤 -->
         <div id="controls" class="maple-panel">
-            <button id="btn-summon" class="maple-btn primary huge" onclick="summonUnit()">유닛 소환 (10 메소)</button>
+            <!-- 메인 액션 버튼 3개 -->
+            <div style="display: flex; gap: 5px; margin-bottom: 5px;">
+                <button id="btn-summon" class="maple-btn primary huge" style="flex: 1.5;" onclick="summonUnit()">소환 (10)</button>
+                <button id="btn-sell-single" class="maple-btn huge danger-btn" style="flex: 1;" onclick="sellSelectedUnit()" disabled>판매</button>
+                <button class="maple-btn secondary huge" style="flex: 1;" onclick="openBulkSellModal()">일괄판매</button>
+            </div>
             
             <div class="upgrade-container">
                 <div class="upgrade-box" onclick="upgrade('전사')">
@@ -59,24 +60,36 @@
                 </div>
             </div>
             
-            <div class="ticket-row">
+            <div class="ticket-row" style="margin-top: 5px;">
                 <span>선택권: <span id="ui-tickets" class="highlight">0</span>장</span>
                 <button class="maple-btn secondary" onclick="openTicketModal()">사용하기</button>
             </div>
         </div>
     </div>
     
-    <!-- 유닛 관리 팝업 -->
     <div id="overlay" onclick="closeAllModals()"></div>
     
-    <div id="popup" class="maple-modal">
-        <h3 id="popup-title">유닛 정보</h3>
-        <p id="popup-desc"></p>
-        <div class="modal-btns">
-            <button id="btn-sell" class="maple-btn primary" onclick="sellUnit()">판매</button>
-            <button class="maple-btn secondary" onclick="startMoveUnit()">이동</button>
-            <button class="maple-btn" onclick="closeAllModals()">취소</button>
+    <!-- 일괄 판매 모달 -->
+    <div id="bulk-sell-modal" class="maple-modal">
+        <h3>일괄 판매 선택</h3>
+        <p style="font-size:12px; margin-bottom:10px;">(5차 이상은 판매되지 않습니다)</p>
+        
+        <div style="text-align: left; font-size: 14px; font-weight: bold; color: #5a3c22; margin-bottom: 5px;">▶ 직업별 전체 판매</div>
+        <div style="display: flex; gap: 5px; margin-bottom: 15px;">
+            <button class="maple-btn" style="flex:1; color:#c62828;" onclick="executeBulkSell('class', '전사')">전사</button>
+            <button class="maple-btn" style="flex:1; color:#1565c0;" onclick="executeBulkSell('class', '법사')">법사</button>
+            <button class="maple-btn" style="flex:1; color:#6a1b9a;" onclick="executeBulkSell('class', '도적')">도적</button>
         </div>
+
+        <div style="text-align: left; font-size: 14px; font-weight: bold; color: #5a3c22; margin-bottom: 5px;">▶ 등급별 전체 판매</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+            <button class="maple-btn" onclick="executeBulkSell('grade', 0)">초보자 전체</button>
+            <button class="maple-btn" onclick="executeBulkSell('grade', 1)">1차 이하</button>
+            <button class="maple-btn" onclick="executeBulkSell('grade', 2)">2차 이하</button>
+            <button class="maple-btn" onclick="executeBulkSell('grade', 3)">3차 이하</button>
+        </div>
+        
+        <button class="maple-btn" onclick="closeAllModals()" style="margin-top:15px; width:100%;">취소</button>
     </div>
 
     <!-- 선택권 모달 -->

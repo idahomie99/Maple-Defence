@@ -13,17 +13,17 @@ const GRADES = [
     { name: "데스티니", prob: 0.019, sell: 0, mult: 256, rangeMul: 6 }
 ];
 
-// 직업별 아이콘(icon) 추가
 const CLASSES = {
     '전사': { type: '전사', icon: '⚔️', color: '#c62828', baseDmg: 20, range: 100, cd: 1000, splash: 40 },
     '법사': { type: '법사', icon: '🪄', color: '#1565c0', baseDmg: 10, range: 160, cd: 1000, splash: 60 },
     '도적': { type: '도적', icon: '✦', color: '#6a1b9a', baseDmg: 18, range: 200, cd: 800, splash: 0 }
 };
 
+// 보스 체력 기존 대비 2배 상향 조정
 const BOSS_WAVES = {
-    24: { hp: 5000, meso: 50, ticket: 3 }, 37: { hp: 15000, meso: 50, ticket: 4 },
-    58: { hp: 50000, meso: 50, ticket: 4 }, 79: { hp: 150000, meso: 70, ticket: 5 },
-    90: { hp: 500000, meso: 100, ticket: 5 }, 100: { hp: 2000000, meso: 100, ticket: 5 }
+    24: { hp: 10000, meso: 50, ticket: 3 }, 37: { hp: 30000, meso: 50, ticket: 4 },
+    58: { hp: 100000, meso: 50, ticket: 4 }, 79: { hp: 300000, meso: 70, ticket: 5 },
+    90: { hp: 1000000, meso: 100, ticket: 5 }, 100: { hp: 4000000, meso: 100, ticket: 5 }
 };
 
 let state = {
@@ -36,8 +36,7 @@ let state = {
 let grid = new Array(25).fill(null);
 let monsters = [], projectiles = [], towers = [];
 let lastTime = 0, waveTimer = 0, spawnTimer = 0;
-let selectedUnitIdx = -1; // 선택된 유닛 위치 저장
-let isMoving = false; // 이동 모드 상태
+let selectedUnitIdx = -1; // 현재 선택된 유닛 위치
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -110,97 +109,144 @@ function addUnit(idx, gradeIdx, clsName) {
     grid[idx] = unit;
     towers.push(unit);
     
-    // 유닛 소환 시 중앙 Fade 애니메이션 알림창
     showSummonToast(grade.name, clsName, cls.color);
-    
     renderGrid();
 }
 
+// ----------------------------------------------------
+// 변경점: 원클릭 선택 및 즉시 이동 시스템
+// ----------------------------------------------------
 function onCellClick(idx) {
     if(state.status !== 'PREP' && state.status !== 'PLAY') return;
     
-    // 위치 이동 처리 로직
-    if(isMoving) {
-        let target = grid[idx];
-        
-        // 현재 자리로 옮김
-        grid[idx] = grid[selectedUnitIdx];
-        grid[idx].idx = idx;
-        grid[idx].x = 75 + (idx % 5) * 70 + 35;
-        grid[idx].y = 75 + Math.floor(idx / 5) * 70 + 35;
+    // 1. 이미 선택된 유닛이 있는 상태에서 어딘가를 클릭했을 때 (이동/교환 혹은 선택해제)
+    if (selectedUnitIdx !== -1) {
+        if (selectedUnitIdx === idx) {
+            // 같은 유닛을 또 누르면 선택 해제
+            selectedUnitIdx = -1;
+        } else {
+            // 다른 위치를 누르면 자리 교체 (빈칸이든 다른 유닛이든)
+            let target = grid[idx];
+            grid[idx] = grid[selectedUnitIdx];
+            grid[idx].idx = idx;
+            grid[idx].x = 75 + (idx % 5) * 70 + 35;
+            grid[idx].y = 75 + Math.floor(idx / 5) * 70 + 35;
 
-        // 타겟(원래 있던 유닛)을 이전 자리로 밀어냄 (Swap)
-        grid[selectedUnitIdx] = target;
-        if(target) {
-            target.idx = selectedUnitIdx;
-            target.x = 75 + (selectedUnitIdx % 5) * 70 + 35;
-            target.y = 75 + Math.floor(selectedUnitIdx / 5) * 70 + 35;
+            grid[selectedUnitIdx] = target;
+            if(target) {
+                target.idx = selectedUnitIdx;
+                target.x = 75 + (selectedUnitIdx % 5) * 70 + 35;
+                target.y = 75 + Math.floor(selectedUnitIdx / 5) * 70 + 35;
+            }
+            selectedUnitIdx = -1; // 이동 완료 후 선택 해제
         }
-        
-        isMoving = false;
-        selectedUnitIdx = -1; // 이동이 끝났으므로 선택 해제
-        renderGrid();
-        showMessage("이동 완료!");
-        return;
+    } 
+    // 2. 선택된 유닛이 없는 상태에서 유닛을 클릭했을 때 (선택 및 사거리 표시)
+    else {
+        if (grid[idx]) {
+            selectedUnitIdx = idx;
+        }
     }
     
-    if(grid[idx]) {
-        selectedUnitIdx = idx; // 사거리 원을 그리기 위해 선택된 유닛 기록
-        let u = grid[idx];
-        document.getElementById('popup-title').innerText = `${u.grade.name} ${u.cls.type}`;
-        document.getElementById('popup-desc').innerText = `판매 시 ${u.grade.sell} 메소 획득`;
-        document.getElementById('btn-sell').disabled = (u.grade.sell === 0);
-        document.getElementById('overlay').style.display = 'block';
-        document.getElementById('popup').style.display = 'block';
+    renderGrid();
+    updateUI();
+}
+
+// 선택된 유닛 단일 판매
+function sellSelectedUnit() {
+    if(selectedUnitIdx === -1) return;
+    let u = grid[selectedUnitIdx];
+    if(u) {
+        if (u.grade.sell > 0) {
+            state.meso += u.grade.sell;
+            towers = towers.filter(t => t !== u);
+            grid[selectedUnitIdx] = null;
+            selectedUnitIdx = -1;
+            renderGrid();
+            updateUI();
+        } else {
+            showMessage("판매할 수 없는 유닛입니다.");
+        }
     }
+}
+
+// 일괄 판매 모달 열기
+function openBulkSellModal() {
+    document.getElementById('overlay').style.display = 'block';
+    document.getElementById('bulk-sell-modal').style.display = 'block';
+}
+
+// 일괄 판매 실행
+function executeBulkSell(type, value) {
+    let soldCount = 0;
+    let earnedMeso = 0;
+    
+    for(let i = 0; i < 25; i++) {
+        let u = grid[i];
+        if(!u) continue;
+        if(u.grade.sell === 0) continue; // 5차 이상 판매 불가 무시
+        
+        let match = false;
+        if(type === 'class' && u.cls.type === value) match = true;
+        if(type === 'grade' && u.gradeIdx <= value) match = true;
+        
+        if(match) {
+            earnedMeso += u.grade.sell;
+            towers = towers.filter(t => t !== u);
+            grid[i] = null;
+            soldCount++;
+        }
+    }
+    
+    if(soldCount > 0) {
+        state.meso += earnedMeso;
+        showMessage(`${soldCount}마리 판매 (+${earnedMeso} 메소)`);
+        selectedUnitIdx = -1; // 팔린게 내가 선택한걸 수도 있으니 선택 초기화
+        renderGrid();
+        updateUI();
+    } else {
+        showMessage("조건에 맞는 유닛이 없습니다.");
+    }
+    closeAllModals();
 }
 
 function closeAllModals() {
     document.getElementById('overlay').style.display = 'none';
-    document.getElementById('popup').style.display = 'none';
+    document.getElementById('bulk-sell-modal').style.display = 'none';
     document.getElementById('ticket-modal').style.display = 'none';
-    
-    // 이동 버튼을 눌러서 창을 닫은게 아니라면 선택 해제 (사거리 원 끄기)
-    if (!isMoving) {
-        selectedUnitIdx = -1;
-    }
-}
-
-function sellUnit() {
-    if(selectedUnitIdx === -1) return;
-    let u = grid[selectedUnitIdx];
-    if(u && u.grade.sell > 0) {
-        state.meso += u.grade.sell;
-        towers = towers.filter(t => t !== u);
-        grid[selectedUnitIdx] = null;
-        renderGrid(); updateUI();
-    }
-    isMoving = false;
-    closeAllModals();
-}
-
-function startMoveUnit() {
-    isMoving = true;
-    closeAllModals();
-    showMessage("바꿀 위치를 터치하세요.");
 }
 
 function renderGrid() {
     let cells = gridContainer.children;
     for(let i=0; i<25; i++) {
         let u = grid[i];
+        
+        // CSS 클래스로 테두리 빛남 효과 부여
+        if (i === selectedUnitIdx) {
+            cells[i].classList.add('selected');
+        } else {
+            cells[i].classList.remove('selected');
+        }
+
         if(u) {
-            // 아이콘(검, 지팡이, 표창)과 등급 텍스트로 렌더링
             cells[i].innerHTML = `
                 <div style="font-size:20px; text-shadow:1px 1px 2px rgba(0,0,0,0.5);">${u.cls.icon}</div>
                 <div style="color:${u.cls.color}; font-size:10px; margin-top:2px;">${u.grade.name}</div>
             `;
-        } else { cells[i].innerHTML = ''; }
+        } else { 
+            cells[i].innerHTML = ''; 
+        }
     }
 }
 
+// ----------------------------------------------------
+// 변경점: 일반 몬스터 체력 밸런스 대폭 상향
+// ----------------------------------------------------
 function spawnMonster() {
-    let hpBase = state.isBoss ? BOSS_WAVES[state.wave].hp : state.wave * 15;
+    // 기존: state.wave * 15
+    // 상향: 웨이브 진행에 따라 기하급수적으로 오르도록 제곱 연산 추가
+    let hpBase = state.isBoss ? BOSS_WAVES[state.wave].hp : Math.floor(state.wave * 45 + Math.pow(state.wave, 1.4) * 8);
+    
     monsters.push({
         hp: hpBase, maxHp: hpBase, x: PATH[0].x, y: PATH[0].y,
         targetNode: 1, speed: state.isBoss ? 25 : 50, isBoss: state.isBoss
@@ -272,7 +318,6 @@ function useTicket(choice) {
     closeAllModals();
 }
 
-// 1배속 -> 3배속 -> 5배속 -> 1배속 반복
 function toggleSpeed() {
     if (state.speed === 1) state.speed = 3;
     else if (state.speed === 3) state.speed = 5;
@@ -336,11 +381,9 @@ function loop() {
             if(target) {
                 let dmg = (t.cls.baseDmg + state.upgrades[t.cls.type].val) * t.grade.mult;
                 projectiles.push({
-                    type: t.cls.type, // 직업 정보 저장 (공격 이펙트용)
-                    x: t.x, y: t.y, tx: target.x, ty: target.y,
+                    type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y,
                     dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash,
-                    color: t.cls.color, target: target,
-                    angle: 0 // 회전이 필요한 도적 표창용
+                    color: t.cls.color, target: target, angle: 0
                 });
                 t.lastAttack = t.cls.cd * (t.grade.speedMul || 1);
             }
@@ -353,7 +396,7 @@ function loop() {
         let dist = Math.hypot(dx, dy);
         let speed = 400 * dt;
         
-        if(p.type === '도적') p.angle += 15 * dt; // 도적 표창 회전 업데이트
+        if(p.type === '도적') p.angle += 15 * dt; 
         
         if(dist <= speed) {
             if(monsters.includes(p.target)) p.target.hp -= p.dmg;
@@ -390,51 +433,35 @@ function loop() {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // 경로 선
     ctx.strokeStyle = "rgba(0,0,0,0.15)";
     ctx.lineWidth = 35;
     ctx.beginPath(); ctx.rect(25, 25, 450, 450); ctx.stroke();
     
-    // 사거리 원 (클릭된 유닛이 있을 때만 렌더링)
+    // 선택된 유닛이 있을 경우 사거리 표시
     if (selectedUnitIdx !== -1 && grid[selectedUnitIdx]) {
         let u = grid[selectedUnitIdx];
         let range = u.cls.range * u.grade.rangeMul;
         ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-        ctx.beginPath();
-        ctx.arc(u.x, u.y, range, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(u.x, u.y, range, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
+        ctx.lineWidth = 1; ctx.stroke();
     }
     
-    // 몬스터 그리기 (직접 코드로 그려서 엑스박스 방지)
     monsters.forEach(m => {
         let size = m.isBoss ? 16 : 10; 
-        
         if (!m.isBoss) {
-            // 일반몹: 슬라임 (초록색 물방울)
             ctx.fillStyle = "#81c784";
-            ctx.beginPath();
-            ctx.arc(m.x, m.y + 2, size, Math.PI, 0);
-            ctx.fillRect(m.x - size, m.y + 2, size*2, size/2);
-            ctx.fill();
+            ctx.beginPath(); ctx.arc(m.x, m.y + 2, size, Math.PI, 0);
+            ctx.fillRect(m.x - size, m.y + 2, size*2, size/2); ctx.fill();
         } else {
-            // 보스몹: 주황버섯 (주황색 갓 + 베이지색 몸통)
-            ctx.fillStyle = "#ff8a65"; // 버섯 머리
-            ctx.beginPath();
-            ctx.arc(m.x, m.y - 2, size, Math.PI, 0);
-            ctx.fill();
-            ctx.fillStyle = "#ffe0b2"; // 몸통
-            ctx.fillRect(m.x - size/2, m.y - 2, size, size - 2);
+            ctx.fillStyle = "#ff8a65"; 
+            ctx.beginPath(); ctx.arc(m.x, m.y - 2, size, Math.PI, 0); ctx.fill();
+            ctx.fillStyle = "#ffe0b2"; ctx.fillRect(m.x - size/2, m.y - 2, size, size - 2);
         }
-        
-        // 체력바
         ctx.fillStyle = "#000"; ctx.fillRect(m.x-10, m.y-size-8, 20, 3);
         ctx.fillStyle = "#4caf50"; ctx.fillRect(m.x-10, m.y-size-8, 20 * (m.hp/m.maxHp), 3);
     });
     
-    // 공격 투사체 이펙트 그리기
     projectiles.forEach(p => {
         ctx.save();
         ctx.translate(p.x, p.y);
@@ -442,36 +469,18 @@ function draw() {
         let dir = Math.atan2(dy, dx);
         
         if (p.type === '전사') {
-            // 전사: 붉은색 검기 (초승달 모양 잔상)
-            ctx.rotate(dir);
-            ctx.fillStyle = "rgba(229, 57, 53, 0.8)";
-            ctx.beginPath();
-            ctx.arc(0, 0, 15, -Math.PI/2, Math.PI/2);
-            ctx.arc(6, 0, 15, Math.PI/2, -Math.PI/2, true);
-            ctx.fill();
+            ctx.rotate(dir); ctx.fillStyle = "rgba(229, 57, 53, 0.8)";
+            ctx.beginPath(); ctx.arc(0, 0, 15, -Math.PI/2, Math.PI/2);
+            ctx.arc(6, 0, 15, Math.PI/2, -Math.PI/2, true); ctx.fill();
         } else if (p.type === '법사') {
-            // 법사: 푸른색 번개 (지그재그 모양)
-            ctx.rotate(dir);
-            ctx.strokeStyle = "#00e5ff";
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(-12, 0);
-            ctx.lineTo(-6, -6);
-            ctx.lineTo(0, 6);
-            ctx.lineTo(6, -6);
-            ctx.lineTo(12, 0);
-            ctx.stroke();
+            ctx.rotate(dir); ctx.strokeStyle = "#00e5ff"; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(-12, 0); ctx.lineTo(-6, -6);
+            ctx.lineTo(0, 6); ctx.lineTo(6, -6); ctx.lineTo(12, 0); ctx.stroke();
         } else if (p.type === '도적') {
-            // 도적: 회전하는 표창 (4각 별모양)
-            ctx.rotate(p.angle);
-            ctx.fillStyle = "#4a148c";
-            ctx.beginPath();
-            ctx.moveTo(0, -10); ctx.lineTo(3, -3);
-            ctx.lineTo(10, 0); ctx.lineTo(3, 3);
-            ctx.lineTo(0, 10); ctx.lineTo(-3, 3);
-            ctx.lineTo(-10, 0); ctx.lineTo(-3, -3);
-            ctx.closePath();
-            ctx.fill();
+            ctx.rotate(p.angle); ctx.fillStyle = "#4a148c"; ctx.beginPath();
+            ctx.moveTo(0, -10); ctx.lineTo(3, -3); ctx.lineTo(10, 0); ctx.lineTo(3, 3);
+            ctx.lineTo(0, 10); ctx.lineTo(-3, 3); ctx.lineTo(-10, 0); ctx.lineTo(-3, -3);
+            ctx.closePath(); ctx.fill();
         }
         ctx.restore();
     });
@@ -484,6 +493,14 @@ function updateUI() {
     document.getElementById('ui-kills').innerText = state.kills.toLocaleString();
     document.getElementById('ui-tickets').innerText = state.tickets.length;
     document.getElementById('btn-summon').disabled = (state.meso < 10);
+    
+    // 유닛이 선택되어 있고 팔 수 있는 등급일 경우에만 판매 버튼 활성화
+    let sellBtn = document.getElementById('btn-sell-single');
+    if (selectedUnitIdx !== -1 && grid[selectedUnitIdx] && grid[selectedUnitIdx].grade.sell > 0) {
+        sellBtn.disabled = false;
+    } else {
+        sellBtn.disabled = true;
+    }
 }
 
 function showMessage(msg) {
