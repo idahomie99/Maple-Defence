@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <!-- 모바일 화면에 맞추고 터치 확대/축소 방지 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>메이플 디펜스</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <!-- 상단 정보 패널 -->
+        <div id="header" class="maple-panel">
+            <!-- 게임 타이틀 추가 -->
+            <div style="text-align: center; font-size: 18px; color: #8b5a2b; margin-bottom: 12px; font-weight: bold; border-bottom: 1px dashed #8b5a2b; padding-bottom: 8px;">
+                🍁 메이플 디펜스 🍁
+            </div>
+            
+            <div class="stat-row">
+                <div>웨이브: <span id="ui-wave" class="highlight">1</span></div>
+                <div>시간: <span id="ui-timer" class="highlight">120</span>초</div>
+                <div><button id="btn-speed" class="maple-btn small" onclick="toggleSpeed()">1배속</button></div>
+            </div>
+            <div class="stat-row">
+                <div>몹: <span id="ui-mobs" class="danger">0 / 200</span></div>
+                <div>킬수: <span id="ui-kills">0</span></div>
+            </div>
+            <div class="resource-row">
+                <div class="meso-box">메소 <span id="ui-meso">25</span></div>
+                <div class="mp-box">MP <span id="ui-mp">0</span></div>
+            </div>
+        </div>
+        
+        <!-- 게임 보드 (정사각형 반응형) -->
+        <div id="board-area">
+            <canvas id="gameCanvas" width="500" height="500"></canvas>
+            <div id="grid-container"></div>
+        </div>
+        
+        <!-- 하단 컨트롤 패널 -->
+        <div id="controls" class="maple-panel">
+            <button id="btn-summon" class="maple-btn primary huge" onclick="summonUnit()">유닛 소환 (10 메소)</button>
+            
+            <div class="upgrade-container">
+                <div class="upgrade-box" onclick="upgrade('전사')">
+                    <div class="job-title warrior">전사 (+<span id="upg-w-val">0</span>)</div>
+                    <div class="cost"><span id="upg-w-cost">10</span> MP</div>
+                </div>
+                <div class="upgrade-box" onclick="upgrade('법사')">
+                    <div class="job-title mage">법사 (+<span id="upg-m-val">0</span>)</div>
+                    <div class="cost"><span id="upg-m-cost">10</span> MP</div>
+                </div>
+                <div class="upgrade-box" onclick="upgrade('도적')">
+                    <div class="job-title thief">도적 (+<span id="upg-t-val">0</span>)</div>
+                    <div class="cost"><span id="upg-t-cost">10</span> MP</div>
+                </div>
+            </div>
+            
+            <div class="ticket-row">
+                <span>선택권: <span id="ui-tickets" class="highlight">0</span>장</span>
+                <button class="maple-btn secondary" onclick="openTicketModal()">사용하기</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 유닛 관리 팝업 (모바일용 중앙 모달) -->
+    <div id="overlay" onclick="closeAllModals()"></div>
+    
+    <div id="popup" class="maple-modal">
+        <h3 id="popup-title">유닛 정보</h3>
+        <p id="popup-desc"></p>
+        <div class="modal-btns">
+            <button id="btn-sell" class="maple-btn primary" onclick="sellUnit()">판매</button>
+            <button class="maple-btn secondary" onclick="startMoveUnit()">이동</button>
+            <button class="maple-btn" onclick="closeAllModals()">취소</button>
+        </div>
+    </div>
+
+    <!-- 선택권 모달 -->
+    <div id="ticket-modal" class="maple-modal">
+        <h3>선택권 사용 (<span id="ticket-tier" class="highlight"></span>차)</h3>
+        <div class="ticket-btns">
+            <button class="maple-btn warrior-btn" onclick="useTicket('전사')">전사</button>
+            <button class="maple-btn mage-btn" onclick="useTicket('법사')">법사</button>
+            <button class="maple-btn thief-btn" onclick="useTicket('도적')">도적</button>
+            <button class="maple-btn random-btn" onclick="useTicket('랜덤')">랜덤(20% 1업)</button>
+        </div>
+        <button class="maple-btn" onclick="closeAllModals()" style="margin-top:15px; width:100%;">닫기</button>
+    </div>
+
+    <!-- 전체 화면 메시지 -->
+    <div id="msg-overlay"></div>
+
+    <!-- 게임 로직 스크립트 연결 -->
+    <script src="script.js"></script>
+</body>
+</html>
