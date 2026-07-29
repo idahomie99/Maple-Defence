@@ -1,9 +1,8 @@
-// --- 최고 기록 및 도감 데이터 불러오기 ---
 let bestWave = localStorage.getItem('mapleDefenseBestWave') || 0;
 document.getElementById('best-record').innerText = `최고 기록: ${bestWave} 웨이브`;
 
 let cardData = JSON.parse(localStorage.getItem('mapleDefenseCards')) || {};
-const CARD_REQ = [1, 2, 4, 8, 12, 16, 20, 24, 28, 32]; // 0~9번 인덱스 (1~10등급 요구량)
+const CARD_REQ = [1, 2, 4, 8, 12, 16, 20, 24, 28, 32]; 
 
 const GRADES = [
     { name: "초보자", prob: 50.0, sell: 3, mult: 1, rangeMul: 1 },
@@ -32,12 +31,11 @@ const BOSS_WAVES = {
     100: { hp: 4000000, meso: 100, ticket: 5, name: "혼테일" }
 };
 
-// 100층 이후 무한 보스 로직
 function getBossInfo(w) {
     if (BOSS_WAVES[w]) return BOSS_WAVES[w];
     if (w > 100 && w % 5 === 0) {
         return {
-            hp: Math.floor(4000000 * Math.pow(1.4, (w - 100) / 5)), // 체력 기하급수적 증가
+            hp: Math.floor(4000000 * Math.pow(1.4, (w - 100) / 5)), 
             meso: 150, ticket: 5, name: `심연의 보스 (${w}층)`
         };
     }
@@ -72,7 +70,6 @@ function initGrid() {
 }
 initGrid();
 
-// 세이브 감지 및 로드
 function checkSave() {
     if (localStorage.getItem('mapleDefenseSave')) {
         document.getElementById('btn-continue').style.display = 'block';
@@ -105,7 +102,7 @@ function loadAndStartGame() {
     });
     
     document.getElementById('start-screen').style.display = 'none';
-    state.status = 'PREP'; state.time = 5; // 이어하기는 대기시간 5초
+    state.status = 'PREP'; state.time = 5; 
     lastTime = performance.now();
     state.isBoss = !!getBossInfo(state.wave);
     updateUI();
@@ -125,12 +122,10 @@ function goToLobby() {
     location.reload();
 }
 
-// 3초마다 자동 저장
 setInterval(() => {
     if(state.status === 'PLAY' || state.status === 'PREP') saveGameData();
 }, 3000);
 
-// --- 도감 시스템 ---
 function getTotalCardBonus() {
     let bonus = 0;
     for(let k in cardData) {
@@ -324,6 +319,7 @@ function executeBulkSell(type, value) {
 }
 
 function closeAllModals() {
+    if (state.status === 'GAMEOVER') return; // 게임오버 시 오버레이 클릭 방지
     document.getElementById('overlay').style.display = 'none';
     document.getElementById('bulk-sell-modal').style.display = 'none';
     document.getElementById('ticket-modal').style.display = 'none';
@@ -430,24 +426,32 @@ function upgrade(type) {
 }
 
 let currentTicketTier = 0;
+
+// 선택권 소모 버그 수정: 여기서 shift() 하지 않고 읽기만 합니다.
 function openTicketModal() {
     if(state.tickets.length === 0) { showMessage("보유한 선택권이 없습니다."); return; }
-    currentTicketTier = state.tickets.shift();
+    currentTicketTier = state.tickets[0]; // 단순히 첫 번째 티켓을 확인만 함
     document.getElementById('ticket-tier').innerText = currentTicketTier;
     document.getElementById('overlay').style.display = 'block';
     document.getElementById('ticket-modal').style.display = 'block';
     updateUI();
 }
 
+// 실제로 사용할 때 배열에서 뺍니다.
 function useTicket(choice) {
     let emptyIdx = grid.findIndex(v => v === null);
     if(emptyIdx === -1) { showMessage("공간 부족!"); return; }
+    
+    // 유닛 소환이 확정되었으므로 배열에서 제거
+    state.tickets.shift(); 
+    
     let tier = currentTicketTier;
     let cls = choice === '랜덤' ? Object.keys(CLASSES)[Math.floor(Math.random()*3)] : choice;
     if(choice === '랜덤' && Math.random() < 0.2) tier++;
     
     addUnit(emptyIdx, tier, cls);
     closeAllModals();
+    updateUI();
 }
 
 function toggleSpeed() {
@@ -501,7 +505,6 @@ function loop() {
     
     if(monsters.length >= 200) { gameOver("몬스터 200마리 초과! 게임 오버"); return; }
     
-    // 도감 카드 전체 데미지 증가율 (ex: 5%면 1.05)
     let cardMulti = 1 + (getTotalCardBonus() / 100);
 
     towers.forEach(t => {
@@ -529,7 +532,6 @@ function loop() {
                 if(d <= minDist) { minDist = d; target = m; }
             }
             if(target) {
-                // 혼줌 수치(15% 적용) + 도감 카드 데미지 계수 반영
                 let dmg = (t.cls.baseDmg + (state.upgrades[t.cls.type].val * 0.15)) * t.grade.mult * cardMulti;
                 projectiles.push({
                     type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y,
@@ -572,7 +574,6 @@ function loop() {
                 state.meso += bInfo.meso; state.tickets.push(bInfo.ticket);
                 showMessage(`${state.wave}라운드 보스 처치!`);
                 
-                // 보스 카드 드롭 확률 (20%에서 시작해 10층마다 2%씩 감소, 최소 1%)
                 let dropRate = Math.max(1, 20 - Math.floor(state.wave / 10) * 2);
                 if (Math.random() * 100 <= dropRate) {
                     cardData[bInfo.name] = cardData[bInfo.name] || { owned: 0, grade: 0 };
@@ -683,10 +684,14 @@ function showMessage(msg) {
     setTimeout(() => { ov.style.display = 'none'; }, 2000);
 }
 
+// 게임오버 시 세이브 삭제 및 모달 팝업 표시
 function gameOver(msg) {
     state.status = 'GAMEOVER';
-    localStorage.removeItem('mapleDefenseSave'); // 죽으면 세이브 파일 삭제
-    showMessage(msg);
+    localStorage.removeItem('mapleDefenseSave'); 
+    
+    document.getElementById('gameover-msg').innerText = msg;
+    document.getElementById('overlay').style.display = 'block';
+    document.getElementById('gameover-modal').style.display = 'block';
 }
 
 updateUI();
