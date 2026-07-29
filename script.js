@@ -1,27 +1,29 @@
+// --- 최고 기록 및 도감 데이터 불러오기 ---
 let bestWave = localStorage.getItem('mapleDefenseBestWave') || 0;
 document.getElementById('best-record').innerText = `최고 기록: ${bestWave} 웨이브`;
 
 let cardData = JSON.parse(localStorage.getItem('mapleDefenseCards')) || {};
 const CARD_REQ = [1, 2, 4, 8, 12, 16, 20, 24, 28, 32]; 
 
-// 보스 이미지 파일 로드 (이름 매칭)
+// 보스 이미지 파일 로드 (투명 배경 png로 일괄 변경 및 누락된 자쿰/혼테일 추가)
 const bossImages = {
     "킹 슬라임": new Image(), "알리샤르": new Image(), "파풀라투스": new Image(),
     "피아누스": new Image(), "자쿰": new Image(), "혼테일": new Image(),
     "시그너스": new Image(), "반반": new Image(), "피에르": new Image(),
     "블러드퀸": new Image(), "벨룸": new Image()
 };
-bossImages["킹 슬라임"].src = "image/kingslime.jpg";
-bossImages["알리샤르"].src = "image/alishar.jpg";
-bossImages["파풀라투스"].src = "image/papulatus.jpg";
-bossImages["피아누스"].src = "image/pianus.jpg";
-bossImages["시그너스"].src = "image/signus.jpg";
-bossImages["반반"].src = "image/banban.jpg";
-bossImages["피에르"].src = "image/pierr.jpg";
-bossImages["블러드퀸"].src = "image/bloodqueen.jpg";
-bossImages["벨룸"].src = "image/velroom.jpg";
+bossImages["킹 슬라임"].src = "image/kingslime.png";
+bossImages["알리샤르"].src = "image/alishar.png";
+bossImages["파풀라투스"].src = "image/papulatus.png";
+bossImages["피아누스"].src = "image/pianus.png";
+bossImages["자쿰"].src = "image/zakum.png";
+bossImages["혼테일"].src = "image/horntail.png";
+bossImages["시그너스"].src = "image/signus.png";
+bossImages["반반"].src = "image/banban.png";
+bossImages["피에르"].src = "image/pierr.png";
+bossImages["블러드퀸"].src = "image/bloodqueen.png";
+bossImages["벨룸"].src = "image/velroom.png";
 
-// 6차 이상은 모두 splash 속성을 true로 부여
 const GRADES = [
     { name: "초보자", prob: 50.0, sell: 3, mult: 1, rangeMul: 1 },
     { name: "1차", prob: 33.1, sell: 6, mult: 2, rangeMul: 1 },
@@ -74,7 +76,7 @@ let state = {
 
 let grid = new Array(25).fill(null);
 let monsters = [], projectiles = [], towers = [];
-let hitEffects = []; // 피격 폭발 이펙트 관리 배열
+let hitEffects = []; 
 let lastTime = 0, waveTimer = 0, spawnTimer = 0;
 let selectedUnitIdx = -1; 
 
@@ -169,11 +171,18 @@ function renderBook() {
         let effectStr = data.grade > 0 ? `+${(1 + (data.grade-1)*0.5).toFixed(1)}%` : `0%`;
         let btnText = data.grade === 0 ? `등록 (${req}장)` : (data.grade === 10 ? 'MAX' : `강화 (${req}장)`);
         
+        // 도감 리스트에 몬스터 이미지 추가
+        let imgSrc = bossImages[bName] ? bossImages[bName].src : '';
+        let imgHtml = imgSrc ? `<img src="${imgSrc}" style="width: 45px; height: 45px; object-fit: contain; margin-right: 12px; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.4));">` : '';
+
         list.innerHTML += `
         <div style="background:#fff; border:2px solid #8d6e63; border-radius:6px; padding:8px; text-align:left; display:flex; justify-content:space-between; align-items:center;">
-            <div>
-                <div style="font-weight:900; color:#3e2723; font-size:14px;">${bName} (등급: ${data.grade})</div>
-                <div style="font-size:12px; color:#666; margin-top:2px;">효과: ${effectStr} / 보유: <b style="color:#e65100">${data.owned}장</b></div>
+            <div style="display:flex; align-items:center;">
+                ${imgHtml}
+                <div>
+                    <div style="font-weight:900; color:#3e2723; font-size:14px;">${bName} (등급: ${data.grade})</div>
+                    <div style="font-size:12px; color:#666; margin-top:2px;">효과: ${effectStr} / 보유: <b style="color:#e65100">${data.owned}장</b></div>
+                </div>
             </div>
             <button class="maple-btn small ${canUpgrade ? 'primary' : ''}" ${!canUpgrade ? 'disabled' : ''} onclick="upgradeCard('${bName}')">${btnText}</button>
         </div>`;
@@ -306,11 +315,10 @@ function renderGrid() {
     let cells = gridContainer.children;
     for(let i=0; i<25; i++) {
         let u = grid[i];
-        cells[i].className = 'grid-cell'; // 초기화
+        cells[i].className = 'grid-cell';
         if (i === selectedUnitIdx) cells[i].classList.add('selected');
         
         if(u) {
-            // 6차 이상 테두리 은은한 글로우
             if (u.gradeIdx === 6) cells[i].classList.add('glow-6');
             if (u.gradeIdx === 7) cells[i].classList.add('glow-7');
             if (u.gradeIdx === 8) cells[i].classList.add('glow-8');
@@ -427,7 +435,6 @@ function loop() {
     if (dt > 0.1) dt = 0.1;
     lastTime = now;
     
-    // 피격 폭발 이펙트 업데이트
     for (let i = hitEffects.length - 1; i >= 0; i--) {
         hitEffects[i].timer -= dt;
         if (hitEffects[i].timer <= 0) hitEffects.splice(i, 1);
@@ -508,7 +515,6 @@ function loop() {
         if(p.type === '도적') p.angle += 15 * dt; 
         
         if(dist <= speed) {
-            // 적중 시 폭발 이펙트 등록 (6차 이상)
             if (p.gradeIdx >= 6) {
                 hitEffects.push({ x: p.tx, y: p.ty, timer: 0.2, color: p.color });
             }
@@ -583,13 +589,9 @@ function draw() {
         let size = m.isBoss ? 16 : 10; 
         
         if (m.isBoss && bossImages[m.name] && bossImages[m.name].complete && bossImages[m.name].naturalWidth > 0) {
-            // 보스 이미지 원형 자르기 렌더링
-            ctx.save();
-            ctx.beginPath(); ctx.arc(m.x, m.y, size * 1.5, 0, Math.PI * 2); ctx.clip();
+            // 원형 자르기(clip) 제거: 누끼 딴 투명 배경 이미지가 그대로 예쁘게 나오도록 수정
             ctx.drawImage(bossImages[m.name], m.x - size * 1.5, m.y - size * 1.5, size * 3, size * 3);
-            ctx.restore();
         } else {
-            // 일반 몹 및 이미지 미로드 시 대체 렌더링
             if (!m.isBoss) {
                 ctx.fillStyle = "#81c784";
                 ctx.beginPath(); ctx.arc(m.x, m.y + 2, size, Math.PI, 0);
@@ -617,14 +619,12 @@ function draw() {
         ctx.fillStyle = "#4caf50"; ctx.fillRect(m.x-10, m.y-size-8, 20 * (m.hp/m.maxHp), 3);
     });
     
-    // 공격 이펙트 렌더링
     projectiles.forEach(p => {
         ctx.save();
         ctx.translate(p.x, p.y);
         let dx = p.tx - p.x; let dy = p.ty - p.y;
         let dir = Math.atan2(dy, dx);
         
-        // 6차 이상일 경우 공격 크기 1.5배 확대
         let scale = p.gradeIdx >= 6 ? 1.5 : 1;
         ctx.scale(scale, scale);
 
@@ -645,10 +645,9 @@ function draw() {
         ctx.restore();
     });
 
-    // 6차 이상 피격(폭발) 이펙트 렌더링
     hitEffects.forEach(h => {
-        let alpha = h.timer / 0.2; // 0.2초 타이머 기준
-        let radius = 5 + (0.2 - h.timer) * 100; // 작게 시작해서 커짐
+        let alpha = h.timer / 0.2; 
+        let radius = 5 + (0.2 - h.timer) * 100; 
         
         ctx.save();
         ctx.globalAlpha = alpha;
