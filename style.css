@@ -1,10 +1,8 @@
-/* 나눔스퀘어 웹 폰트 불러오기 */
 @import url('https://cdn.jsdelivr.net/gh/moonspam/NanumSquare@2.0/nanumsquare.css');
 
 * { box-sizing: border-box; touch-action: manipulation; }
 
 body {
-    /* 폰트를 나눔스퀘어로 일괄 변경 */
     font-family: 'NanumSquare', sans-serif; 
     background-color: #2b2b2b;
     margin: 0; padding: 0; display: flex; justify-content: center;
@@ -31,7 +29,6 @@ body {
     100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 152, 0, 0); }
 }
 
-/* 화면 진동 효과 (5차 이상 소환 시) */
 @keyframes shake {
     0% { transform: translate(1px, 1px) rotate(0deg); }
     10% { transform: translate(-1px, -2px) rotate(-1deg); }
@@ -47,7 +44,6 @@ body {
 }
 .shake-active { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
 
-/* 소환 및 보스 토스트 애니메이션 */
 #summon-toast, #boss-toast {
     position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%);
     font-weight: bold; color: white;
@@ -79,12 +75,18 @@ body {
     position: relative; width: 100%; aspect-ratio: 1/1; 
     background-color: #4a5c68; border-top: 3px solid #333; border-bottom: 3px solid #333;
 }
-canvas { width: 100%; height: 100%; position: absolute; top: 0; left: 0; pointer-events: none; }
 
+/* 캔버스가 유닛 박스(격자) 위로 오도록 z-index 10 부여 */
+canvas { 
+    width: 100%; height: 100%; position: absolute; top: 0; left: 0; 
+    pointer-events: none; z-index: 10; 
+}
+
+/* 격자(유닛 박스)는 캔버스 아래로 가도록 z-index 5 부여 */
 #grid-container {
     position: absolute; top: 15%; left: 15%; width: 70%; height: 70%;
     display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(5, 1fr);
-    background-color: #a47c54; border: 2px solid #5d4037;
+    background-color: #a47c54; border: 2px solid #5d4037; z-index: 5;
 }
 
 .grid-cell {
@@ -107,7 +109,6 @@ canvas { width: 100%; height: 100%; position: absolute; top: 0; left: 0; pointer
 .cost { font-size: 12px; color: #333; }
 .ticket-row { display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
 
-/* 강화 수치 플로팅 애니메이션 */
 .upgrade-toast {
     position: absolute; left: 50%; top: 0; transform: translateX(-50%);
     color: #4caf50; font-weight: bold; font-size: 18px;

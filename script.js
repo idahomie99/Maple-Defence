@@ -8,7 +8,7 @@ const GRADES = [
     { name: "3차", prob: 5.1, sell: 16, mult: 8, rangeMul: 1.2, speedMul: 0.8 },
     { name: "4차", prob: 0.8, sell: 30, mult: 16, rangeMul: 1.2 },
     { name: "5차", prob: 0.5, sell: 0, mult: 32, rangeMul: 1.2, splash: true },
-    { name: "6차", prob: 0.2, sell: 0, mult: 64, rangeMul: 4, bind: true },
+    { name: "6차", prob: 0.2, sell: 0, mult: 64, rangeMul: 4 }, // 바인드는 로직에서 등급 인덱스(6)로 체크합니다
     { name: "제네시스", prob: 0.08, sell: 0, mult: 128, rangeMul: 4 },
     { name: "데스티니", prob: 0.019, sell: 0, mult: 256, rangeMul: 6 }
 ];
@@ -92,7 +92,6 @@ function summonUnit() {
 
 function showSummonToast(gradeName, gradeIdx, clsName, color) {
     let toast = document.getElementById('summon-toast');
-    // 등급별 텍스트 크기 조절 (0등급 16px ~ 8등급 32px)
     let fontSize = 16 + (gradeIdx * 2); 
     
     toast.innerHTML = `<span style="color:${color}">${gradeName}</span> ${clsName}!`;
@@ -100,7 +99,6 @@ function showSummonToast(gradeName, gradeIdx, clsName, color) {
     toast.className = 'toast-show';
     setTimeout(() => { toast.className = ''; }, 1500);
 
-    // 5차(인덱스 5) 이상일 때 화면 전체 진동
     if (gradeIdx >= 5) {
         let container = document.getElementById('game-container');
         container.classList.add('shake-active');
@@ -120,7 +118,8 @@ function addUnit(idx, gradeIdx, clsName) {
     let cls = CLASSES[clsName];
     let unit = {
         idx: idx, gradeIdx: gradeIdx, grade: grade, cls: cls,
-        x: 75 + (idx % 5) * 70 + 35, y: 75 + Math.floor(idx / 5) * 70 + 35, lastAttack: 0
+        x: 75 + (idx % 5) * 70 + 35, y: 75 + Math.floor(idx / 5) * 70 + 35, lastAttack: 0,
+        bindCooldown: 0 // 바인드 쿨타임 추가 (0이면 즉시 사용 가능)
     };
     grid[idx] = unit;
     towers.push(unit);
@@ -216,9 +215,19 @@ function renderGrid() {
         else cells[i].classList.remove('selected');
 
         if(u) {
+            // 6차 유닛 전용 바인드 게이지 바 (UI에만 추가)
+            let bindHtml = '';
+            if (u.gradeIdx === 6) {
+                bindHtml = `
+                <div style="width: 80%; height: 4px; background: #333; margin-top: 2px; border-radius: 2px; overflow: hidden; border: 1px solid #111;">
+                    <div id="bind-bar-${u.idx}" style="width: 0%; height: 100%; background: #00e5ff;"></div>
+                </div>`;
+            }
+
             cells[i].innerHTML = `
                 <div style="font-size:20px; text-shadow:1px 1px 2px rgba(0,0,0,0.5);">${u.cls.icon}</div>
                 <div style="color:${u.cls.color}; font-size:10px; margin-top:2px;">${u.grade.name}</div>
+                ${bindHtml}
             `;
         } else { cells[i].innerHTML = ''; }
     }
@@ -228,23 +237,22 @@ function spawnMonster() {
     let hpBase = state.isBoss ? BOSS_WAVES[state.wave].hp : Math.floor(state.wave * 45 + Math.pow(state.wave, 1.4) * 8);
     monsters.push({
         hp: hpBase, maxHp: hpBase, x: PATH[0].x, y: PATH[0].y,
-        targetNode: 1, speed: state.isBoss ? 25 : 50, isBoss: state.isBoss
+        targetNode: 1, speed: state.isBoss ? 25 : 50, isBoss: state.isBoss,
+        bindTimer: 0 // 바인드 걸린 시간 초기화
     });
 }
 
 function skipBossRound() {
-    waveTimer = 150; // 남은 시간을 즉시 스킵하여 다음 라운드 유도
+    waveTimer = 150; 
     document.getElementById('btn-skip-boss').style.display = 'none';
 }
 
 function updateWave(dt) {
     waveTimer += dt; spawnTimer += dt;
-    // 일반 라운드 60초, 보스 라운드 150초로 단축
     let limit = state.isBoss ? 150 : 60; 
     
     if(waveTimer >= limit) { nextWave(); return; }
     
-    // 60초 동안 40마리를 뽑아야 하므로 스폰 주기는 60/40 = 1.5초
     if(!state.isBoss && spawnTimer >= 1.5) {
         spawnMonster(); spawnTimer = 0;
     }
@@ -276,7 +284,7 @@ function showUpgradeToast(idChar, amt) {
     floatEl.className = 'upgrade-toast';
     floatEl.innerText = '+' + amt;
     box.appendChild(floatEl);
-    setTimeout(() => floatEl.remove(), 1000); // 애니메이션 후 삭제
+    setTimeout(() => floatEl.remove(), 1000);
 }
 
 function upgrade(type) {
@@ -284,12 +292,11 @@ function upgrade(type) {
     let u = state.upgrades[type];
     if(state.mp >= u.cost) {
         state.mp -= u.cost;
-        let amt = Math.floor(Math.random() * 6) + 1; // 1~6 랜덤
+        let amt = Math.floor(Math.random() * 6) + 1; 
         u.val += amt;
         u.cost += 1;
         let idChar = type === '전사' ? 'w' : (type === '법사' ? 'm' : 't');
         
-        // 플로팅 애니메이션 실행
         showUpgradeToast(idChar, amt);
 
         document.getElementById(`upg-${idChar}-val`).innerText = u.val;
@@ -353,6 +360,13 @@ function loop() {
     
     for(let i=monsters.length-1; i>=0; i--) {
         let m = monsters[i];
+        
+        // 몬스터 바인드 체크 (바인드 상태면 이동 안 함)
+        if (m.bindTimer > 0) {
+            m.bindTimer -= dt;
+            continue; // 이동 생략
+        }
+
         let t = PATH[m.targetNode];
         let dx = t.x - m.x, dy = t.y - m.y;
         let dist = Math.hypot(dx, dy);
@@ -369,6 +383,32 @@ function loop() {
     if(monsters.length >= 200) { gameOver("몬스터 200마리 초과! 게임 오버"); return; }
     
     towers.forEach(t => {
+        // 6차 전용 바인드 스킬 체크
+        if (t.gradeIdx === 6) {
+            t.bindCooldown -= dt * 1000;
+            let bar = document.getElementById(`bind-bar-${t.idx}`);
+            if (bar) {
+                // 남은 시간을 백분율로 계산해 게이지 바 시각화 (0부터 차오름)
+                let pct = Math.max(0, Math.min(100, ((60000 - t.bindCooldown) / 60000) * 100));
+                bar.style.width = pct + '%';
+            }
+            
+            // 쿨타임이 찼다면 스킬 발동
+            if (t.bindCooldown <= 0 && monsters.length > 0) {
+                let target = null;
+                // 가급적 얼어있지 않은 몹을 찾음
+                for (let m of monsters) {
+                    if (m.bindTimer <= 0) { target = m; break; }
+                }
+                if (!target) target = monsters[0]; // 다 얼어있으면 그냥 아무나 묶음
+                
+                if (target) {
+                    target.bindTimer = 10; // 10초간 정지
+                    t.bindCooldown = 60000; // 60초 쿨타임 리셋
+                }
+            }
+        }
+
         t.lastAttack -= dt * 1000;
         if(t.lastAttack <= 0) {
             let range = t.cls.range * t.grade.rangeMul;
@@ -378,7 +418,6 @@ function loop() {
                 if(d <= minDist) { minDist = d; target = m; }
             }
             if(target) {
-                // 혼줌 강화 너프: 강화 수치가 곱해지는게 아니라 베이스 수치 합산 시 영향력을 15%로 낮춤
                 let dmg = (t.cls.baseDmg + (state.upgrades[t.cls.type].val * 0.15)) * t.grade.mult;
                 projectiles.push({
                     type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y,
@@ -457,6 +496,16 @@ function draw() {
             ctx.beginPath(); ctx.arc(m.x, m.y - 2, size, Math.PI, 0); ctx.fill();
             ctx.fillStyle = "#ffe0b2"; ctx.fillRect(m.x - size/2, m.y - 2, size, size - 2);
         }
+        
+        // 몬스터 바인드 시 얼어붙은 이펙트
+        if (m.bindTimer > 0) {
+            ctx.fillStyle = "rgba(0, 200, 255, 0.5)"; // 반투명한 시안색 얼음
+            ctx.fillRect(m.x - size - 4, m.y - size - 4, (size + 4) * 2, (size + 4) * 2);
+            ctx.fillStyle = "#fff";
+            ctx.font = "12px sans-serif";
+            ctx.fillText("❄️", m.x - 7, m.y + 4); // 얼음 결정 모양 마크
+        }
+
         ctx.fillStyle = "#000"; ctx.fillRect(m.x-10, m.y-size-8, 20, 3);
         ctx.fillStyle = "#4caf50"; ctx.fillRect(m.x-10, m.y-size-8, 20 * (m.hp/m.maxHp), 3);
     });
@@ -500,7 +549,6 @@ function updateUI() {
         sellBtn.disabled = true;
     }
     
-    // 보스 라운드 클리어 시 스킵 버튼 노출 로직
     let skipBtn = document.getElementById('btn-skip-boss');
     if (state.isBoss && monsters.length === 0 && waveTimer > 0) {
         skipBtn.style.display = 'block';
