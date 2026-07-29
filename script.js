@@ -5,7 +5,7 @@ document.getElementById('best-record').innerText = `최고 기록: ${bestWave} �
 let cardData = JSON.parse(localStorage.getItem('mapleDefenseCards')) || {};
 const CARD_REQ = [1, 2, 4, 8, 12, 16, 20, 24, 28, 32]; 
 
-// 보스 이미지 파일 로드 (투명 배경 png로 일괄 변경 및 누락된 자쿰/혼테일 추가)
+// 보스 이미지 파일 로드
 const bossImages = {
     "킹 슬라임": new Image(), "알리샤르": new Image(), "파풀라투스": new Image(),
     "피아누스": new Image(), "자쿰": new Image(), "혼테일": new Image(),
@@ -171,7 +171,6 @@ function renderBook() {
         let effectStr = data.grade > 0 ? `+${(1 + (data.grade-1)*0.5).toFixed(1)}%` : `0%`;
         let btnText = data.grade === 0 ? `등록 (${req}장)` : (data.grade === 10 ? 'MAX' : `강화 (${req}장)`);
         
-        // 도감 리스트에 몬스터 이미지 추가
         let imgSrc = bossImages[bName] ? bossImages[bName].src : '';
         let imgHtml = imgSrc ? `<img src="${imgSrc}" style="width: 45px; height: 45px; object-fit: contain; margin-right: 12px; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.4));">` : '';
 
@@ -344,7 +343,8 @@ function spawnMonster() {
     let hpBase = bInfo ? bInfo.hp : Math.floor(state.wave * 45 + Math.pow(state.wave, 1.4) * 8);
     monsters.push({
         hp: hpBase, maxHp: hpBase, x: PATH[0].x, y: PATH[0].y,
-        targetNode: 1, speed: bInfo ? 25 : 50, isBoss: !!bInfo, bindTimer: 0, stunTimer: 0, name: bInfo ? bInfo.name : null
+        targetNode: 1, speed: bInfo ? 25 : 50, isBoss: !!bInfo, bindTimer: 0, stunTimer: 0, name: bInfo ? bInfo.name : null,
+        facingRight: true // 최초 스폰 시 오른쪽(PATH 노드 1)을 향함
     });
 }
 
@@ -461,6 +461,10 @@ function loop() {
         let dx = t.x - m.x, dy = t.y - m.y;
         let dist = Math.hypot(dx, dy);
         let move = m.speed * dt;
+        
+        // 이동 방향에 따라 바라보는 방향 업데이트
+        if (dx > 0) m.facingRight = true;
+        else if (dx < 0) m.facingRight = false;
         
         if(dist <= move) {
             m.x = t.x; m.y = t.y; m.targetNode = (m.targetNode + 1) % PATH.length;
@@ -589,8 +593,15 @@ function draw() {
         let size = m.isBoss ? 16 : 10; 
         
         if (m.isBoss && bossImages[m.name] && bossImages[m.name].complete && bossImages[m.name].naturalWidth > 0) {
-            // 원형 자르기(clip) 제거: 누끼 딴 투명 배경 이미지가 그대로 예쁘게 나오도록 수정
-            ctx.drawImage(bossImages[m.name], m.x - size * 1.5, m.y - size * 1.5, size * 3, size * 3);
+            ctx.save();
+            ctx.translate(m.x, m.y);
+            // 오른쪽으로 이동 중이면 좌우 반전
+            if (m.facingRight) {
+                ctx.scale(-1, 1);
+            }
+            // 0,0 을 기준으로 중심에 맞게 렌더링
+            ctx.drawImage(bossImages[m.name], -size * 1.5, -size * 1.5, size * 3, size * 3);
+            ctx.restore();
         } else {
             if (!m.isBoss) {
                 ctx.fillStyle = "#81c784";
