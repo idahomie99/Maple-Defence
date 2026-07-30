@@ -19,7 +19,6 @@ const database = getDatabase(app);
 let currentUserName = "이름없는 용사";
 let currentUserUid = null;
 
-// ★ 이어하기 버튼 갱신을 위한 함수! ★
 window.checkSave = () => {
     let btn = document.getElementById('btn-continue');
     if (btn) {
@@ -38,7 +37,6 @@ window.switchScreen = (screenId) => {
         const activeEl = document.getElementById(screenId);
         if (activeEl) activeEl.style.display = 'flex';
         
-        // 로비 켜질 때마다 이어하기 버튼 갱신!
         if (screenId === 'start-screen') window.checkSave();
     }
 };
@@ -181,7 +179,6 @@ function initGrid() {
 }
 initGrid();
 
-// 초기 로딩 시에도 체크
 window.checkSave();
 
 function saveGameData() {
@@ -1051,6 +1048,7 @@ let pkState = {
     projectiles: [], dmgTexts: [], vfx: []
 };
 
+// 펀치킹 실시간 랭킹 로드 (로비 TOP 10 갱신용)
 window.loadPkLiveRanking = async () => {
     let list = document.getElementById('pk-live-ranking-list');
     if(!list) return;
@@ -1104,6 +1102,7 @@ window.showPkClassSelect = () => {
     document.getElementById('pk-class-select').style.display = 'block';
 };
 
+// 메인 랭킹 보드 보기
 window.showPkRanking = async () => {
     document.getElementById('pk-menu').style.display = 'none';
     document.getElementById('pk-class-select').style.display = 'none';
@@ -1163,6 +1162,7 @@ window.startPkGame = (clsName) => {
     
     pkState = {
         active: true, time: 60, score: 0, lastTime: performance.now(), speed: 1,
+        // 유닛은 9시 방향 칸 정중앙 (x: 110, y: 250), 허수아비는 3시 방향 정중앙 (x: 390, y: 250)
         unit: { cls: cls, grade: grade, gradeIdx: 8, x: 110, y: 250, lastAttack: 0, globalCooldown: 0 },
         scarecrow: { x: 390, y: 250, size: 20, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0 },
         projectiles: [], dmgTexts: [], vfx: []
@@ -1190,6 +1190,7 @@ function pkLoop() {
         pkState.active = false;
         cancelAnimationFrame(pkReqId);
         
+        // 팝업 즉시 노출
         document.getElementById('pk-final-score').innerText = Math.floor(pkState.score).toLocaleString();
         document.getElementById('pk-result-overlay').style.display = 'block';
         document.getElementById('pk-result-modal').style.display = 'block';
@@ -1213,6 +1214,7 @@ function pkLoop() {
     let sharpChance = skillLevels.common_sharp * 0.05;
     let windReduc = 1 + (skillLevels.common_wind * 0.2);
     
+    // ★ 펀치킹 밸런스 평준화: 모든 직업 기본공격력 20, 쿨타임 1초(1000ms) 고정 ★
     let pkBaseDmg = 20; 
     let pkBaseCd = 1000;
     
@@ -1302,6 +1304,101 @@ function pkLoop() {
     pkReqId = requestAnimationFrame(pkLoop);
 }
 
+// 오타 수정: 도적의 투사체 경로도 pkCtx에 정상 렌더링되도록 수정 (메인 캔버스 겹침 현상 해결)
+function drawPk() {
+    let pkCanvas = document.getElementById('pkCanvas');
+    let pkCtx = pkCanvas.getContext('2d');
+    pkCtx.clearRect(0, 0, pkCanvas.width, pkCanvas.height);
+    
+    pkCtx.strokeStyle = "rgba(188, 170, 164, 0.2)";
+    pkCtx.lineWidth = 35;
+    pkCtx.lineJoin = "round";
+    pkCtx.beginPath(); pkCtx.rect(25, 25, 450, 450); pkCtx.stroke();
+    
+    let m = pkState.scarecrow;
+    
+    let size = 25; 
+    
+    if (husooabiImg && husooabiImg.complete && husooabiImg.naturalWidth > 0) {
+        pkCtx.save();
+        pkCtx.translate(m.x, m.y);
+        if (m.freezeTimer > 0) {
+            pkCtx.globalAlpha = 0.5; pkCtx.fillStyle = "#81d4fa";
+            pkCtx.fillRect(-size * 1.5, -size * 1.5, size * 3, size * 3);
+            pkCtx.globalAlpha = 1.0;
+        }
+        pkCtx.drawImage(husooabiImg, -size * 1.5, -size * 1.5, size * 3, size * 3);
+        pkCtx.restore();
+    } else {
+        pkCtx.font = "40px NanumSquare";
+        pkCtx.textAlign = "center";
+        pkCtx.textBaseline = "middle";
+        pkCtx.fillText("🎃", m.x, m.y); 
+    }
+    
+    if (m.freezeTimer > 0) {
+        pkCtx.fillStyle = "rgba(0, 200, 255, 0.5)"; 
+        pkCtx.fillRect(m.x - 20, m.y - 20, 40, 40);
+        pkCtx.fillStyle = "#fff"; pkCtx.font = "16px NanumSquare";
+        pkCtx.fillText("❄️", m.x + 15, m.y - 15); 
+    }
+    
+    pkState.projectiles.forEach(p => {
+        pkCtx.save();
+        pkCtx.translate(p.x, p.y);
+        let dir = Math.atan2(p.ty - p.y, p.tx - p.x);
+        let scale = 1.5;
+        if (p.isFinal) { scale *= 1.3; pkCtx.globalAlpha = 1.0; }
+        else pkCtx.globalAlpha = 0.8;
+        
+        pkCtx.scale(scale, scale);
+        if (p.type === '전사') {
+            pkCtx.rotate(dir); pkCtx.fillStyle = p.isFinal ? "#b71c1c" : "rgba(229, 57, 53, 0.8)";
+            pkCtx.beginPath(); pkCtx.arc(0, 0, 15, -Math.PI/2, Math.PI/2);
+            pkCtx.arc(6, 0, 15, Math.PI/2, -Math.PI/2, true); pkCtx.fill();
+        } else if (p.type === '법사') {
+            pkCtx.rotate(dir); pkCtx.strokeStyle = "#00e5ff"; pkCtx.lineWidth = p.isFinal ? 5 : 3;
+            pkCtx.beginPath(); pkCtx.moveTo(-12, 0); pkCtx.lineTo(-6, -6);
+            pkCtx.lineTo(0, 6); pkCtx.lineTo(6, -6); pkCtx.lineTo(12, 0); pkCtx.stroke();
+        } else if (p.type === '도적') {
+            pkCtx.rotate(p.angle); pkCtx.fillStyle = "#4a148c"; pkCtx.beginPath();
+            // 이곳이 버그의 핵심이었습니다! ctx -> pkCtx 로 전부 수정했습니다.
+            pkCtx.moveTo(0, -10); pkCtx.lineTo(3, -3); pkCtx.lineTo(10, 0); pkCtx.lineTo(3, 3);
+            pkCtx.lineTo(0, 10); pkCtx.lineTo(-3, 3); pkCtx.lineTo(-10, 0); pkCtx.lineTo(-3, -3);
+            pkCtx.closePath(); pkCtx.fill();
+        }
+        pkCtx.restore();
+    });
+    
+    pkState.dmgTexts.forEach(d => {
+        pkCtx.save();
+        pkCtx.globalAlpha = Math.max(0, d.timer / 0.6);
+        pkCtx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff";
+        pkCtx.font = d.isCrit ? "900 24px NanumSquare" : "bold 18px NanumSquare";
+        pkCtx.shadowColor = d.isCrit ? "#c62828" : "#000"; 
+        pkCtx.shadowBlur = 4;
+        pkCtx.fillText(d.val, d.x, d.y);
+        pkCtx.restore();
+    });
+    
+    pkState.vfx.forEach(v => {
+        pkCtx.save();
+        if (v.type === 'death') {
+            pkCtx.fillStyle = `rgba(0, 0, 0, ${v.timer})`; pkCtx.fillRect(0,0,500,500);
+            pkCtx.strokeStyle = `rgba(255, 0, 0, ${v.timer * 2})`; pkCtx.lineWidth = 10;
+            pkCtx.beginPath(); pkCtx.moveTo(0,0); pkCtx.lineTo(500,500); pkCtx.stroke();
+            pkCtx.beginPath(); pkCtx.moveTo(500,0); pkCtx.lineTo(0,500); pkCtx.stroke();
+        } else if (v.type === 'thunder') {
+            pkCtx.fillStyle = `rgba(0, 229, 255, ${v.timer})`; pkCtx.fillRect(0,0,500,500);
+            pkCtx.strokeStyle = `rgba(255, 255, 255, ${v.timer * 2})`; pkCtx.lineWidth = 15;
+            pkCtx.beginPath(); pkCtx.moveTo(250,0); pkCtx.lineTo(200,250); pkCtx.lineTo(300,250); pkCtx.lineTo(250,500); pkCtx.stroke();
+        } else if (v.type === 'fuma') {
+            pkCtx.fillStyle = `rgba(171, 71, 188, ${v.timer})`; pkCtx.fillRect(0,0,500,500);
+        }
+        pkCtx.restore();
+    });
+}
+
 function pkApplyDmg(dmg, isCrit) {
     pkState.score += (dmg / 10000);
     document.getElementById('pk-score').innerText = Math.floor(pkState.score).toLocaleString();
@@ -1370,95 +1467,3 @@ window.endPkGame = (isGiveUp) => {
         window.switchScreen('start-screen'); 
     }
 };
-
-function drawPk() {
-    let pkCanvas = document.getElementById('pkCanvas');
-    let pkCtx = pkCanvas.getContext('2d');
-    pkCtx.clearRect(0, 0, pkCanvas.width, pkCanvas.height);
-    
-    pkCtx.strokeStyle = "rgba(188, 170, 164, 0.2)";
-    pkCtx.lineWidth = 35;
-    pkCtx.lineJoin = "round";
-    pkCtx.beginPath(); pkCtx.rect(25, 25, 450, 450); pkCtx.stroke();
-    
-    let m = pkState.scarecrow;
-    let size = 25; 
-    
-    if (husooabiImg && husooabiImg.complete && husooabiImg.naturalWidth > 0) {
-        pkCtx.save();
-        pkCtx.translate(m.x, m.y);
-        if (m.freezeTimer > 0) {
-            pkCtx.globalAlpha = 0.5; pkCtx.fillStyle = "#81d4fa";
-            pkCtx.fillRect(-size * 1.5, -size * 1.5, size * 3, size * 3);
-            pkCtx.globalAlpha = 1.0;
-        }
-        pkCtx.drawImage(husooabiImg, -size * 1.5, -size * 1.5, size * 3, size * 3);
-        pkCtx.restore();
-    } else {
-        pkCtx.font = "40px NanumSquare";
-        pkCtx.textAlign = "center";
-        pkCtx.textBaseline = "middle";
-        pkCtx.fillText("🎃", m.x, m.y); 
-    }
-    
-    if (m.freezeTimer > 0) {
-        pkCtx.fillStyle = "rgba(0, 200, 255, 0.5)"; 
-        pkCtx.fillRect(m.x - 20, m.y - 20, 40, 40);
-        pkCtx.fillStyle = "#fff"; pkCtx.font = "16px NanumSquare";
-        pkCtx.fillText("❄️", m.x + 15, m.y - 15); 
-    }
-    
-    pkState.projectiles.forEach(p => {
-        pkCtx.save();
-        pkCtx.translate(p.x, p.y);
-        let dir = Math.atan2(p.ty - p.y, p.tx - p.x);
-        let scale = 1.5;
-        if (p.isFinal) { scale *= 1.3; pkCtx.globalAlpha = 1.0; }
-        else pkCtx.globalAlpha = 0.8;
-        
-        pkCtx.scale(scale, scale);
-        if (p.type === '전사') {
-            pkCtx.rotate(dir); pkCtx.fillStyle = p.isFinal ? "#b71c1c" : "rgba(229, 57, 53, 0.8)";
-            pkCtx.beginPath(); pkCtx.arc(0, 0, 15, -Math.PI/2, Math.PI/2);
-            pkCtx.arc(6, 0, 15, Math.PI/2, -Math.PI/2, true); pkCtx.fill();
-        } else if (p.type === '법사') {
-            pkCtx.rotate(dir); pkCtx.strokeStyle = "#00e5ff"; pkCtx.lineWidth = p.isFinal ? 5 : 3;
-            pkCtx.beginPath(); pkCtx.moveTo(-12, 0); pkCtx.lineTo(-6, -6);
-            pkCtx.lineTo(0, 6); pkCtx.lineTo(6, -6); pkCtx.lineTo(12, 0); pkCtx.stroke();
-        } else if (p.type === '도적') {
-            pkCtx.rotate(p.angle); pkCtx.fillStyle = "#4a148c"; pkCtx.beginPath();
-            ctx.moveTo(0, -10); ctx.lineTo(3, -3); ctx.lineTo(10, 0); ctx.lineTo(3, 3);
-            ctx.lineTo(0, 10); ctx.lineTo(-3, 3); ctx.lineTo(-10, 0); ctx.lineTo(-3, -3);
-            pkCtx.closePath(); pkCtx.fill();
-        }
-        pkCtx.restore();
-    });
-    
-    pkState.dmgTexts.forEach(d => {
-        pkCtx.save();
-        pkCtx.globalAlpha = Math.max(0, d.timer / 0.6);
-        pkCtx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff";
-        pkCtx.font = d.isCrit ? "900 24px NanumSquare" : "bold 18px NanumSquare";
-        pkCtx.shadowColor = d.isCrit ? "#c62828" : "#000"; 
-        pkCtx.shadowBlur = 4;
-        pkCtx.fillText(d.val, d.x, d.y);
-        pkCtx.restore();
-    });
-    
-    pkState.vfx.forEach(v => {
-        pkCtx.save();
-        if (v.type === 'death') {
-            pkCtx.fillStyle = `rgba(0, 0, 0, ${v.timer})`; pkCtx.fillRect(0,0,500,500);
-            pkCtx.strokeStyle = `rgba(255, 0, 0, ${v.timer * 2})`; pkCtx.lineWidth = 10;
-            pkCtx.beginPath(); pkCtx.moveTo(0,0); pkCtx.lineTo(500,500); pkCtx.stroke();
-            pkCtx.beginPath(); pkCtx.moveTo(500,0); pkCtx.lineTo(0,500); pkCtx.stroke();
-        } else if (v.type === 'thunder') {
-            pkCtx.fillStyle = `rgba(0, 229, 255, ${v.timer})`; pkCtx.fillRect(0,0,500,500);
-            pkCtx.strokeStyle = `rgba(255, 255, 255, ${v.timer * 2})`; pkCtx.lineWidth = 15;
-            pkCtx.beginPath(); pkCtx.moveTo(250,0); pkCtx.lineTo(200,250); pkCtx.lineTo(300,250); pkCtx.lineTo(250,500); pkCtx.stroke();
-        } else if (v.type === 'fuma') {
-            pkCtx.fillStyle = `rgba(171, 71, 188, ${v.timer})`; pkCtx.fillRect(0,0,500,500);
-        }
-        pkCtx.restore();
-    });
-}
