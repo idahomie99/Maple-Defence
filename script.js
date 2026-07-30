@@ -1,11 +1,9 @@
-// --- 최고 기록 및 도감 데이터 불러오기 ---
 let bestWave = localStorage.getItem('mapleDefenseBestWave') || 0;
 document.getElementById('best-record').innerText = `최고 기록: ${bestWave} 웨이브`;
 
 let cardData = JSON.parse(localStorage.getItem('mapleDefenseCards')) || {};
 const CARD_REQ = [1, 2, 4, 8, 12, 16, 20, 24, 28, 32]; 
 
-// 스킬 시스템 관련 데이터
 let spentCoins = parseInt(localStorage.getItem('mapleDefenseSpentCoins')) || 0;
 let skillLevels = JSON.parse(localStorage.getItem('mapleDefenseSkills')) || {
     common_wind: 0, common_sharp: 0, common_rage: 0,
@@ -62,24 +60,41 @@ const CLASSES = {
     '도적': { type: '도적', icon: '✦', color: '#6a1b9a', baseDmg: 18, range: 200, cd: 800, splash: 0 }
 };
 
+// 100층 미만 보스만 체력을 하드코딩하고, 100층 이상은 이름과 보상만 정의해둡니다.
 const BOSS_WAVES = {
     24: { hp: 10000, meso: 50, ticket: 3, name: "킹 슬라임" },
     37: { hp: 30000, meso: 50, ticket: 4, name: "알리샤르" },
     58: { hp: 100000, meso: 50, ticket: 4, name: "파풀라투스" },
     79: { hp: 300000, meso: 70, ticket: 5, name: "피아누스" },
     90: { hp: 1000000, meso: 100, ticket: 5, name: "자쿰" },
-    100: { hp: 2000000, meso: 100, ticket: 5, name: "혼테일" },
-    110: { hp: 4000000, meso: 150, ticket: 5, name: "시그너스" },
-    120: { hp: 8000000, meso: 150, ticket: 5, name: "반반" },
-    130: { hp: 16000000, meso: 150, ticket: 5, name: "피에르" },
-    140: { hp: 32000000, meso: 150, ticket: 5, name: "블러드퀸" },
-    150: { hp: 64000000, meso: 150, ticket: 5, name: "벨룸" }
+    
+    // 아래 100층 이상은 getBossInfo 함수에서 공식을 통해 체력이 자동 계산됩니다.
+    100: { name: "혼테일", meso: 100, ticket: 5 },
+    110: { name: "시그너스", meso: 150, ticket: 5 },
+    120: { name: "반반", meso: 150, ticket: 5 },
+    130: { name: "피에르", meso: 150, ticket: 5 },
+    140: { name: "블러드퀸", meso: 150, ticket: 5 },
+    150: { name: "벨룸", meso: 150, ticket: 5 }
 };
 
 function getBossInfo(w) {
-    if (BOSS_WAVES[w]) return BOSS_WAVES[w];
-    if (w > 100 && w % 5 === 0) {
-        return { hp: Math.floor(2000000 * Math.pow(1.4142, (w - 100) / 5)), meso: 150, ticket: 5, name: `심연의 보스 (${w}층)` };
+    // 1. 100층 미만 보스는 정해진 수치 그대로 반환
+    if (w < 100 && BOSS_WAVES[w]) {
+        return BOSS_WAVES[w];
+    }
+    
+    // 2. 100층 이상 (5층 단위) 보스는 가속도(이차 함수) 공식을 적용하여 체력 계산
+    if (w >= 100 && w % 5 === 0) {
+        let n = (w - 100) / 5; // 100층은 n=0, 105층은 n=1, 110층은 n=2 ...
+        
+        // 이차 함수 체력 스케일링 공식 (기본 200만 + 100만씩 증가 + 가속도)
+        let calculatedHp = 2000000 + (n * 1000000) + (Math.pow(n, 2) * 150000);
+        
+        let bName = BOSS_WAVES[w] ? BOSS_WAVES[w].name : `심연의 보스 (${w}층)`;
+        let bMeso = BOSS_WAVES[w] ? BOSS_WAVES[w].meso : 150;
+        let bTicket = BOSS_WAVES[w] ? BOSS_WAVES[w].ticket : 5;
+
+        return { hp: Math.floor(calculatedHp), meso: bMeso, ticket: bTicket, name: bName };
     }
     return null;
 }
@@ -164,8 +179,10 @@ function getTotalCardBonus() {
     for(let k in cardData) { if(cardData[k].grade > 0) bonus += 1 + (cardData[k].grade - 1) * 0.5; }
     return bonus;
 }
+// --- 코인 획득 2배수로 변경 ---
 function getAvailableCoins() {
-    return Math.floor(getTotalGrade() / 3) - spentCoins;
+    // 기존 / 3 을 / 2 로 변경
+    return Math.floor(getTotalGrade() / 2) - spentCoins;
 }
 
 function openBookModal() {
@@ -190,7 +207,6 @@ function renderBook() {
         let imgSrc = bossImages[bName] ? bossImages[bName].src : '';
         let imgHtml = imgSrc ? `<img src="${imgSrc}" style="width: 40px; height: 40px; object-fit: contain; margin-right: 8px; flex-shrink: 0; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.4));">` : '';
 
-        // 텍스트 오버플로우 방지 (1줄 강제 고정)
         list.innerHTML += `
         <div style="background:#fff; border:2px solid #8d6e63; border-radius:6px; padding:6px 8px; text-align:left; display:flex; justify-content:space-between; align-items:center;">
             <div style="display:flex; align-items:center; overflow:hidden;">
@@ -237,7 +253,6 @@ function renderShop(category) {
             let canUpgrade = lvl < info.max && getAvailableCoins() > 0;
             let btnText = lvl === info.max ? 'MAX' : `강화 (1코인)`;
             
-            // 텍스트 오버플로우 방지 (1줄 강제 고정)
             list.innerHTML += `
             <div style="background:#fff; border:2px solid #8d6e63; border-radius:6px; padding:6px 8px; display:flex; justify-content:space-between; align-items:center;">
                 <div style="display:flex; align-items:center; overflow:hidden;">
@@ -272,7 +287,6 @@ function openActiveSkillsModal() {
     for(let key in skillLevels) {
         if(skillLevels[key] > 0) {
             hasSkill = true;
-            // 텍스트 오버플로우 방지 (1줄 강제 고정)
             list.innerHTML += `
             <div style="background:#fff; border:2px solid #8d6e63; border-radius:6px; padding:6px 8px; display:flex; align-items:center; overflow:hidden;">
                 <img src="${SKILL_INFO[key].img}" onerror="this.src='image/mepo.png'" style="width:30px; height:30px; object-fit:contain; margin-right:8px; flex-shrink:0;">
