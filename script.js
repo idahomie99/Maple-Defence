@@ -1054,7 +1054,7 @@ window.showPkRanking = async () => {
     document.getElementById('pk-result-modal').style.display = 'none';
     document.getElementById('pk-result-overlay').style.display = 'none';
     
-    document.getElementById('pk-overlay').style.display = 'flex'; // 오버레이 켜기
+    document.getElementById('pk-overlay').style.display = 'flex';
     document.getElementById('pk-ranking').style.display = 'flex';
     
     let list = document.getElementById('pk-ranking-list');
@@ -1094,19 +1094,18 @@ window.togglePkSpeed = () => {
 };
 
 window.startPkGame = (clsName) => {
-    document.getElementById('pk-overlay').style.display = 'none'; // 오버레이 끄기 (일반 맵처럼 투명하게 보이기 위해)
+    document.getElementById('start-screen').style.display = 'none'; // 로비 숨김
+    document.getElementById('pk-overlay').style.display = 'none'; 
     document.getElementById('pk-game').style.display = 'flex';
     
     let grade = GRADES[8]; // 데스티니 고정
     let cls = CLASSES[clsName];
     
-    // UI 업데이트 (유닛 박스에 선택한 직업 적용)
     document.getElementById('pk-unit-icon').innerText = cls.icon;
     document.getElementById('pk-unit-name').style.color = cls.color;
     
     pkState = {
         active: true, time: 60, score: 0, lastTime: performance.now(), speed: 1,
-        // 유닛은 9시 방향 칸 (x: 110, y: 250), 허수아비는 3시 방향 (x: 390, y: 250)
         unit: { cls: cls, grade: grade, gradeIdx: 8, x: 110, y: 250, lastAttack: 0, globalCooldown: 0 },
         scarecrow: { x: 390, y: 250, size: 20, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0 },
         projectiles: [], dmgTexts: [], vfx: []
@@ -1123,20 +1122,16 @@ function pkLoop() {
     if (!pkState.active) return;
     
     let now = performance.now();
-    // 배속을 dt에 곱해줘서 프레임당 이동거리와 쿨타임 감소폭을 늘림
     let dt = ((now - pkState.lastTime) / 1000) * pkState.speed;
     if (dt > 0.1) dt = 0.1;
     pkState.lastTime = now;
     
-    // 타임아웃도 배속에 비례해서 빨리 깎임 (dt 그대로 차감)
     pkState.time -= dt; 
     document.getElementById('pk-time').innerText = Math.ceil(Math.max(0, pkState.time));
     
     if (pkState.time <= 0) {
         pkState.active = false;
         cancelAnimationFrame(pkReqId);
-        
-        // 종료 시 결과 팝업 표시
         document.getElementById('pk-final-score').innerText = Math.floor(pkState.score).toLocaleString();
         document.getElementById('pk-result-overlay').style.display = 'block';
         document.getElementById('pk-result-modal').style.display = 'block';
@@ -1160,7 +1155,6 @@ function pkLoop() {
     let sharpChance = skillLevels.common_sharp * 0.05;
     let windReduc = 1 + (skillLevels.common_wind * 0.2);
     
-    // ★ 펀치킹 밸런스 평준화: 모든 직업 기본공격력 20, 쿨타임 1초(1000ms) 고정 ★
     let pkBaseDmg = 20; 
     let pkBaseCd = 1000;
     
@@ -1259,13 +1253,13 @@ function pkApplyDmg(dmg, isCrit) {
     pkState.dmgTexts.push({ val: Math.floor(dmg), x: pkState.scarecrow.x + ox, y: pkState.scarecrow.y - 40 + oy, timer: 0.6, isCrit: isCrit });
 }
 
-// 측정 종료 시 랭킹 등록
 window.submitPkScore = async () => {
     let finalScore = Math.floor(pkState.score);
     let className = pkState.unit.cls.type;
     
     if (!currentUserUid) {
         alert("로그인이 끊어졌습니다.");
+        document.getElementById('start-screen').style.display = 'flex';
         window.openPkMenu();
         return;
     }
@@ -1290,12 +1284,18 @@ window.submitPkScore = async () => {
         alert("서버에 랭킹을 저장하는 중 오류가 발생했습니다.");
     }
     
+    document.getElementById('pk-result-overlay').style.display = 'none';
+    document.getElementById('pk-result-modal').style.display = 'none';
+    document.getElementById('pk-game').style.display = 'none';
+    document.getElementById('start-screen').style.display = 'flex'; // 로비 복구
     window.showPkRanking();
 };
 
-// 중도 포기 또는 결과창에서 그냥 로비로
 window.discardPkScore = () => {
+    document.getElementById('pk-result-overlay').style.display = 'none';
+    document.getElementById('pk-result-modal').style.display = 'none';
     document.getElementById('pk-game').style.display = 'none';
+    document.getElementById('start-screen').style.display = 'flex'; // 로비 복구
     window.openPkMenu();
 };
 
@@ -1304,6 +1304,7 @@ window.endPkGame = (isGiveUp) => {
     cancelAnimationFrame(pkReqId);
     if (isGiveUp) { 
         document.getElementById('pk-game').style.display = 'none';
+        document.getElementById('start-screen').style.display = 'flex'; // 로비 복구
         window.openPkMenu(); 
     }
 };
@@ -1313,7 +1314,6 @@ function drawPk() {
     let pkCtx = pkCanvas.getContext('2d');
     pkCtx.clearRect(0, 0, pkCanvas.width, pkCanvas.height);
     
-    // 일반 맵과 동일한 길(트랙) 그리기
     pkCtx.strokeStyle = "rgba(188, 170, 164, 0.2)";
     pkCtx.lineWidth = 35;
     pkCtx.lineJoin = "round";
@@ -1321,12 +1321,10 @@ function drawPk() {
     
     let m = pkState.scarecrow;
     
-    // 3시 방향 허수아비 렌더링 (빨간 박스 삭제, 텍스트만 표시)
     pkCtx.font = "30px NanumSquare";
     pkCtx.textAlign = "center"; pkCtx.textBaseline = "middle";
     pkCtx.fillText("🎃", m.x, m.y); 
     
-    // 상태이상 시각화
     if (m.freezeTimer > 0) {
         pkCtx.fillStyle = "rgba(0, 200, 255, 0.5)"; 
         pkCtx.fillRect(m.x - 20, m.y - 20, 40, 40);
@@ -1334,7 +1332,6 @@ function drawPk() {
         pkCtx.fillText("❄️", m.x + 15, m.y - 15); 
     }
     
-    // 투사체
     pkState.projectiles.forEach(p => {
         pkCtx.save();
         pkCtx.translate(p.x, p.y);
@@ -1361,7 +1358,6 @@ function drawPk() {
         pkCtx.restore();
     });
     
-    // 데미지 텍스트
     pkState.dmgTexts.forEach(d => {
         pkCtx.save();
         pkCtx.globalAlpha = Math.max(0, d.timer / 0.6);
@@ -1373,7 +1369,6 @@ function drawPk() {
         pkCtx.restore();
     });
     
-    // 전역 스킬 효과
     pkState.vfx.forEach(v => {
         pkCtx.save();
         if (v.type === 'death') {
