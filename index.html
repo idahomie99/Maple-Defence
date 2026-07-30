@@ -13,17 +13,64 @@
         <div style="display:flex; flex-direction:column; gap:12px; width: 80%; max-width: 250px;">
             <button id="btn-continue" class="pulse-btn" style="display:none;" onclick="loadAndStartGame()">이어하기</button>
             <button class="pulse-btn" style="background: linear-gradient(to bottom, #66bb6a, #2e7d32); border-color:#1b5e20;" onclick="startNewGame()">새로하기</button>
-            <!-- 몬스터 도감 및 상점 버튼 -->
             <div style="display:flex; gap:10px;">
                 <button class="pulse-btn" style="flex:1; padding: 15px 10px; background: linear-gradient(to bottom, #42a5f5, #1565c0); border-color:#0d47a1; animation: none;" onclick="openBookModal()">도감</button>
                 <button class="pulse-btn" style="flex:1; padding: 15px 10px; background: linear-gradient(to bottom, #ab47bc, #6a1b9a); border-color:#4a148c; animation: none;" onclick="openShopModal()">상점</button>
             </div>
+            <button class="pulse-btn" style="background: linear-gradient(to bottom, #ef5350, #c62828); border-color:#b71c1c; animation: none;" onclick="openPkMenu()">🥊 월드 펀치킹</button>
         </div>
     </div>
 
+    <!-- 월드 펀치킹 전용 오버레이 -->
+    <div id="pk-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:2000; flex-direction:column; align-items:center;">
+        
+        <!-- 펀치킹 메뉴 -->
+        <div id="pk-menu" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 20vh;">
+            <h3>🥊 월드 펀치킹 🥊</h3>
+            <p style="font-size:12px; color:#555; margin-bottom:15px;">혼줌 제외, 도감 및 스킬 스펙만 적용된<br>순수 DPS를 측정합니다. (1분)</p>
+            <button class="maple-btn huge primary" style="width:100%; margin-bottom:10px;" onclick="showPkClassSelect()">시작하기</button>
+            <button class="maple-btn huge secondary" style="width:100%; margin-bottom:15px;" onclick="showPkRanking()">랭킹</button>
+            <button class="maple-btn danger-btn" style="width:100%;" onclick="closePk()">로비로 돌아가기</button>
+        </div>
+        
+        <!-- 직업 선택 -->
+        <div id="pk-class-select" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 20vh;">
+            <h3>직업 선택 (데스티니)</h3>
+            <div style="display:flex; gap:10px; margin-bottom:15px;">
+                <button class="maple-btn warrior-btn" style="flex:1; background:#c62828;" onclick="startPkGame('전사')">전사</button>
+                <button class="maple-btn mage-btn" style="flex:1; background:#1565c0;" onclick="startPkGame('법사')">법사</button>
+                <button class="maple-btn thief-btn" style="flex:1; background:#6a1b9a;" onclick="startPkGame('도적')">도적</button>
+            </div>
+            <button class="maple-btn" style="width:100%;" onclick="openPkMenu()">뒤로</button>
+        </div>
+
+        <!-- 펀치킹 전투 맵 -->
+        <div id="pk-game" style="display:none; flex-direction:column; align-items:center; width:100%; max-width:500px; height:100%; padding-top:10vh;">
+            <div id="pk-score" style="font-size:64px; font-weight:900; color:#ffeb3b; text-shadow: 3px 3px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; letter-spacing: 2px;">0</div>
+            <div style="color:#fff; font-size:20px; font-weight:bold; margin: 15px 0;">남은 시간: <span id="pk-time" style="color:#ff5252; font-size:28px;">60</span>초</div>
+            
+            <div style="position:relative; width: 320px; height: 160px; margin-top: 30px;">
+                <!-- 유닛 박스 (좌) / 허수아비 박스 (우) -->
+                <div style="position:absolute; top: 30px; left: 40px; width: 80px; height: 80px; border: 3px solid #bcaaa4; background: rgba(215, 204, 200, 0.8);"></div>
+                <div style="position:absolute; top: 30px; left: 200px; width: 80px; height: 80px; border: 3px solid #546e7a; background: rgba(69, 90, 100, 0.8);"></div>
+                <canvas id="pkCanvas" width="320" height="160" style="position:absolute; top:0; left:0; pointer-events:none; z-index:10;"></canvas>
+            </div>
+            
+            <button class="maple-btn danger-btn" style="margin-top: 50px; width: 200px;" onclick="endPkGame(true)">중도 포기</button>
+        </div>
+
+        <!-- 펀치킹 랭킹 -->
+        <div id="pk-ranking" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 10vh; width:90%; max-width:360px; max-height: 80vh; flex-direction:column;">
+            <h3>🏆 월드 펀치킹 랭킹 🏆</h3>
+            <div id="pk-ranking-list" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:8px; margin-bottom:15px; padding-right:5px;"></div>
+            <button class="maple-btn" style="width:100%;" onclick="openPkMenu()">뒤로</button>
+        </div>
+    </div>
+
+    <!-- 기존 디펜스 모드용 오버레이들 -->
     <div id="summon-toast"></div>
     <div id="boss-toast"></div>
-
+    <!-- ... (아래는 기존 코드를 그대로 유지합니다) ... -->
     <div id="game-container">
         <div id="header" class="maple-panel">
             <div class="stat-row">
@@ -34,19 +81,14 @@
                     <button class="maple-btn small danger-btn" onclick="goToLobby()">로비로</button>
                 </div>
             </div>
-            <!-- 적용중인 스킬 효과 보기 버튼 -->
             <button class="maple-btn small" style="width: 100%; margin: 4px 0; background: linear-gradient(to bottom, #7e57c2, #4a148c); border-color: #311b92;" onclick="openActiveSkillsModal()">⭐ 적용중인 스킬 효과 보기</button>
             <div class="stat-row">
                 <div>몹: <span id="ui-mobs" class="danger">0 / 200</span></div>
                 <div>킬수: <span id="ui-kills">0</span></div>
             </div>
             <div class="resource-row">
-                <div class="meso-box">
-                    <img src="image/meso.png" alt="Meso" style="height: 16px; vertical-align: middle; margin-right: 4px;">메소 <span id="ui-meso">25</span>
-                </div>
-                <div class="mp-box">
-                    <img src="image/mepo.png" alt="Mepo" style="height: 16px; vertical-align: middle; margin-right: 4px;">메포 <span id="ui-mp">0</span>
-                </div>
+                <div class="meso-box"><img src="image/meso.png" alt="Meso" style="height: 16px; vertical-align: middle; margin-right: 4px;">메소 <span id="ui-meso">25</span></div>
+                <div class="mp-box"><img src="image/mepo.png" alt="Mepo" style="height: 16px; vertical-align: middle; margin-right: 4px;">메포 <span id="ui-mp">0</span></div>
             </div>
         </div>
         
@@ -64,7 +106,6 @@
                 <button id="btn-sell-single" class="maple-btn huge danger-btn" style="flex: 1;" onclick="sellSelectedUnit()" disabled>판매</button>
                 <button class="maple-btn secondary huge" style="flex: 1;" onclick="openBulkSellModal()">일괄판매</button>
             </div>
-            
             <div style="text-align:center; font-weight:bold; font-size:14px; color:#5a3c22; margin-bottom: 5px; border-top: 1px dashed #8b5a2b; padding-top: 5px;">
                 <img src="image/chaosscroll.png" style="height: 20px; vertical-align: middle;"> 혼돈의 주문서 강화 <img src="image/chaosscroll.png" style="height: 20px; vertical-align: middle;">
             </div>
@@ -83,7 +124,6 @@
                 </div>
             </div>
             <div style="text-align:center; font-size:11px; color:#666; margin-top:2px;">(+1~+6 랜덤 적용, 공격력에 미세하게 합산됨)</div>
-            
             <div class="ticket-row" style="margin-top: 10px;">
                 <span>선택권: <span id="ui-tickets" class="highlight">0</span>장</span>
                 <button class="maple-btn secondary" onclick="openTicketModal()">사용하기</button>
@@ -93,7 +133,7 @@
     
     <div id="overlay" onclick="closeAllModals()"></div>
 
-    <!-- 몬스터 도감 모달 -->
+    <!-- 모달들 (도감, 상점 등 기존과 동일) -->
     <div id="book-modal" class="maple-modal" style="max-height: 85vh; display: none; flex-direction: column;">
         <h3>📖 몬스터 도감 📖</h3>
         <div id="book-total-grade" style="font-weight:900; color:#1565c0; font-size: 14px;">총 등급 합계: <span id="ui-total-grade">0</span> (코인: <span id="ui-book-coins">0</span>)</div>
@@ -102,7 +142,6 @@
         <button class="maple-btn" onclick="closeAllModals()" style="margin-top:15px; width:100%;">닫기</button>
     </div>
 
-    <!-- 스킬 상점 모달 -->
     <div id="shop-modal" class="maple-modal" style="max-height: 85vh; display: none; flex-direction: column; width: 90%; max-width: 360px;">
         <h3>🛒 스킬 상점 🛒</h3>
         <div style="font-weight:900; color:#e65100; margin-bottom:10px; font-size: 15px;">보유 몬스터 코인: <span id="ui-shop-coins">0</span>개</div>
@@ -116,7 +155,6 @@
         <button class="maple-btn" onclick="closeAllModals()" style="margin-top:15px; width:100%;">닫기</button>
     </div>
 
-    <!-- 인게임 활성 스킬 확인 모달 -->
     <div id="active-skills-modal" class="maple-modal" style="max-height: 80vh; display: none; flex-direction: column;">
         <h3>⭐ 적용중인 스킬 ⭐</h3>
         <div id="active-skills-list" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 8px; padding-right: 5px; text-align:left;"></div>
