@@ -5,6 +5,7 @@ import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/fireb
 const firebaseConfig = {
     apiKey: "AIzaSyCJfYaeZGXyfIzxb0AlbPAv36ZWdMksolc",
     authDomain: "maple-defence.firebaseapp.com",
+    databaseURL: "https://maple-defence-default-rtdb.asia-southeast1.firebasedatabase.app", // <--- 이 부분이 핵심입니다!
     projectId: "maple-defence",
     storageBucket: "maple-defence.firebasestorage.app",
     messagingSenderId: "507227611120",
