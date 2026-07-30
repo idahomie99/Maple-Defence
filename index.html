@@ -60,22 +60,32 @@
             <button class="maple-btn" style="width:100%;" onclick="openPkMenu()">뒤로</button>
         </div>
 
-        <!-- 디펜스 본판과 동일한 디자인의 펀치킹 맵 -->
+        <!-- 디펜스 본판과 100% 동일한 디자인의 펀치킹 맵 -->
         <div id="pk-game" style="display:none; flex-direction:column; width:100%; max-width:500px; height:auto; min-height:100vh; background-color: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); padding-bottom: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.8);">
-            <div class="maple-panel" style="margin: 10px; padding: 12px; display: flex; justify-content: space-between; align-items: center;">
-                <div style="font-size:24px; color:#ffeb3b; font-weight:900; text-shadow:2px 2px 0 #000; flex:1;">점수: <span id="pk-score">0</span></div>
-                <div style="display:flex; align-items:center; gap: 10px;">
-                    <button id="pk-btn-speed" class="maple-btn small" onclick="togglePkSpeed()">1배속</button>
-                    <div style="color:#ff5252; font-size:18px; font-weight:bold; white-space:nowrap;">시간: <span id="pk-time">60</span></div>
+            
+            <!-- 일반 게임과 동일한 형태의 헤더 UI -->
+            <div id="pk-header" class="maple-panel" style="margin: 10px 10px 0 10px; padding: 12px; font-size: 15px; font-weight: bold;">
+                <div class="stat-row">
+                    <div>점수: <span id="pk-score" class="highlight">0</span></div>
+                    <div>타이머: <span id="pk-time" class="highlight" style="color:#ff5252;">60</span>초</div>
+                    <div style="display:flex; gap:5px;">
+                        <button id="pk-btn-speed" class="maple-btn small" onclick="togglePkSpeed()">1배속</button>
+                        <button class="maple-btn small danger-btn" onclick="endPkGame(true)">포기</button>
+                    </div>
                 </div>
             </div>
             
-            <div style="position: relative; width: 100%; aspect-ratio: 1/1; background-color: rgba(55, 71, 79, 0.5); border-top: 4px solid rgba(38, 50, 56, 0.8); border-bottom: 4px solid rgba(38, 50, 56, 0.8);">
-                <canvas id="pkCanvas" width="500" height="500" style="position:absolute; top:0; left:0; z-index:10;"></canvas>
-            </div>
-            
-            <div class="maple-panel" style="margin: 10px; padding: 12px;">
-                <button class="maple-btn huge danger-btn" style="width: 100%;" onclick="endPkGame(true)">포기하고 로비로</button>
+            <!-- 일반 게임과 동일한 보드 에어리어 (트랙 표시용) -->
+            <div id="pk-board-area" style="position: relative; width: 100%; aspect-ratio: 1/1; background-color: transparent; border: none; margin-top: 10px;">
+                <canvas id="pkCanvas" width="500" height="500" style="position:absolute; top:0; left:0; z-index:10; pointer-events:none;"></canvas>
+                
+                <!-- 중앙에 배치된 유닛 전용 1칸 박스 (디펜스 맵 그리드와 동일 디자인) -->
+                <div style="position: absolute; top: 38%; left: 38%; width: 24%; height: 24%; background-color: rgba(220, 190, 170, 0.85); border: 3px solid rgba(120, 80, 60, 0.9); z-index: 5; border-radius: 4px; display:flex; justify-content:center; align-items:center; padding: 4px;">
+                    <div class="grid-cell glow-8" style="width: 100%; height: 100%; background: rgba(30, 30, 30, 0.7); box-shadow: inset 0 0 15px rgba(255,213,79,0.6), 0 0 8px rgba(255,213,79,0.8); cursor:default; border:none;">
+                        <div id="pk-unit-icon" style="font-size:32px; text-shadow:1px 1px 2px rgba(0,0,0,0.5);">🗡️</div>
+                        <div id="pk-unit-name" style="color:#ffd54f; font-size:12px; margin-top:4px;">데스티니</div>
+                    </div>
+                </div>
             </div>
         </div>
 

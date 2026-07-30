@@ -134,7 +134,7 @@ let monsters = [], projectiles = [], towers = [];
 let hitEffects = []; let visualEffects = []; let fumaList = []; let damageTexts = [];
 let lastTime = 0, waveTimer = 0, spawnTimer = 0;
 let selectedUnitIdx = -1; 
-let mainReqId; // 메인 게임 루프 ID
+let mainReqId; 
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -184,7 +184,6 @@ window.loadAndStartGame = () => {
     updateUI(); mainReqId = requestAnimationFrame(loop);
 };
 
-// 새로하기 변수 초기화 로직 (이어하기 버그 완벽 수정)
 window.startNewGame = () => {
     localStorage.removeItem('mapleDefenseSave');
     
@@ -842,7 +841,7 @@ function loop() {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    ctx.strokeStyle = "rgba(0,0,0,0.15)";
+    ctx.strokeStyle = "rgba(188, 170, 164, 0.2)";
     ctx.lineWidth = 35;
     ctx.lineJoin = "round";
     ctx.beginPath(); ctx.rect(25, 25, 450, 450); ctx.stroke();
@@ -1019,7 +1018,7 @@ function gameOver(msg) {
 let pkReqId;
 let pkState = {
     active: false, time: 60, score: 0, lastTime: 0, speed: 1,
-    unit: null, scarecrow: { x: 350, y: 250, size: 30, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0 },
+    unit: null, scarecrow: { x: 250, y: 25, size: 20, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0 },
     projectiles: [], dmgTexts: [], vfx: []
 };
 
@@ -1095,10 +1094,15 @@ window.startPkGame = (clsName) => {
     let grade = GRADES[8]; // 데스티니 고정
     let cls = CLASSES[clsName];
     
+    // UI 업데이트 (유닛 박스에 선택한 직업의 아이콘과 색상 적용)
+    document.getElementById('pk-unit-icon').innerText = cls.icon;
+    document.getElementById('pk-unit-name').style.color = cls.color;
+    
     pkState = {
         active: true, time: 60, score: 0, lastTime: performance.now(), speed: 1,
-        unit: { cls: cls, grade: grade, gradeIdx: 8, x: 150, y: 250, lastAttack: 0, globalCooldown: 0 },
-        scarecrow: { x: 350, y: 250, size: 30, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0 },
+        // 유닛은 보드 정중앙, 허수아비는 몹 나오는 길의 상단 중앙에 배치
+        unit: { cls: cls, grade: grade, gradeIdx: 8, x: 250, y: 250, lastAttack: 0, globalCooldown: 0 },
+        scarecrow: { x: 250, y: 25, size: 20, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0 },
         projectiles: [], dmgTexts: [], vfx: []
     };
     
@@ -1113,11 +1117,12 @@ function pkLoop() {
     if (!pkState.active) return;
     
     let now = performance.now();
+    // 배속에 비례하여 dt 적용 -> 시간이 시각적으로 훅훅 줄어들게 처리
     let dt = ((now - pkState.lastTime) / 1000) * pkState.speed;
     if (dt > 0.1) dt = 0.1;
     pkState.lastTime = now;
     
-    pkState.time -= (dt / pkState.speed); // 시간은 실제 현실 시간 기준으로 흘러가게 보정
+    pkState.time -= dt; 
     document.getElementById('pk-time').innerText = Math.ceil(Math.max(0, pkState.time));
     
     if (pkState.time <= 0) { window.endPkGame(false); return; }
@@ -1135,12 +1140,14 @@ function pkLoop() {
         }
     }
 
+    // 도감 퍼센트 및 스킬 연산 적용
     let cardMulti = 1 + (getTotalCardBonus() / 100);
     let rageMulti = 1 + (skillLevels.common_rage * 0.01);
     let sharpChance = skillLevels.common_sharp * 0.05;
     let windReduc = 1 + (skillLevels.common_wind * 0.2);
     
-    // ★ 펀치킹 밸런스 평준화: 직업 고유 데미지와 쿨타임을 무시하고 모두 기본공격력 20, 쿨타임 1초로 고정 ★
+    // ★ 펀치킹 밸런스 평준화: 모든 직업 기본공격력 20, 쿨타임 1초(1000ms) 고정 ★
+    // 혼줌 강화 미적용, 보스 추가 데미지 미적용
     let pkBaseDmg = 20; 
     let pkBaseCd = 1000;
     
@@ -1172,7 +1179,7 @@ function pkLoop() {
         
         let isFinal = false;
         if (u.cls.type === '전사' && skillLevels.war_final > 0 && Math.random() < (skillLevels.war_final * 0.03)) {
-            isFinal = true; dmg *= 2;
+            isFinal = true; dmg *= 2; // 파이널어택 발동 시 2배 데미지
         }
         
         pkState.projectiles.push({
@@ -1283,30 +1290,41 @@ function drawPk() {
     let pkCtx = pkCanvas.getContext('2d');
     pkCtx.clearRect(0, 0, pkCanvas.width, pkCanvas.height);
     
-    // 펀치킹 경기장 라인 드로잉
+    // 일반 맵과 동일한 길(트랙) 그리기
     pkCtx.strokeStyle = "rgba(188, 170, 164, 0.2)";
-    pkCtx.lineWidth = 15;
-    pkCtx.beginPath(); pkCtx.arc(250, 250, 180, 0, Math.PI * 2); pkCtx.stroke();
+    pkCtx.lineWidth = 35;
+    pkCtx.lineJoin = "round";
+    pkCtx.beginPath(); pkCtx.rect(25, 25, 450, 450); pkCtx.stroke();
     
     let u = pkState.unit;
     let m = pkState.scarecrow;
     
-    // 내 유닛
-    pkCtx.fillStyle = 'rgba(255, 235, 59, 0.2)';
-    pkCtx.beginPath(); pkCtx.arc(u.x, u.y, 80, 0, Math.PI * 2); pkCtx.fill();
-    pkCtx.font = "40px NanumSquare"; pkCtx.textAlign = "center"; pkCtx.textBaseline = "middle";
-    pkCtx.fillText(u.cls.icon, u.x, u.y);
+    // 허수아비가 스폰되는 1칸짜리 박스 시각화 (몹 경로 상단)
+    pkCtx.fillStyle = 'rgba(255, 82, 82, 0.3)';
+    pkCtx.fillRect(m.x - 25, m.y - 25, 50, 50);
+    pkCtx.strokeStyle = 'rgba(255, 82, 82, 0.8)';
+    pkCtx.lineWidth = 2;
+    pkCtx.strokeRect(m.x - 25, m.y - 25, 50, 50);
     
-    // 허수아비
-    pkCtx.font = "60px NanumSquare";
+    // 허수아비 렌더링
+    pkCtx.font = "30px NanumSquare";
+    pkCtx.textAlign = "center"; pkCtx.textBaseline = "middle";
     pkCtx.fillText("🎃", m.x, m.y); 
+    
+    // 상태이상 시각화
+    if (m.freezeTimer > 0) {
+        pkCtx.fillStyle = "rgba(0, 200, 255, 0.5)"; 
+        pkCtx.fillRect(m.x - 20, m.y - 20, 40, 40);
+        pkCtx.fillStyle = "#fff"; pkCtx.font = "16px NanumSquare";
+        pkCtx.fillText("❄️", m.x + 15, m.y - 15); 
+    }
     
     // 투사체
     pkState.projectiles.forEach(p => {
         pkCtx.save();
         pkCtx.translate(p.x, p.y);
         let dir = Math.atan2(p.ty - p.y, p.tx - p.x);
-        let scale = 2.0;
+        let scale = 1.5;
         if (p.isFinal) { scale *= 1.3; pkCtx.globalAlpha = 1.0; }
         else pkCtx.globalAlpha = 0.8;
         
