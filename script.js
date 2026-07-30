@@ -1,3 +1,54 @@
+// ==========================================
+// Firebase 연동 및 초기화 세팅
+// ==========================================
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
+import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyCJfYaeZGXyfIzxb0AlbPAv36ZWdMksolc",
+    authDomain: "maple-defence.firebaseapp.com",
+    projectId: "maple-defence",
+    storageBucket: "maple-defence.firebasestorage.app",
+    messagingSenderId: "507227611120",
+    appId: "1:507227611120:web:0f18aebe3b350af3014735"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const database = getDatabase(app);
+
+let currentUserName = "이름없는 용사";
+let currentUserUid = null;
+
+// 로그인 상태 감지
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        currentUserUid = user.uid;
+        currentUserName = user.displayName || "용사";
+        document.getElementById('current-user-name').innerText = currentUserName;
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('start-screen').style.display = 'flex';
+    } else {
+        currentUserUid = null;
+        document.getElementById('login-screen').style.display = 'flex';
+        document.getElementById('start-screen').style.display = 'none';
+    }
+});
+
+window.loginWithGoogle = () => {
+    const provider = new GoogleAuthProvider();
+    signInWithPopup(auth, provider).catch(error => alert("로그인 실패: " + error.message));
+};
+
+window.logout = () => {
+    signOut(auth).then(() => { location.reload(); });
+};
+
+
+// ==========================================
+// 기존 게임 로직 
+// ==========================================
 let bestWave = localStorage.getItem('mapleDefenseBestWave') || 0;
 document.getElementById('best-record').innerText = `최고 기록: ${bestWave} 웨이브`;
 
@@ -111,7 +162,7 @@ function initGrid() {
     for(let i=0; i<25; i++) {
         let cell = document.createElement('div');
         cell.className = 'grid-cell';
-        cell.onclick = () => onCellClick(i);
+        cell.onclick = () => window.onCellClick(i); // window 연동
         gridContainer.appendChild(cell);
     }
 }
@@ -130,30 +181,39 @@ function saveGameData() {
     localStorage.setItem('mapleDefenseSave', JSON.stringify(saveObj));
 }
 
-function loadAndStartGame() {
+window.loadAndStartGame = () => {
     let saved = JSON.parse(localStorage.getItem('mapleDefenseSave'));
-    if(!saved) { startNewGame(); return; }
+    if(!saved) { window.startNewGame(); return; }
     state.wave = saved.wave; state.meso = saved.meso; state.mp = saved.mp;
     state.mpTotal = saved.mpTotal; state.kills = saved.kills;
     state.upgrades = saved.upgrades; state.tickets = saved.tickets;
     
     grid = new Array(25).fill(null); towers = [];
-    saved.gridData.forEach((u) => { if(u) addUnit(u.idx, u.gradeIdx, u.clsName, true); });
+    saved.gridData.forEach((u) => { if(u) window.addUnit(u.idx, u.gradeIdx, u.clsName, true); });
     
     document.getElementById('start-screen').style.display = 'none';
+    document.getElementById('game-container').style.display = 'flex';
     state.status = 'PREP'; state.time = 5; 
     lastTime = performance.now(); state.isBoss = !!getBossInfo(state.wave);
     updateUI(); requestAnimationFrame(loop);
-}
+};
 
-function startNewGame() {
+window.startNewGame = () => {
     localStorage.removeItem('mapleDefenseSave');
     document.getElementById('start-screen').style.display = 'none';
+    document.getElementById('game-container').style.display = 'flex';
     state.status = 'PREP'; state.time = 30;
     lastTime = performance.now(); requestAnimationFrame(loop);
-}
+};
 
-function goToLobby() { saveGameData(); location.reload(); }
+window.goToLobby = () => { 
+    saveGameData(); 
+    document.getElementById('gameover-modal').style.display = 'none';
+    document.getElementById('overlay').style.display = 'none';
+    document.getElementById('game-container').style.display = 'none';
+    document.getElementById('start-screen').style.display = 'flex';
+    state.status = 'TITLE';
+};
 
 setInterval(() => { if(state.status === 'PLAY' || state.status === 'PREP') saveGameData(); }, 3000);
 
@@ -171,13 +231,13 @@ function getAvailableCoins() {
     return Math.floor(getTotalGrade() / 2) - spentCoins;
 }
 
-function openBookModal() {
+window.openBookModal = () => {
     document.getElementById('overlay').style.display = 'block';
     document.getElementById('book-modal').style.display = 'flex';
-    renderBook();
-}
+    window.renderBook();
+};
 
-function renderBook() {
+window.renderBook = () => {
     let list = document.getElementById('book-list');
     list.innerHTML = '';
     let allBosses = Object.keys(BOSS_WAVES).map(k => BOSS_WAVES[k].name);
@@ -207,25 +267,25 @@ function renderBook() {
     });
     document.getElementById('book-total-grade').innerHTML = `총 등급 합계: <span style="color:#c62828;">${getTotalGrade()}</span> (코인: <span style="color:#f57c00;">${getAvailableCoins()}</span>)`;
     document.getElementById('book-total-bonus').innerText = `총 보유 효과: 공격력 +${getTotalCardBonus().toFixed(1)}%`;
-}
+};
 
-function upgradeCard(bName) {
+window.upgradeCard = (bName) => {
     let data = cardData[bName];
     let req = CARD_REQ[data.grade];
     if(data.grade < 10 && data.owned >= req) {
         data.owned -= req; data.grade++;
         localStorage.setItem('mapleDefenseCards', JSON.stringify(cardData));
-        renderBook();
+        window.renderBook();
     }
-}
+};
 
-function openShopModal() {
+window.openShopModal = () => {
     document.getElementById('overlay').style.display = 'block';
     document.getElementById('shop-modal').style.display = 'flex';
-    renderShop('common');
-}
+    window.renderShop('common');
+};
 
-function renderShop(category) {
+window.renderShop = (category) => {
     document.getElementById('ui-shop-coins').innerText = getAvailableCoins();
     let list = document.getElementById('shop-list');
     list.innerHTML = '';
@@ -252,19 +312,19 @@ function renderShop(category) {
             </div>`;
         }
     }
-}
+};
 
-function upgradeSkill(key, category) {
+window.upgradeSkill = (key, category) => {
     if(skillLevels[key] < SKILL_INFO[key].max && getAvailableCoins() > 0) {
         skillLevels[key]++;
         spentCoins++;
         localStorage.setItem('mapleDefenseSkills', JSON.stringify(skillLevels));
         localStorage.setItem('mapleDefenseSpentCoins', spentCoins);
-        renderShop(category);
+        window.renderShop(category);
     }
-}
+};
 
-function openActiveSkillsModal() {
+window.openActiveSkillsModal = () => {
     document.getElementById('overlay').style.display = 'block';
     document.getElementById('active-skills-modal').style.display = 'flex';
     let list = document.getElementById('active-skills-list');
@@ -284,7 +344,7 @@ function openActiveSkillsModal() {
         }
     }
     if(!hasSkill) list.innerHTML = `<div style="text-align:center; padding: 20px; font-weight:bold; color:#666;">적용중인 스킬이 없습니다. 상점에서 스킬을 구매하세요!</div>`;
-}
+};
 
 function getGradeByProb() {
     let rand = Math.random() * 100; let acc = 0;
@@ -292,7 +352,7 @@ function getGradeByProb() {
     return 0;
 }
 
-function summonUnit() {
+window.summonUnit = () => {
     if(state.status !== 'PREP' && state.status !== 'PLAY') return;
     if(state.meso < 10) return;
     let emptyIdx = grid.findIndex(v => v === null);
@@ -301,9 +361,9 @@ function summonUnit() {
     let gradeIdx = getGradeByProb();
     let clsNames = Object.keys(CLASSES);
     let clsName = clsNames[Math.floor(Math.random() * clsNames.length)];
-    addUnit(emptyIdx, gradeIdx, clsName);
+    window.addUnit(emptyIdx, gradeIdx, clsName);
     updateUI();
-}
+};
 
 function showSummonToast(gradeName, gradeIdx, clsName, color) {
     let toast = document.getElementById('summon-toast');
@@ -329,7 +389,7 @@ function showBossToast(name, isDrop = false) {
     setTimeout(() => { toast.className = ''; }, 2500);
 }
 
-function addUnit(idx, gradeIdx, clsName, isLoad = false) {
+window.addUnit = (idx, gradeIdx, clsName, isLoad = false) => {
     let grade = GRADES[gradeIdx];
     let cls = CLASSES[clsName];
     let unit = {
@@ -341,9 +401,9 @@ function addUnit(idx, gradeIdx, clsName, isLoad = false) {
     towers.push(unit);
     if(!isLoad) showSummonToast(grade.name, gradeIdx, clsName, cls.color);
     renderGrid();
-}
+};
 
-function onCellClick(idx) {
+window.onCellClick = (idx) => {
     if(state.status !== 'PREP' && state.status !== 'PLAY') return;
     if (selectedUnitIdx !== -1) {
         if (selectedUnitIdx === idx) { selectedUnitIdx = -1; } 
@@ -357,23 +417,23 @@ function onCellClick(idx) {
         }
     } else { if (grid[idx]) selectedUnitIdx = idx; }
     renderGrid(); updateUI();
-}
+};
 
-function sellSelectedUnit() {
+window.sellSelectedUnit = () => {
     if(selectedUnitIdx === -1) return;
     let u = grid[selectedUnitIdx];
     if(u && u.grade.sell > 0) {
         state.meso += u.grade.sell; towers = towers.filter(t => t !== u);
         grid[selectedUnitIdx] = null; selectedUnitIdx = -1; renderGrid(); updateUI();
     }
-}
+};
 
-function openBulkSellModal() {
+window.openBulkSellModal = () => {
     document.getElementById('overlay').style.display = 'block';
     document.getElementById('bulk-sell-modal').style.display = 'block';
-}
+};
 
-function executeBulkSell(type, value) {
+window.executeBulkSell = (type, value) => {
     let soldCount = 0; let earnedMeso = 0;
     for(let i = 0; i < 25; i++) {
         let u = grid[i];
@@ -387,10 +447,10 @@ function executeBulkSell(type, value) {
         state.meso += earnedMeso; showMessage(`${soldCount}마리 판매 (+${earnedMeso} 메소)`);
         selectedUnitIdx = -1; renderGrid(); updateUI();
     } else { showMessage("조건에 맞는 유닛이 없습니다."); }
-    closeAllModals();
-}
+    window.closeAllModals();
+};
 
-function closeAllModals() {
+window.closeAllModals = () => {
     if (state.status === 'GAMEOVER') return; 
     document.getElementById('overlay').style.display = 'none';
     document.getElementById('bulk-sell-modal').style.display = 'none';
@@ -398,7 +458,7 @@ function closeAllModals() {
     document.getElementById('book-modal').style.display = 'none';
     document.getElementById('shop-modal').style.display = 'none';
     document.getElementById('active-skills-modal').style.display = 'none';
-}
+};
 
 function renderGrid() {
     let cells = gridContainer.children;
@@ -441,10 +501,10 @@ function spawnMonster() {
     });
 }
 
-function skipBossRound() {
+window.skipBossRound = () => {
     waveTimer = 150; 
     document.getElementById('boss-skip-wrapper').style.display = 'none';
-}
+};
 
 function updateWave(dt) {
     waveTimer += dt; spawnTimer += dt;
@@ -477,7 +537,7 @@ function showUpgradeToast(idChar, amt) {
     box.appendChild(floatEl); setTimeout(() => floatEl.remove(), 1000);
 }
 
-function upgrade(type) {
+window.upgrade = (type) => {
     if(state.status !== 'PREP' && state.status !== 'PLAY') return;
     let u = state.upgrades[type];
     if(state.mp >= u.cost) {
@@ -490,35 +550,35 @@ function upgrade(type) {
         document.getElementById(`upg-${idChar}-cost`).innerText = u.cost;
         updateUI();
     } else { showMessage("메포가 부족합니다."); }
-}
+};
 
 let currentTicketTier = 0;
 
-function openTicketModal() {
+window.openTicketModal = () => {
     if(state.tickets.length === 0) { showMessage("보유한 선택권이 없습니다."); return; }
     currentTicketTier = state.tickets[0]; 
     document.getElementById('ticket-tier').innerText = currentTicketTier;
     document.getElementById('overlay').style.display = 'block';
     document.getElementById('ticket-modal').style.display = 'block';
     updateUI();
-}
+};
 
-function useTicket(choice) {
+window.useTicket = (choice) => {
     let emptyIdx = grid.findIndex(v => v === null);
     if(emptyIdx === -1) { showMessage("공간 부족!"); return; }
     state.tickets.shift(); 
     let tier = currentTicketTier;
     let cls = choice === '랜덤' ? Object.keys(CLASSES)[Math.floor(Math.random()*3)] : choice;
     if(choice === '랜덤' && Math.random() < 0.2) tier++;
-    addUnit(emptyIdx, tier, cls); closeAllModals(); updateUI();
-}
+    window.addUnit(emptyIdx, tier, cls); window.closeAllModals(); updateUI();
+};
 
-function toggleSpeed() {
+window.toggleSpeed = () => {
     if (state.speed === 1) state.speed = 4;
     else if (state.speed === 4) state.speed = 7;
     else state.speed = 1;
     document.getElementById('btn-speed').innerText = state.speed + "배속";
-}
+};
 
 let damageTexts = []; 
 
@@ -781,8 +841,9 @@ function loop() {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    ctx.strokeStyle = "rgba(0,0,0,0.15)";
+    ctx.strokeStyle = "rgba(188, 170, 164, 0.2)";
     ctx.lineWidth = 35;
+    ctx.lineJoin = "round";
     ctx.beginPath(); ctx.rect(25, 25, 450, 450); ctx.stroke();
     
     if (selectedUnitIdx !== -1 && grid[selectedUnitIdx]) {
@@ -950,63 +1011,78 @@ function gameOver(msg) {
     document.getElementById('gameover-modal').style.display = 'block';
 }
 
-updateUI();
 
 // ==========================================
-// 월드 펀치킹 시스템 전용 로직
+// 월드 펀치킹 시스템 (서버 연동)
 // ==========================================
 let pkReqId;
-let pkLeaderboard = JSON.parse(localStorage.getItem('mapleDefensePKRank')) || [];
-
 let pkState = {
     active: false, time: 60, score: 0, lastTime: 0,
     unit: null, scarecrow: { x: 240, y: 80, size: 20 },
     projectiles: [], dmgTexts: [], vfx: []
 };
 
-function openPkMenu() {
+window.openPkMenu = () => {
     document.getElementById('pk-overlay').style.display = 'flex';
     document.getElementById('pk-menu').style.display = 'block';
     document.getElementById('pk-class-select').style.display = 'none';
     document.getElementById('pk-game').style.display = 'none';
     document.getElementById('pk-ranking').style.display = 'none';
-}
+};
 
-function closePk() {
+window.closePk = () => {
     document.getElementById('pk-overlay').style.display = 'none';
     pkState.active = false;
     cancelAnimationFrame(pkReqId);
-}
+};
 
-function showPkClassSelect() {
+window.showPkClassSelect = () => {
+    if (!currentUserUid) {
+        alert("로그인이 필요한 서비스입니다.");
+        return;
+    }
     document.getElementById('pk-menu').style.display = 'none';
     document.getElementById('pk-class-select').style.display = 'block';
-}
+};
 
-function showPkRanking() {
+window.showPkRanking = async () => {
     document.getElementById('pk-menu').style.display = 'none';
     document.getElementById('pk-game').style.display = 'none';
     document.getElementById('pk-class-select').style.display = 'none';
     document.getElementById('pk-ranking').style.display = 'flex';
     
     let list = document.getElementById('pk-ranking-list');
-    list.innerHTML = '';
+    list.innerHTML = '<div style="text-align:center; padding:20px; color:#fff;">서버에서 랭킹을 불러오는 중...</div>';
     
-    if (pkLeaderboard.length === 0) {
-        list.innerHTML = '<div style="text-align:center; padding:20px; color:#fff;">등록된 랭킹이 없습니다.</div>';
-    } else {
-        pkLeaderboard.forEach((entry, idx) => {
-            let color = idx === 0 ? '#ffd700' : (idx === 1 ? '#e0e0e0' : (idx === 2 ? '#cd7f32' : '#fff'));
-            list.innerHTML += `
-            <div style="display:flex; justify-content:space-between; background:rgba(255,255,255,0.1); padding:10px; border-radius:6px; color:${color}; font-weight:bold;">
-                <span>${idx + 1}위 - ${entry.class}</span>
-                <span>${entry.score.toLocaleString()}점 <span style="font-size:10px; color:#aaa;">(${entry.date})</span></span>
-            </div>`;
-        });
+    try {
+        const dbRef = ref(database);
+        const snapshot = await get(child(dbRef, `pk_rankings`));
+        if (snapshot.exists()) {
+            let ranks = [];
+            snapshot.forEach(childSnap => {
+                ranks.push(childSnap.val());
+            });
+            ranks.sort((a, b) => b.score - a.score);
+            ranks = ranks.slice(0, 10);
+            
+            list.innerHTML = '';
+            ranks.forEach((entry, idx) => {
+                let color = idx === 0 ? '#ffd700' : (idx === 1 ? '#e0e0e0' : (idx === 2 ? '#cd7f32' : '#fff'));
+                list.innerHTML += `
+                <div style="display:flex; justify-content:space-between; background:rgba(255,255,255,0.1); padding:10px; border-radius:6px; color:${color}; font-weight:bold;">
+                    <span>${idx + 1}위 - ${entry.nickname} (${entry.class})</span>
+                    <span>${entry.score.toLocaleString()}점 <span style="font-size:10px; color:#aaa;">(${entry.date})</span></span>
+                </div>`;
+            });
+        } else {
+            list.innerHTML = '<div style="text-align:center; padding:20px; color:#fff;">아직 등록된 랭킹이 없습니다. 첫 랭커에 도전하세요!</div>';
+        }
+    } catch(e) {
+        list.innerHTML = '<div style="text-align:center; padding:20px; color:#ff5252;">랭킹 서버와 연결할 수 없습니다.</div>';
     }
-}
+};
 
-function startPkGame(clsName) {
+window.startPkGame = (clsName) => {
     document.getElementById('pk-class-select').style.display = 'none';
     document.getElementById('pk-game').style.display = 'flex';
     
@@ -1024,7 +1100,7 @@ function startPkGame(clsName) {
     document.getElementById('pk-time').innerText = '60';
     
     pkLoop();
-}
+};
 
 function pkLoop() {
     if (!pkState.active) return;
@@ -1037,7 +1113,7 @@ function pkLoop() {
     pkState.time -= dt;
     document.getElementById('pk-time').innerText = Math.ceil(Math.max(0, pkState.time));
     
-    if (pkState.time <= 0) { endPkGame(false); return; }
+    if (pkState.time <= 0) { window.endPkGame(false); return; }
     
     let u = pkState.unit;
     let target = pkState.scarecrow;
@@ -1047,14 +1123,13 @@ function pkLoop() {
     let sharpChance = skillLevels.common_sharp * 0.05;
     let windReduc = 1 + (skillLevels.common_wind * 0.2);
     
-    // 전역 스킬 발동
     if ((u.cls.type === '전사' && skillLevels.war_death > 0) || 
         (u.cls.type === '법사' && skillLevels.mage_thunder > 0) || 
         (u.cls.type === '도적' && skillLevels.thief_fuma > 0)) {
         
         u.globalCooldown -= dt * 1000;
         if (u.globalCooldown <= 0) {
-            let baseDmg = u.cls.baseDmg * u.grade.mult * cardMulti * rageMulti; // 혼줌(val) 0 적용
+            let baseDmg = u.cls.baseDmg * u.grade.mult * cardMulti * rageMulti; 
             if (u.cls.type === '전사' && skillLevels.war_death > 0) {
                 let gdmg = baseDmg * (1 + skillLevels.war_death * 0.1);
                 pkApplyDmg(gdmg, false); pkState.vfx.push({ type: 'death', timer: 0.5 }); u.globalCooldown = 60000;
@@ -1068,7 +1143,6 @@ function pkLoop() {
         }
     }
     
-    // 일반 공격
     u.lastAttack -= dt * 1000;
     if (u.lastAttack <= 0) {
         let dmg = u.cls.baseDmg * u.grade.mult * cardMulti * rageMulti;
@@ -1095,7 +1169,6 @@ function pkLoop() {
         u.lastAttack = (u.cls.cd * (u.grade.speedMul || 1)) / windReduc;
     }
     
-    // 투사체 이동 및 적중
     for (let i = pkState.projectiles.length - 1; i >= 0; i--) {
         let p = pkState.projectiles[i];
         let dx = p.tx - p.x, dy = p.ty - p.y;
@@ -1114,7 +1187,6 @@ function pkLoop() {
         }
     }
     
-    // 이펙트 타이머 업데이트
     for (let i = pkState.dmgTexts.length - 1; i >= 0; i--) {
         pkState.dmgTexts[i].timer -= dt;
         pkState.dmgTexts[i].y -= dt * 40;
@@ -1138,25 +1210,51 @@ function pkApplyDmg(dmg, isCrit) {
     pkState.dmgTexts.push({ val: Math.floor(dmg), x: pkState.scarecrow.x + ox, y: pkState.scarecrow.y - 20 + oy, timer: 0.6, isCrit: isCrit });
 }
 
-function endPkGame(isGiveUp) {
+window.endPkGame = async (isGiveUp) => {
     pkState.active = false;
     cancelAnimationFrame(pkReqId);
     
-    if (isGiveUp) {
-        openPkMenu();
-        return;
-    }
+    if (isGiveUp) { window.openPkMenu(); return; }
     
     let finalScore = Math.floor(pkState.score);
     let className = pkState.unit.cls.type;
     
-    pkLeaderboard.push({ class: className, score: finalScore, date: new Date().toLocaleDateString() });
-    pkLeaderboard.sort((a, b) => b.score - a.score);
-    pkLeaderboard = pkLeaderboard.slice(0, 10); 
-    localStorage.setItem('mapleDefensePKRank', JSON.stringify(pkLeaderboard));
+    if (!currentUserUid) {
+        alert("로그인이 끊어졌습니다.");
+        window.openPkMenu();
+        return;
+    }
+
+    try {
+        const dbRef = ref(database);
+        const snapshot = await get(child(dbRef, `pk_rankings/${currentUserUid}`));
+        
+        if (snapshot.exists()) {
+            const data = snapshot.val();
+            // 기존 서버 기록보다 점수가 높을 때만 갱신!
+            if (finalScore > data.score) {
+                await set(ref(database, `pk_rankings/${currentUserUid}`), {
+                    nickname: currentUserName,
+                    class: className,
+                    score: finalScore,
+                    date: new Date().toLocaleDateString()
+                });
+            }
+        } else {
+            // 처음 등록
+            await set(ref(database, `pk_rankings/${currentUserUid}`), {
+                nickname: currentUserName,
+                class: className,
+                score: finalScore,
+                date: new Date().toLocaleDateString()
+            });
+        }
+    } catch(e) {
+        alert("서버에 랭킹을 저장하는 중 오류가 발생했습니다.");
+    }
     
-    showPkRanking();
-}
+    window.showPkRanking();
+};
 
 function drawPk() {
     let pkCanvas = document.getElementById('pkCanvas');
@@ -1171,7 +1269,6 @@ function drawPk() {
     pkCtx.font = "30px NanumSquare"; pkCtx.textAlign = "center"; pkCtx.textBaseline = "middle";
     pkCtx.fillText(u.cls.icon, u.x, u.y);
     
-    // 허수아비 아이콘
     pkCtx.font = "36px NanumSquare";
     pkCtx.fillText("🎃", m.x, m.y); 
     
@@ -1201,7 +1298,6 @@ function drawPk() {
         pkCtx.restore();
     });
     
-    // 모든 타격 데미지 텍스트 띄우기
     pkState.dmgTexts.forEach(d => {
         pkCtx.save();
         pkCtx.globalAlpha = Math.max(0, d.timer / 0.6);

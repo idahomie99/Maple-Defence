@@ -12,6 +12,7 @@ body {
     color: #333; min-height: 100vh; overflow-y: auto; overflow-x: hidden;
 }
 
+/* 로비 배경 */
 #start-screen {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('image/wallpaper.png') no-repeat center center;
@@ -55,16 +56,17 @@ body {
 #game-container {
     width: 100%; max-width: 500px; min-height: 100vh; height: auto;
     display: flex; flex-direction: column; 
-    background-color: rgba(0, 0, 0, 0.6); backdrop-filter: blur(5px);
+    /* 인게임 전체를 투명하게 (바탕화면이 비치도록) */
+    background-color: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px);
     padding-bottom: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.8);
 }
 
 .maple-panel {
     background: rgba(253, 245, 230, 0.95); border: 3px solid #6d4c41; border-radius: 12px;
-    padding: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+    padding: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.4); margin-bottom: 10px;
 }
 
-#header { margin: 10px; padding: 12px; font-size: 15px; font-weight: bold; }
+#header { margin: 10px 10px 0 10px; padding: 12px; font-size: 15px; font-weight: bold; }
 .stat-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .resource-row { display: flex; justify-content: space-between; margin-top: 10px; font-size: 16px; }
 .meso-box, .mp-box { 
@@ -76,28 +78,42 @@ body {
 
 #board-area {
     position: relative; width: 100%; aspect-ratio: 1/1; 
-    background-color: rgba(55, 71, 79, 0.5); 
-    border-top: 4px solid rgba(38, 50, 56, 0.8); border-bottom: 4px solid rgba(38, 50, 56, 0.8);
+    /* 기존 칙칙한 박스 제거, 투명한 배경 사용 */
+    background-color: transparent; border: none;
 }
 
 canvas { width: 100%; height: 100%; position: absolute; top: 0; left: 0; pointer-events: none; z-index: 10; }
 
+/* 유닛 배치 박스 전면 개편: 덩어리가 아닌 개별 독립 타일 느낌으로 */
 #grid-container {
     position: absolute; top: 15%; left: 15%; width: 70%; height: 70%;
     display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(5, 1fr);
-    background-color: rgba(220, 190, 170, 0.85); 
-    border: 3px solid rgba(120, 80, 60, 0.9); z-index: 5; border-radius: 4px;
+    background-color: transparent; /* 뒷 배경 투명 */
+    border: none; z-index: 5;
+    gap: 4px; /* 칸과 칸 사이를 완전히 벌림 */
 }
 
+/* 개별 칸(타일) 입체감 부여 */
 .grid-cell {
-    border: 1px solid rgba(255,255,255,0.4); display: flex; flex-direction: column;
+    background: rgba(30, 30, 30, 0.7); /* 어두운 반투명 타일 */
+    border: 2px solid #5d4037; /* 테두리 */
+    border-radius: 6px; /* 둥근 모서리 */
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.8), 0 4px 6px rgba(0,0,0,0.4); /* 입체감 */
+    display: flex; flex-direction: column;
     justify-content: center; align-items: center; font-weight: 800; cursor: pointer; text-align: center; line-height: 1.2;
+    transition: all 0.1s;
 }
-.grid-cell.selected { background-color: rgba(255, 235, 59, 0.6); border: 2px solid #ffeb3b; box-shadow: inset 0 0 15px rgba(255, 235, 59, 0.8); z-index: 6; }
+.grid-cell:hover { background: rgba(50, 50, 50, 0.8); border-color: #8d6e63; }
+.grid-cell.selected { 
+    background-color: rgba(255, 235, 59, 0.4); 
+    border: 2px solid #ffeb3b; 
+    box-shadow: inset 0 0 15px rgba(255, 235, 59, 0.8), 0 0 10px #ffeb3b; 
+    z-index: 6; transform: scale(1.05); /* 선택시 살짝 튀어나옴 */
+}
 
-.glow-6 { border: 2px solid #00e5ff !important; box-shadow: inset 0 0 15px rgba(0,229,255,0.6), 0 0 8px rgba(0,229,255,0.8); }
-.glow-7 { border: 2px solid #ea80fc !important; box-shadow: inset 0 0 15px rgba(234,128,252,0.6), 0 0 8px rgba(234,128,252,0.8); }
-.glow-8 { border: 2px solid #ffd54f !important; box-shadow: inset 0 0 15px rgba(255,213,79,0.6), 0 0 8px rgba(255,213,79,0.8); }
+.glow-6 { border: 2px solid #00e5ff !important; box-shadow: inset 0 0 15px rgba(0,229,255,0.6), 0 0 8px rgba(0,229,255,0.8) !important; }
+.glow-7 { border: 2px solid #ea80fc !important; box-shadow: inset 0 0 15px rgba(234,128,252,0.6), 0 0 8px rgba(234,128,252,0.8) !important; }
+.glow-8 { border: 2px solid #ffd54f !important; box-shadow: inset 0 0 15px rgba(255,213,79,0.6), 0 0 8px rgba(255,213,79,0.8) !important; }
 
 #controls { margin: auto 10px 10px 10px; display: flex; flex-direction: column; gap: 8px; }
 .upgrade-container { display: flex; justify-content: space-between; gap: 6px; }
