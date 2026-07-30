@@ -18,17 +18,32 @@ const database = getDatabase(app);
 let currentUserName = "이름없는 용사";
 let currentUserUid = null;
 
+// ★ 핵심 버그 수정: 화면 분할 방지용 중앙 통제 함수 ★
+window.switchScreen = (screenId) => {
+    const screens = ['login-screen', 'start-screen', 'game-container', 'pk-game'];
+    screens.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+    if (screenId) {
+        const activeEl = document.getElementById(screenId);
+        if (activeEl) activeEl.style.display = 'flex';
+    }
+};
+
 onAuthStateChanged(auth, (user) => {
     if (user) {
         currentUserUid = user.uid;
         currentUserName = user.displayName || "용사";
         document.getElementById('current-user-name').innerText = currentUserName;
-        document.getElementById('login-screen').style.display = 'none';
-        document.getElementById('start-screen').style.display = 'flex';
+        
+        // 로그인 화면에 있을 때만 로비로 넘기기 (게임 중에 로비가 튀어나오는 버그 방지)
+        if (document.getElementById('login-screen').style.display !== 'none') {
+            window.switchScreen('start-screen');
+        }
     } else {
         currentUserUid = null;
-        document.getElementById('login-screen').style.display = 'flex';
-        document.getElementById('start-screen').style.display = 'none';
+        window.switchScreen('login-screen');
     }
 });
 
@@ -175,8 +190,7 @@ window.loadAndStartGame = () => {
     grid = new Array(25).fill(null); towers = [];
     saved.gridData.forEach((u) => { if(u) window.addUnit(u.idx, u.gradeIdx, u.clsName, true); });
     
-    document.getElementById('start-screen').style.display = 'none';
-    document.getElementById('game-container').style.display = 'flex';
+    window.switchScreen('game-container');
     state.status = 'PREP'; state.time = 5; 
     lastTime = performance.now(); state.isBoss = !!getBossInfo(state.wave);
     
@@ -199,9 +213,7 @@ window.startNewGame = () => {
     bestWave = localStorage.getItem('mapleDefenseBestWave') || 0;
     
     initGrid();
-    
-    document.getElementById('start-screen').style.display = 'none';
-    document.getElementById('game-container').style.display = 'flex';
+    window.switchScreen('game-container');
     lastTime = performance.now(); 
     
     cancelAnimationFrame(mainReqId);
@@ -212,10 +224,8 @@ window.goToLobby = () => {
     saveGameData(); 
     state.status = 'TITLE';
     cancelAnimationFrame(mainReqId);
-    document.getElementById('gameover-modal').style.display = 'none';
-    document.getElementById('overlay').style.display = 'none';
-    document.getElementById('game-container').style.display = 'none';
-    document.getElementById('start-screen').style.display = 'flex';
+    window.closeAllModals();
+    window.switchScreen('start-screen');
 };
 
 setInterval(() => { if(state.status === 'PLAY' || state.status === 'PREP') saveGameData(); }, 3000);
@@ -1026,7 +1036,6 @@ window.openPkMenu = () => {
     document.getElementById('pk-overlay').style.display = 'flex';
     document.getElementById('pk-menu').style.display = 'block';
     document.getElementById('pk-class-select').style.display = 'none';
-    document.getElementById('pk-game').style.display = 'none';
     document.getElementById('pk-ranking').style.display = 'none';
     document.getElementById('pk-result-modal').style.display = 'none';
     document.getElementById('pk-result-overlay').style.display = 'none';
@@ -1049,7 +1058,6 @@ window.showPkClassSelect = () => {
 
 window.showPkRanking = async () => {
     document.getElementById('pk-menu').style.display = 'none';
-    document.getElementById('pk-game').style.display = 'none';
     document.getElementById('pk-class-select').style.display = 'none';
     document.getElementById('pk-result-modal').style.display = 'none';
     document.getElementById('pk-result-overlay').style.display = 'none';
@@ -1094,9 +1102,8 @@ window.togglePkSpeed = () => {
 };
 
 window.startPkGame = (clsName) => {
-    document.getElementById('start-screen').style.display = 'none'; // 로비 숨김
     document.getElementById('pk-overlay').style.display = 'none'; 
-    document.getElementById('pk-game').style.display = 'flex';
+    window.switchScreen('pk-game');
     
     let grade = GRADES[8]; // 데스티니 고정
     let cls = CLASSES[clsName];
@@ -1106,6 +1113,7 @@ window.startPkGame = (clsName) => {
     
     pkState = {
         active: true, time: 60, score: 0, lastTime: performance.now(), speed: 1,
+        // 유닛은 9시 방향 칸 (x: 110, y: 250), 허수아비는 3시 방향 (x: 390, y: 250)
         unit: { cls: cls, grade: grade, gradeIdx: 8, x: 110, y: 250, lastAttack: 0, globalCooldown: 0 },
         scarecrow: { x: 390, y: 250, size: 20, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0 },
         projectiles: [], dmgTexts: [], vfx: []
@@ -1155,6 +1163,7 @@ function pkLoop() {
     let sharpChance = skillLevels.common_sharp * 0.05;
     let windReduc = 1 + (skillLevels.common_wind * 0.2);
     
+    // ★ 펀치킹 밸런스 평준화: 모든 직업 기본공격력 20, 쿨타임 1초(1000ms) 고정 ★
     let pkBaseDmg = 20; 
     let pkBaseCd = 1000;
     
@@ -1259,7 +1268,7 @@ window.submitPkScore = async () => {
     
     if (!currentUserUid) {
         alert("로그인이 끊어졌습니다.");
-        document.getElementById('start-screen').style.display = 'flex';
+        window.switchScreen('start-screen');
         window.openPkMenu();
         return;
     }
@@ -1286,16 +1295,14 @@ window.submitPkScore = async () => {
     
     document.getElementById('pk-result-overlay').style.display = 'none';
     document.getElementById('pk-result-modal').style.display = 'none';
-    document.getElementById('pk-game').style.display = 'none';
-    document.getElementById('start-screen').style.display = 'flex'; // 로비 복구
+    window.switchScreen('start-screen'); 
     window.showPkRanking();
 };
 
 window.discardPkScore = () => {
     document.getElementById('pk-result-overlay').style.display = 'none';
     document.getElementById('pk-result-modal').style.display = 'none';
-    document.getElementById('pk-game').style.display = 'none';
-    document.getElementById('start-screen').style.display = 'flex'; // 로비 복구
+    window.switchScreen('start-screen'); 
     window.openPkMenu();
 };
 
@@ -1303,8 +1310,7 @@ window.endPkGame = (isGiveUp) => {
     pkState.active = false;
     cancelAnimationFrame(pkReqId);
     if (isGiveUp) { 
-        document.getElementById('pk-game').style.display = 'none';
-        document.getElementById('start-screen').style.display = 'flex'; // 로비 복구
+        window.switchScreen('start-screen'); 
         window.openPkMenu(); 
     }
 };
@@ -1320,10 +1326,26 @@ function drawPk() {
     pkCtx.beginPath(); pkCtx.rect(25, 25, 450, 450); pkCtx.stroke();
     
     let m = pkState.scarecrow;
+    let bImg = bossImages["벨룸"];
+    let size = 30; // 벨룸 크기 세팅
     
-    pkCtx.font = "30px NanumSquare";
-    pkCtx.textAlign = "center"; pkCtx.textBaseline = "middle";
-    pkCtx.fillText("🎃", m.x, m.y); 
+    if (bImg && bImg.complete && bImg.naturalWidth > 0) {
+        pkCtx.save();
+        pkCtx.translate(m.x, m.y);
+        
+        if (m.freezeTimer > 0) {
+            pkCtx.globalAlpha = 0.5; pkCtx.fillStyle = "#81d4fa";
+            pkCtx.fillRect(-size * 1.5, -size * 1.5, size * 3, size * 3);
+            pkCtx.globalAlpha = 1.0;
+        }
+        pkCtx.drawImage(bImg, -size * 1.5, -size * 1.5, size * 3, size * 3);
+        pkCtx.restore();
+    } else {
+        pkCtx.font = "40px NanumSquare";
+        pkCtx.textAlign = "center";
+        pkCtx.textBaseline = "middle";
+        pkCtx.fillText("🐉", m.x, m.y); 
+    }
     
     if (m.freezeTimer > 0) {
         pkCtx.fillStyle = "rgba(0, 200, 255, 0.5)"; 
