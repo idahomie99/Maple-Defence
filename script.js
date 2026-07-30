@@ -5,7 +5,7 @@ import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/fireb
 const firebaseConfig = {
     apiKey: "AIzaSyCJfYaeZGXyfIzxb0AlbPAv36ZWdMksolc",
     authDomain: "maple-defence.firebaseapp.com",
-    databaseURL: "https://maple-defence-default-rtdb.asia-southeast1.firebasedatabase.app", // <--- 이 부분이 핵심입니다!
+    databaseURL: "https://maple-defence-default-rtdb.asia-southeast1.firebasedatabase.app",
     projectId: "maple-defence",
     storageBucket: "maple-defence.firebasestorage.app",
     messagingSenderId: "507227611120",
@@ -1032,9 +1032,10 @@ let pkState = {
     projectiles: [], dmgTexts: [], vfx: []
 };
 
-// 펀치킹 실시간 랭킹 로드 함수
+// 펀치킹 실시간 랭킹 로드 (로비 TOP 10 갱신용)
 window.loadPkLiveRanking = async () => {
     let list = document.getElementById('pk-live-ranking-list');
+    if(!list) return;
     try {
         const dbRef = ref(database);
         const snapshot = await get(child(dbRef, `pk_rankings`));
@@ -1085,6 +1086,7 @@ window.showPkClassSelect = () => {
     document.getElementById('pk-class-select').style.display = 'block';
 };
 
+// 메인 랭킹 보드 보기
 window.showPkRanking = async () => {
     document.getElementById('pk-menu').style.display = 'none';
     document.getElementById('pk-class-select').style.display = 'none';
@@ -1134,7 +1136,7 @@ window.startPkGame = (clsName) => {
     document.getElementById('pk-overlay').style.display = 'none'; 
     window.switchScreen('pk-game');
     
-    // 시작할 때 실시간 랭킹도 미리 불러와두기
+    // 게임 시작 시, 미니 랭킹판 정보 미리 업데이트
     window.loadPkLiveRanking();
     
     let grade = GRADES[8]; // 데스티니 고정
@@ -1145,7 +1147,7 @@ window.startPkGame = (clsName) => {
     
     pkState = {
         active: true, time: 60, score: 0, lastTime: performance.now(), speed: 1,
-        // 유닛은 9시 방향 칸 정중앙 (x: 110, y: 250), 허수아비는 3시 방향 정중앙 (x: 390, y: 250)
+        // 9시(유닛): x 110, y 250 / 3시(보스): x 390, y 250
         unit: { cls: cls, grade: grade, gradeIdx: 8, x: 110, y: 250, lastAttack: 0, globalCooldown: 0 },
         scarecrow: { x: 390, y: 250, size: 20, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0 },
         projectiles: [], dmgTexts: [], vfx: []
@@ -1172,6 +1174,8 @@ function pkLoop() {
     if (pkState.time <= 0) {
         pkState.active = false;
         cancelAnimationFrame(pkReqId);
+        
+        // 팝업 즉시 노출
         document.getElementById('pk-final-score').innerText = Math.floor(pkState.score).toLocaleString();
         document.getElementById('pk-result-overlay').style.display = 'block';
         document.getElementById('pk-result-modal').style.display = 'block';
@@ -1295,38 +1299,45 @@ function pkApplyDmg(dmg, isCrit) {
 }
 
 window.submitPkScore = async () => {
+    // 저장하기 위해 팝업을 즉시 내리고 로비로 이동 (화면 마비 방지)
+    document.getElementById('pk-result-overlay').style.display = 'none';
+    document.getElementById('pk-result-modal').style.display = 'none';
+    window.switchScreen('start-screen');
+    
+    // 랭킹 메뉴를 띄운 뒤 "저장중" 안내 (사용자가 불안하지 않게 피드백)
+    document.getElementById('pk-overlay').style.display = 'flex';
+    document.getElementById('pk-menu').style.display = 'none';
+    document.getElementById('pk-class-select').style.display = 'none';
+    document.getElementById('pk-ranking').style.display = 'flex';
+    document.getElementById('pk-ranking-list').innerHTML = '<div style="text-align:center; padding:20px; color:#fff;">기록을 서버에 저장하는 중...</div>';
+    
     let finalScore = Math.floor(pkState.score);
     let className = pkState.unit.cls.type;
     
-    if (!currentUserUid) {
-        alert("로그인이 끊어졌습니다.");
-        window.switchScreen('start-screen');
-        return;
-    }
-
-    try {
-        const dbRef = ref(database);
-        const snapshot = await get(child(dbRef, `pk_rankings/${currentUserUid}`));
-        
-        if (snapshot.exists()) {
-            const data = snapshot.val();
-            if (finalScore > data.score) {
+    if (currentUserUid) {
+        try {
+            const dbRef = ref(database);
+            const snapshot = await get(child(dbRef, `pk_rankings/${currentUserUid}`));
+            
+            if (snapshot.exists()) {
+                const data = snapshot.val();
+                if (finalScore > data.score) {
+                    await set(ref(database, `pk_rankings/${currentUserUid}`), {
+                        nickname: currentUserName, class: className, score: finalScore, date: new Date().toLocaleDateString()
+                    });
+                }
+            } else {
                 await set(ref(database, `pk_rankings/${currentUserUid}`), {
                     nickname: currentUserName, class: className, score: finalScore, date: new Date().toLocaleDateString()
                 });
             }
-        } else {
-            await set(ref(database, `pk_rankings/${currentUserUid}`), {
-                nickname: currentUserName, class: className, score: finalScore, date: new Date().toLocaleDateString()
-            });
+        } catch(e) {
+            console.error(e);
+            alert("서버 통신 중 오류가 발생했습니다.");
         }
-    } catch(e) {
-        alert("서버에 랭킹을 저장하는 중 오류가 발생했습니다.");
     }
     
-    document.getElementById('pk-result-overlay').style.display = 'none';
-    document.getElementById('pk-result-modal').style.display = 'none';
-    window.switchScreen('start-screen'); 
+    // 저장이 끝나면 랭킹 다시 불러오기
     window.showPkRanking();
 };
 
@@ -1356,7 +1367,7 @@ function drawPk() {
     
     let m = pkState.scarecrow;
     
-    // 벨룸 이미지 렌더링 (이미지가 없으면 용 이모티콘)
+    // 벨룸 이미지 렌더링 (이미지 오류 방지용 fallback)
     let bImg = bossImages["벨룸"];
     let size = 20; 
     
