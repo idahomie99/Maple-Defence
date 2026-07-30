@@ -46,7 +46,6 @@
             <h3>🥊 월드 펀치킹 🥊</h3>
             <p style="font-size:12px; color:#555; margin-bottom:15px;">혼줌/보스추뎀 제외, 전 직업 기본공격 완전 동일!<br>순수 도감과 스킬 내실로 승부합니다. (1분)</p>
             <button class="maple-btn huge primary" style="width:100%; margin-bottom:10px;" onclick="showPkClassSelect()">시작하기</button>
-            <button class="maple-btn huge secondary" style="width:100%; margin-bottom:15px;" onclick="showPkRanking()">랭킹 (서버 연동됨)</button>
             <button class="maple-btn danger-btn" style="width:100%;" onclick="closePk()">로비로 돌아가기</button>
         </div>
         
@@ -59,18 +58,11 @@
             </div>
             <button class="maple-btn" style="width:100%;" onclick="openPkMenu()">뒤로</button>
         </div>
-
-        <div id="pk-ranking" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 10vh; width:90%; max-width:360px; max-height: 80vh; flex-direction:column;">
-            <h3>🏆 서버 펀치킹 랭킹 🏆</h3>
-            <div id="pk-ranking-list" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:8px; margin-bottom:15px; padding-right:5px;"></div>
-            <button class="maple-btn" style="width:100%;" onclick="openPkMenu()">뒤로</button>
-        </div>
     </div>
 
     <!-- 디펜스 본판과 100% 동일한 디자인의 펀치킹 인게임 화면 -->
     <div id="pk-game" style="display:none; flex-direction:column; width:100%; max-width:500px; height:auto; min-height:100vh; background-color: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); padding-bottom: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.8);">
         
-        <!-- 헤더 UI -->
         <div id="pk-header" class="maple-panel" style="margin: 10px 10px 0 10px; padding: 12px; font-size: 15px; font-weight: bold;">
             <div class="stat-row">
                 <div>점수: <span id="pk-score" class="highlight">0</span></div>
@@ -81,21 +73,32 @@
             </div>
         </div>
         
-        <!-- 보드 에어리어 (트랙 표시용) -->
         <div id="pk-board-area" style="position: relative; width: 100%; aspect-ratio: 1/1; background-color: rgba(55, 71, 79, 0.5); border-top: 4px solid rgba(38, 50, 56, 0.8); border-bottom: 4px solid rgba(38, 50, 56, 0.8); margin-top: 10px;">
-            <canvas id="pkCanvas" width="500" height="500" style="position:absolute; top:0; left:0; z-index:10; pointer-events:none;"></canvas>
+            <!-- 모바일 좌표 불일치 해결: width, height 100% 적용 -->
+            <canvas id="pkCanvas" width="500" height="500" style="position:absolute; top:0; left:0; width:100%; height:100%; z-index:10; pointer-events:none;"></canvas>
             
-            <!-- 9시 방향에 배치된 유닛 전용 1칸 박스 (디펜스 맵 그리드 1칸과 완벽히 동일 크기 및 디자인) -->
-            <div style="position: absolute; top: 215px; left: 75px; width: 70px; height: 70px; background-color: rgba(220, 190, 170, 0.85); border: 3px solid rgba(120, 80, 60, 0.9); z-index: 5; border-radius: 4px;">
+            <!-- 9시 방향 유닛 배치 (일반 게임 그리드 0열 2행과 동일한 위치/크기 비율) -->
+            <div style="position: absolute; top: 43%; left: 15%; width: 14%; height: 14%; background-color: rgba(220, 190, 170, 0.85); border: 2px solid rgba(120, 80, 60, 0.9); z-index: 5; border-radius: 4px; box-sizing: border-box;">
                 <div class="grid-cell glow-8" style="width: 100%; height: 100%; background: transparent; box-shadow: none; cursor:default; border:none; display:flex; flex-direction:column; justify-content:center; align-items:center;">
-                    <div id="pk-unit-icon" style="font-size:20px; text-shadow:1px 1px 2px rgba(0,0,0,0.5);">🗡️</div>
-                    <div id="pk-unit-name" style="color:#ffd54f; font-size:10px; margin-top:2px; font-weight:800;">데스티니</div>
+                    <div id="pk-unit-icon" style="font-size: clamp(14px, 4vw, 20px); text-shadow:1px 1px 2px rgba(0,0,0,0.5);">🗡️</div>
+                    <div id="pk-unit-name" style="color:#ffd54f; font-size: clamp(8px, 2.5vw, 10px); margin-top:2px; font-weight:800;">데스티니</div>
                 </div>
             </div>
+
+            <!-- 3시 방향 몹 스폰 구역 (일반 게임 그리드 4열 2행과 동일한 위치/크기 비율) -->
+            <div style="position: absolute; top: 43%; left: 71%; width: 14%; height: 14%; background-color: rgba(255, 82, 82, 0.15); border: 2px solid rgba(255, 82, 82, 0.4); z-index: 4; border-radius: 4px; box-sizing: border-box;"></div>
         </div>
         
         <div class="maple-panel" style="margin: 10px; padding: 12px;">
-            <button class="maple-btn huge danger-btn" style="width: 100%;" onclick="endPkGame(true)">포기하고 로비로</button>
+            <button class="maple-btn huge danger-btn" style="width: 100%; margin-bottom: 15px;" onclick="endPkGame(true)">포기하고 로비로</button>
+            
+            <!-- 실시간 TOP 10 랭킹판 -->
+            <div style="background: rgba(0,0,0,0.5); border-radius: 8px; padding: 10px;">
+                <h4 style="color: #ffeb3b; margin: 0 0 10px 0; text-align: center; font-size: 16px; font-weight:900;">🏆 펀치킹 실시간 TOP 10 🏆</h4>
+                <div id="pk-live-ranking-list" style="display:flex; flex-direction:column; gap:5px; font-size:13px; max-height: 200px; overflow-y: auto;">
+                    <div style="text-align:center; color:#ccc;">랭킹을 불러오는 중...</div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -105,8 +108,8 @@
         <h3 style="color:#e65100;">측정 종료!</h3>
         <div style="font-size:16px; margin-bottom:10px; color:#5a3c22; font-weight:bold;">나의 최종 DPS 점수</div>
         <div id="pk-final-score" style="font-size:42px; font-weight:900; color:#c62828; text-shadow:1px 1px 0 #fff; margin-bottom:20px;">0</div>
-        <button class="maple-btn huge primary" style="width:100%; margin-bottom:10px;" onclick="submitPkScore()">랭킹 등록 및 확인</button>
-        <button class="maple-btn danger-btn" style="width:100%;" onclick="discardPkScore()">기록 버리고 로비로</button>
+        <button class="maple-btn huge primary" style="width:100%; margin-bottom:10px;" onclick="submitPkScore()">랭킹 등록하고 로비로</button>
+        <button class="maple-btn danger-btn" style="width:100%;" onclick="exitPkToLobby()">기록 버리고 로비로</button>
     </div>
 
     <!-- 기존 디펜스 모드 오버레이 및 게임 화면 -->

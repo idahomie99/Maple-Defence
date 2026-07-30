@@ -18,7 +18,7 @@ const database = getDatabase(app);
 let currentUserName = "이름없는 용사";
 let currentUserUid = null;
 
-// ★ 핵심 버그 수정: 화면 분할 방지용 중앙 통제 함수 ★
+// 중앙 통제형 화면 전환 함수 (화면 2분할 버그 완전 차단)
 window.switchScreen = (screenId) => {
     const screens = ['login-screen', 'start-screen', 'game-container', 'pk-game'];
     screens.forEach(id => {
@@ -37,7 +37,6 @@ onAuthStateChanged(auth, (user) => {
         currentUserName = user.displayName || "용사";
         document.getElementById('current-user-name').innerText = currentUserName;
         
-        // 로그인 화면에 있을 때만 로비로 넘기기 (게임 중에 로비가 튀어나오는 버그 방지)
         if (document.getElementById('login-screen').style.display !== 'none') {
             window.switchScreen('start-screen');
         }
@@ -1032,6 +1031,35 @@ let pkState = {
     projectiles: [], dmgTexts: [], vfx: []
 };
 
+// 펀치킹 실시간 랭킹 로드 함수
+window.loadPkLiveRanking = async () => {
+    let list = document.getElementById('pk-live-ranking-list');
+    try {
+        const dbRef = ref(database);
+        const snapshot = await get(child(dbRef, `pk_rankings`));
+        if (snapshot.exists()) {
+            let ranks = [];
+            snapshot.forEach(childSnap => { ranks.push(childSnap.val()); });
+            ranks.sort((a, b) => b.score - a.score);
+            ranks = ranks.slice(0, 10);
+            
+            list.innerHTML = '';
+            ranks.forEach((entry, idx) => {
+                let color = idx === 0 ? '#ffd700' : (idx === 1 ? '#e0e0e0' : (idx === 2 ? '#cd7f32' : '#fff'));
+                list.innerHTML += `
+                <div style="display:flex; justify-content:space-between; background:rgba(255,255,255,0.1); padding:6px 10px; border-radius:4px; color:${color}; font-weight:bold;">
+                    <span>${idx + 1}. ${entry.nickname} <span style="font-size:10px; color:#aaa;">(${entry.class})</span></span>
+                    <span>${entry.score.toLocaleString()}점</span>
+                </div>`;
+            });
+        } else {
+            list.innerHTML = '<div style="text-align:center; color:#ccc;">아직 등록된 랭킹이 없습니다.</div>';
+        }
+    } catch(e) {
+        list.innerHTML = '<div style="text-align:center; color:#ff5252;">랭킹 서버 연결 실패.</div>';
+    }
+};
+
 window.openPkMenu = () => {
     document.getElementById('pk-overlay').style.display = 'flex';
     document.getElementById('pk-menu').style.display = 'block';
@@ -1105,6 +1133,9 @@ window.startPkGame = (clsName) => {
     document.getElementById('pk-overlay').style.display = 'none'; 
     window.switchScreen('pk-game');
     
+    // 시작할 때 실시간 랭킹도 미리 불러와두기
+    window.loadPkLiveRanking();
+    
     let grade = GRADES[8]; // 데스티니 고정
     let cls = CLASSES[clsName];
     
@@ -1113,7 +1144,7 @@ window.startPkGame = (clsName) => {
     
     pkState = {
         active: true, time: 60, score: 0, lastTime: performance.now(), speed: 1,
-        // 유닛은 9시 방향 칸 (x: 110, y: 250), 허수아비는 3시 방향 (x: 390, y: 250)
+        // 유닛은 9시 방향 칸 정중앙 (x: 110, y: 250), 허수아비는 3시 방향 정중앙 (x: 390, y: 250)
         unit: { cls: cls, grade: grade, gradeIdx: 8, x: 110, y: 250, lastAttack: 0, globalCooldown: 0 },
         scarecrow: { x: 390, y: 250, size: 20, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0 },
         projectiles: [], dmgTexts: [], vfx: []
@@ -1269,7 +1300,6 @@ window.submitPkScore = async () => {
     if (!currentUserUid) {
         alert("로그인이 끊어졌습니다.");
         window.switchScreen('start-screen');
-        window.openPkMenu();
         return;
     }
 
@@ -1299,11 +1329,10 @@ window.submitPkScore = async () => {
     window.showPkRanking();
 };
 
-window.discardPkScore = () => {
+window.exitPkToLobby = () => {
     document.getElementById('pk-result-overlay').style.display = 'none';
     document.getElementById('pk-result-modal').style.display = 'none';
     window.switchScreen('start-screen'); 
-    window.openPkMenu();
 };
 
 window.endPkGame = (isGiveUp) => {
@@ -1311,7 +1340,6 @@ window.endPkGame = (isGiveUp) => {
     cancelAnimationFrame(pkReqId);
     if (isGiveUp) { 
         window.switchScreen('start-screen'); 
-        window.openPkMenu(); 
     }
 };
 
@@ -1326,13 +1354,14 @@ function drawPk() {
     pkCtx.beginPath(); pkCtx.rect(25, 25, 450, 450); pkCtx.stroke();
     
     let m = pkState.scarecrow;
+    
+    // 벨룸 이미지 렌더링 (이미지가 없으면 용 이모티콘)
     let bImg = bossImages["벨룸"];
-    let size = 30; // 벨룸 크기 세팅
+    let size = 20; 
     
     if (bImg && bImg.complete && bImg.naturalWidth > 0) {
         pkCtx.save();
         pkCtx.translate(m.x, m.y);
-        
         if (m.freezeTimer > 0) {
             pkCtx.globalAlpha = 0.5; pkCtx.fillStyle = "#81d4fa";
             pkCtx.fillRect(-size * 1.5, -size * 1.5, size * 3, size * 3);
