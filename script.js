@@ -1,3 +1,4 @@
+// --- 최고 기록 및 도감 데이터 불러오기 ---
 let bestWave = localStorage.getItem('mapleDefenseBestWave') || 0;
 document.getElementById('best-record').innerText = `최고 기록: ${bestWave} 웨이브`;
 
@@ -21,7 +22,7 @@ const SKILL_INFO = {
     war_death: { name: "데스폴트", max: 5, desc: "60초마다 전역 피해 (전사 5차↑)", img: "image/skill_death.png" },
     mage_freeze: { name: "프리즈", max: 5, desc: "적 빙결 및 도트 피해 (법사)", img: "image/skill_freeze.png" },
     mage_thunder: { name: "썬더 브레이크", max: 5, desc: "60초마다 전역 피해 (법사 5차↑)", img: "image/skill_thunder.png" },
-    thief_shadow: { name: "섀도 파트너", max: 5, desc: "3%p 확률로 투사체 추가 (도적)", img: "image/skill_shadow.png" },
+    thief_shadow: { name: "섀도우 파트너", max: 5, desc: "3%p 확률로 투사체 추가 (도적)", img: "image/skill_shadow.png" },
     thief_fuma: { name: "풍마 수리검", max: 5, desc: "60초마다 맵 순회 수리검 (도적 5차↑)", img: "image/skill_fuma.png" }
 };
 
@@ -184,21 +185,22 @@ function renderBook() {
         let req = data.grade < 10 ? CARD_REQ[data.grade] : 'Max';
         let canUpgrade = data.grade < 10 && data.owned >= req;
         let effectStr = data.grade > 0 ? `+${(1 + (data.grade-1)*0.5).toFixed(1)}%` : `0%`;
-        let btnText = data.grade === 0 ? `등록 (${req}장)` : (data.grade === 10 ? 'MAX' : `강화 (${req}장)`);
+        let btnText = data.grade === 0 ? `등록 (${req})` : (data.grade === 10 ? 'MAX' : `강화 (${req})`);
         
         let imgSrc = bossImages[bName] ? bossImages[bName].src : '';
-        let imgHtml = imgSrc ? `<img src="${imgSrc}" style="width: 45px; height: 45px; object-fit: contain; margin-right: 12px; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.4));">` : '';
+        let imgHtml = imgSrc ? `<img src="${imgSrc}" style="width: 40px; height: 40px; object-fit: contain; margin-right: 8px; flex-shrink: 0; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.4));">` : '';
 
+        // 텍스트 오버플로우 방지 (1줄 강제 고정)
         list.innerHTML += `
-        <div style="background:#fff; border:2px solid #8d6e63; border-radius:6px; padding:8px; text-align:left; display:flex; justify-content:space-between; align-items:center;">
-            <div style="display:flex; align-items:center;">
+        <div style="background:#fff; border:2px solid #8d6e63; border-radius:6px; padding:6px 8px; text-align:left; display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; align-items:center; overflow:hidden;">
                 ${imgHtml}
-                <div>
-                    <div style="font-weight:900; color:#3e2723; font-size:14px;">${bName} (등급: ${data.grade})</div>
-                    <div style="font-size:12px; color:#666; margin-top:2px;">효과: ${effectStr} / 보유: <b style="color:#e65100">${data.owned}장</b></div>
+                <div style="overflow:hidden;">
+                    <div style="font-weight:900; color:#3e2723; font-size:13px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">${bName} (등급: ${data.grade})</div>
+                    <div style="font-size:10.5px; color:#666; margin-top:2px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">효과: ${effectStr} / 보유: <b style="color:#e65100">${data.owned}장</b></div>
                 </div>
             </div>
-            <button class="maple-btn small ${canUpgrade ? 'primary' : ''}" ${!canUpgrade ? 'disabled' : ''} onclick="upgradeCard('${bName}')">${btnText}</button>
+            <button class="maple-btn small ${canUpgrade ? 'primary' : ''}" ${!canUpgrade ? 'disabled' : ''} style="white-space:nowrap; flex-shrink:0; margin-left:5px; min-width:65px;" onclick="upgradeCard('${bName}')">${btnText}</button>
         </div>`;
     });
     document.getElementById('book-total-grade').innerHTML = `총 등급 합계: <span style="color:#c62828;">${getTotalGrade()}</span> (코인: <span style="color:#f57c00;">${getAvailableCoins()}</span>)`;
@@ -235,16 +237,17 @@ function renderShop(category) {
             let canUpgrade = lvl < info.max && getAvailableCoins() > 0;
             let btnText = lvl === info.max ? 'MAX' : `강화 (1코인)`;
             
+            // 텍스트 오버플로우 방지 (1줄 강제 고정)
             list.innerHTML += `
-            <div style="background:#fff; border:2px solid #8d6e63; border-radius:6px; padding:8px; display:flex; justify-content:space-between; align-items:center;">
-                <div style="display:flex; align-items:center;">
-                    <img src="${info.img}" onerror="this.src='image/mepo.png'" style="width:30px; height:30px; object-fit:contain; margin-right:10px;">
-                    <div>
-                        <div style="font-weight:900; color:#3e2723; font-size:14px;">${info.name} <span style="color:#c62828;">Lv.${lvl}</span></div>
-                        <div style="font-size:11px; color:#666; margin-top:2px;">${info.desc}</div>
+            <div style="background:#fff; border:2px solid #8d6e63; border-radius:6px; padding:6px 8px; display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; align-items:center; overflow:hidden;">
+                    <img src="${info.img}" onerror="this.src='image/mepo.png'" style="width:30px; height:30px; object-fit:contain; margin-right:8px; flex-shrink:0;">
+                    <div style="overflow:hidden;">
+                        <div style="font-weight:900; color:#3e2723; font-size:13px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">${info.name} <span style="color:#c62828;">Lv.${lvl}</span></div>
+                        <div style="font-size:10.5px; color:#666; margin-top:2px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">${info.desc}</div>
                     </div>
                 </div>
-                <button class="maple-btn small ${canUpgrade ? 'primary' : ''}" ${!canUpgrade ? 'disabled' : ''} onclick="upgradeSkill('${key}', '${category}')">${btnText}</button>
+                <button class="maple-btn small ${canUpgrade ? 'primary' : ''}" ${!canUpgrade ? 'disabled' : ''} style="white-space:nowrap; flex-shrink:0; margin-left:5px; min-width:70px;" onclick="upgradeSkill('${key}', '${category}')">${btnText}</button>
             </div>`;
         }
     }
@@ -269,12 +272,13 @@ function openActiveSkillsModal() {
     for(let key in skillLevels) {
         if(skillLevels[key] > 0) {
             hasSkill = true;
+            // 텍스트 오버플로우 방지 (1줄 강제 고정)
             list.innerHTML += `
-            <div style="background:#fff; border:2px solid #8d6e63; border-radius:6px; padding:8px; display:flex; align-items:center;">
-                <img src="${SKILL_INFO[key].img}" onerror="this.src='image/mepo.png'" style="width:30px; height:30px; object-fit:contain; margin-right:10px;">
-                <div>
-                    <div style="font-weight:900; color:#3e2723; font-size:14px;">${SKILL_INFO[key].name} <span style="color:#c62828;">Lv.${skillLevels[key]}</span></div>
-                    <div style="font-size:11px; color:#666; margin-top:2px;">${SKILL_INFO[key].desc}</div>
+            <div style="background:#fff; border:2px solid #8d6e63; border-radius:6px; padding:6px 8px; display:flex; align-items:center; overflow:hidden;">
+                <img src="${SKILL_INFO[key].img}" onerror="this.src='image/mepo.png'" style="width:30px; height:30px; object-fit:contain; margin-right:8px; flex-shrink:0;">
+                <div style="overflow:hidden;">
+                    <div style="font-weight:900; color:#3e2723; font-size:13px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">${SKILL_INFO[key].name} <span style="color:#c62828;">Lv.${skillLevels[key]}</span></div>
+                    <div style="font-size:10.5px; color:#666; margin-top:2px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">${SKILL_INFO[key].desc}</div>
                 </div>
             </div>`;
         }
@@ -509,7 +513,6 @@ function useTicket(choice) {
     addUnit(emptyIdx, tier, cls); closeAllModals(); updateUI();
 }
 
-// 순환 속도를 1배속 -> 4배속 -> 7배속 으로 수정
 function toggleSpeed() {
     if (state.speed === 1) state.speed = 4;
     else if (state.speed === 4) state.speed = 7;
