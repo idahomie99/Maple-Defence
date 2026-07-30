@@ -44,7 +44,7 @@
         
         <div id="pk-menu" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 20vh;">
             <h3>🥊 월드 펀치킹 🥊</h3>
-            <p style="font-size:12px; color:#555; margin-bottom:15px;">혼줌 제외, 도감 및 스킬 스펙만 적용된<br>순수 DPS를 측정합니다. (1분)</p>
+            <p style="font-size:12px; color:#555; margin-bottom:15px;">혼줌/보스추뎀 제외, 전 직업 기본공격 완전 동일!<br>순수 도감과 스킬 내실로 승부합니다. (1분)</p>
             <button class="maple-btn huge primary" style="width:100%; margin-bottom:10px;" onclick="showPkClassSelect()">시작하기</button>
             <button class="maple-btn huge secondary" style="width:100%; margin-bottom:15px;" onclick="showPkRanking()">랭킹 (서버 연동됨)</button>
             <button class="maple-btn danger-btn" style="width:100%;" onclick="closePk()">로비로 돌아가기</button>
@@ -60,17 +60,23 @@
             <button class="maple-btn" style="width:100%;" onclick="openPkMenu()">뒤로</button>
         </div>
 
-        <div id="pk-game" style="display:none; flex-direction:column; align-items:center; width:100%; max-width:500px; height:100%; padding-top:10vh;">
-            <div id="pk-score" style="font-size:64px; font-weight:900; color:#ffeb3b; text-shadow: 3px 3px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; letter-spacing: 2px;">0</div>
-            <div style="color:#fff; font-size:20px; font-weight:bold; margin: 15px 0;">남은 시간: <span id="pk-time" style="color:#ff5252; font-size:28px;">60</span>초</div>
-            
-            <div style="position:relative; width: 320px; height: 160px; margin-top: 30px;">
-                <div style="position:absolute; top: 30px; left: 40px; width: 80px; height: 80px; border: 3px solid #bcaaa4; background: rgba(215, 204, 200, 0.8);"></div>
-                <div style="position:absolute; top: 30px; left: 200px; width: 80px; height: 80px; border: 3px solid #546e7a; background: rgba(69, 90, 100, 0.8);"></div>
-                <canvas id="pkCanvas" width="320" height="160" style="position:absolute; top:0; left:0; pointer-events:none; z-index:10;"></canvas>
+        <!-- 디펜스 본판과 동일한 디자인의 펀치킹 맵 -->
+        <div id="pk-game" style="display:none; flex-direction:column; width:100%; max-width:500px; height:auto; min-height:100vh; background-color: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); padding-bottom: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.8);">
+            <div class="maple-panel" style="margin: 10px; padding: 12px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size:24px; color:#ffeb3b; font-weight:900; text-shadow:2px 2px 0 #000; flex:1;">점수: <span id="pk-score">0</span></div>
+                <div style="display:flex; align-items:center; gap: 10px;">
+                    <button id="pk-btn-speed" class="maple-btn small" onclick="togglePkSpeed()">1배속</button>
+                    <div style="color:#ff5252; font-size:18px; font-weight:bold; white-space:nowrap;">시간: <span id="pk-time">60</span></div>
+                </div>
             </div>
             
-            <button class="maple-btn danger-btn" style="margin-top: 50px; width: 200px;" onclick="endPkGame(true)">중도 포기</button>
+            <div style="position: relative; width: 100%; aspect-ratio: 1/1; background-color: rgba(55, 71, 79, 0.5); border-top: 4px solid rgba(38, 50, 56, 0.8); border-bottom: 4px solid rgba(38, 50, 56, 0.8);">
+                <canvas id="pkCanvas" width="500" height="500" style="position:absolute; top:0; left:0; z-index:10;"></canvas>
+            </div>
+            
+            <div class="maple-panel" style="margin: 10px; padding: 12px;">
+                <button class="maple-btn huge danger-btn" style="width: 100%;" onclick="endPkGame(true)">포기하고 로비로</button>
+            </div>
         </div>
 
         <div id="pk-ranking" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 10vh; width:90%; max-width:360px; max-height: 80vh; flex-direction:column;">
@@ -80,6 +86,7 @@
         </div>
     </div>
 
+    <!-- 기존 디펜스 모드 오버레이 및 게임 화면 -->
     <div id="summon-toast"></div>
     <div id="boss-toast"></div>
     
@@ -210,8 +217,6 @@
     </div>
 
     <div id="msg-overlay"></div>
-    
-    <!-- 모듈 타입으로 스크립트 연결 -->
     <script type="module" src="script.js"></script>
 </body>
 </html>

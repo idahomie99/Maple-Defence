@@ -12,7 +12,6 @@ body {
     color: #333; min-height: 100vh; overflow-y: auto; overflow-x: hidden;
 }
 
-/* 로비 배경 */
 #start-screen {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('image/wallpaper.png') no-repeat center center;
@@ -56,7 +55,6 @@ body {
 #game-container {
     width: 100%; max-width: 500px; min-height: 100vh; height: auto;
     display: flex; flex-direction: column; 
-    /* 인게임 전체를 투명하게 (바탕화면이 비치도록) */
     background-color: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px);
     padding-bottom: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.8);
 }
@@ -78,37 +76,31 @@ body {
 
 #board-area {
     position: relative; width: 100%; aspect-ratio: 1/1; 
-    /* 기존 칙칙한 박스 제거, 투명한 배경 사용 */
-    background-color: transparent; border: none;
+    background-color: rgba(55, 71, 79, 0.5); 
+    border-top: 4px solid rgba(38, 50, 56, 0.8); border-bottom: 4px solid rgba(38, 50, 56, 0.8);
 }
 
 canvas { width: 100%; height: 100%; position: absolute; top: 0; left: 0; pointer-events: none; z-index: 10; }
 
-/* 유닛 배치 박스 전면 개편: 덩어리가 아닌 개별 독립 타일 느낌으로 */
+/* 유닛 배치 박스 이전 버전으로 완벽 롤백 */
 #grid-container {
     position: absolute; top: 15%; left: 15%; width: 70%; height: 70%;
     display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(5, 1fr);
-    background-color: transparent; /* 뒷 배경 투명 */
-    border: none; z-index: 5;
-    gap: 4px; /* 칸과 칸 사이를 완전히 벌림 */
+    background-color: rgba(220, 190, 170, 0.85); 
+    border: 3px solid rgba(120, 80, 60, 0.9); z-index: 5; border-radius: 4px;
+    gap: 0;
 }
 
-/* 개별 칸(타일) 입체감 부여 */
 .grid-cell {
-    background: rgba(30, 30, 30, 0.7); /* 어두운 반투명 타일 */
-    border: 2px solid #5d4037; /* 테두리 */
-    border-radius: 6px; /* 둥근 모서리 */
-    box-shadow: inset 0 0 10px rgba(0,0,0,0.8), 0 4px 6px rgba(0,0,0,0.4); /* 입체감 */
-    display: flex; flex-direction: column;
+    background: transparent; box-shadow: none; border-radius: 0;
+    border: 1px solid rgba(255,255,255,0.4); display: flex; flex-direction: column;
     justify-content: center; align-items: center; font-weight: 800; cursor: pointer; text-align: center; line-height: 1.2;
     transition: all 0.1s;
 }
-.grid-cell:hover { background: rgba(50, 50, 50, 0.8); border-color: #8d6e63; }
+.grid-cell:hover { background-color: rgba(255, 255, 255, 0.2); }
 .grid-cell.selected { 
-    background-color: rgba(255, 235, 59, 0.4); 
-    border: 2px solid #ffeb3b; 
-    box-shadow: inset 0 0 15px rgba(255, 235, 59, 0.8), 0 0 10px #ffeb3b; 
-    z-index: 6; transform: scale(1.05); /* 선택시 살짝 튀어나옴 */
+    background-color: rgba(255, 235, 59, 0.6); border: 2px solid #ffeb3b; 
+    box-shadow: inset 0 0 15px rgba(255, 235, 59, 0.8); z-index: 6; transform: none; 
 }
 
 .glow-6 { border: 2px solid #00e5ff !important; box-shadow: inset 0 0 15px rgba(0,229,255,0.6), 0 0 8px rgba(0,229,255,0.8) !important; }
@@ -137,7 +129,7 @@ canvas { width: 100%; height: 100%; position: absolute; top: 0; left: 0; pointer
 }
 @keyframes floatUp { 0% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -40px); } }
 
-/* 데미지 텍스트 플로팅 (크리티컬 시 표시) */
+/* 데미지 텍스트 플로팅 */
 .dmg-text {
     position: absolute; color: #ffeb3b; font-weight: 900; font-size: 16px;
     text-shadow: 1px 1px 0 #c62828, -1px -1px 0 #c62828, 1px -1px 0 #c62828, -1px 1px 0 #c62828;
