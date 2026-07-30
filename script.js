@@ -1018,7 +1018,7 @@ function gameOver(msg) {
 let pkReqId;
 let pkState = {
     active: false, time: 60, score: 0, lastTime: 0, speed: 1,
-    unit: null, scarecrow: { x: 250, y: 25, size: 20, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0 },
+    unit: null, scarecrow: { x: 390, y: 250, size: 20, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0 },
     projectiles: [], dmgTexts: [], vfx: []
 };
 
@@ -1028,6 +1028,8 @@ window.openPkMenu = () => {
     document.getElementById('pk-class-select').style.display = 'none';
     document.getElementById('pk-game').style.display = 'none';
     document.getElementById('pk-ranking').style.display = 'none';
+    document.getElementById('pk-result-modal').style.display = 'none';
+    document.getElementById('pk-result-overlay').style.display = 'none';
 };
 
 window.closePk = () => {
@@ -1049,6 +1051,10 @@ window.showPkRanking = async () => {
     document.getElementById('pk-menu').style.display = 'none';
     document.getElementById('pk-game').style.display = 'none';
     document.getElementById('pk-class-select').style.display = 'none';
+    document.getElementById('pk-result-modal').style.display = 'none';
+    document.getElementById('pk-result-overlay').style.display = 'none';
+    
+    document.getElementById('pk-overlay').style.display = 'flex'; // 오버레이 켜기
     document.getElementById('pk-ranking').style.display = 'flex';
     
     let list = document.getElementById('pk-ranking-list');
@@ -1088,21 +1094,21 @@ window.togglePkSpeed = () => {
 };
 
 window.startPkGame = (clsName) => {
-    document.getElementById('pk-class-select').style.display = 'none';
+    document.getElementById('pk-overlay').style.display = 'none'; // 오버레이 끄기 (일반 맵처럼 투명하게 보이기 위해)
     document.getElementById('pk-game').style.display = 'flex';
     
     let grade = GRADES[8]; // 데스티니 고정
     let cls = CLASSES[clsName];
     
-    // UI 업데이트 (유닛 박스에 선택한 직업의 아이콘과 색상 적용)
+    // UI 업데이트 (유닛 박스에 선택한 직업 적용)
     document.getElementById('pk-unit-icon').innerText = cls.icon;
     document.getElementById('pk-unit-name').style.color = cls.color;
     
     pkState = {
         active: true, time: 60, score: 0, lastTime: performance.now(), speed: 1,
-        // 유닛은 보드 정중앙, 허수아비는 몹 나오는 길의 상단 중앙에 배치
-        unit: { cls: cls, grade: grade, gradeIdx: 8, x: 250, y: 250, lastAttack: 0, globalCooldown: 0 },
-        scarecrow: { x: 250, y: 25, size: 20, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0 },
+        // 유닛은 9시 방향 칸 (x: 110, y: 250), 허수아비는 3시 방향 (x: 390, y: 250)
+        unit: { cls: cls, grade: grade, gradeIdx: 8, x: 110, y: 250, lastAttack: 0, globalCooldown: 0 },
+        scarecrow: { x: 390, y: 250, size: 20, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0 },
         projectiles: [], dmgTexts: [], vfx: []
     };
     
@@ -1117,20 +1123,29 @@ function pkLoop() {
     if (!pkState.active) return;
     
     let now = performance.now();
-    // 배속에 비례하여 dt 적용 -> 시간이 시각적으로 훅훅 줄어들게 처리
+    // 배속을 dt에 곱해줘서 프레임당 이동거리와 쿨타임 감소폭을 늘림
     let dt = ((now - pkState.lastTime) / 1000) * pkState.speed;
     if (dt > 0.1) dt = 0.1;
     pkState.lastTime = now;
     
+    // 타임아웃도 배속에 비례해서 빨리 깎임 (dt 그대로 차감)
     pkState.time -= dt; 
     document.getElementById('pk-time').innerText = Math.ceil(Math.max(0, pkState.time));
     
-    if (pkState.time <= 0) { window.endPkGame(false); return; }
+    if (pkState.time <= 0) {
+        pkState.active = false;
+        cancelAnimationFrame(pkReqId);
+        
+        // 종료 시 결과 팝업 표시
+        document.getElementById('pk-final-score').innerText = Math.floor(pkState.score).toLocaleString();
+        document.getElementById('pk-result-overlay').style.display = 'block';
+        document.getElementById('pk-result-modal').style.display = 'block';
+        return; 
+    }
     
     let u = pkState.unit;
     let target = pkState.scarecrow;
     
-    // 빙결 도트 데미지 처리
     if (target.freezeTimer > 0) {
         target.freezeTimer -= dt;
         target.freezeTickTimer -= dt;
@@ -1140,14 +1155,12 @@ function pkLoop() {
         }
     }
 
-    // 도감 퍼센트 및 스킬 연산 적용
     let cardMulti = 1 + (getTotalCardBonus() / 100);
     let rageMulti = 1 + (skillLevels.common_rage * 0.01);
     let sharpChance = skillLevels.common_sharp * 0.05;
     let windReduc = 1 + (skillLevels.common_wind * 0.2);
     
     // ★ 펀치킹 밸런스 평준화: 모든 직업 기본공격력 20, 쿨타임 1초(1000ms) 고정 ★
-    // 혼줌 강화 미적용, 보스 추가 데미지 미적용
     let pkBaseDmg = 20; 
     let pkBaseCd = 1000;
     
@@ -1179,7 +1192,7 @@ function pkLoop() {
         
         let isFinal = false;
         if (u.cls.type === '전사' && skillLevels.war_final > 0 && Math.random() < (skillLevels.war_final * 0.03)) {
-            isFinal = true; dmg *= 2; // 파이널어택 발동 시 2배 데미지
+            isFinal = true; dmg *= 2;
         }
         
         pkState.projectiles.push({
@@ -1208,7 +1221,6 @@ function pkLoop() {
         if (dist <= speed) {
             pkApplyDmg(p.dmg, p.isCrit);
             
-            // 법사 프리즈 효과 허수아비에게 부여
             if (p.type === '법사' && skillLevels.mage_freeze > 0 && Math.random() < ((10 + skillLevels.mage_freeze * 2) / 100)) {
                 if (target.freezeTimer <= 0) {
                     target.freezeTimer = 3; target.freezeTickTimer = 1;
@@ -1247,12 +1259,8 @@ function pkApplyDmg(dmg, isCrit) {
     pkState.dmgTexts.push({ val: Math.floor(dmg), x: pkState.scarecrow.x + ox, y: pkState.scarecrow.y - 40 + oy, timer: 0.6, isCrit: isCrit });
 }
 
-window.endPkGame = async (isGiveUp) => {
-    pkState.active = false;
-    cancelAnimationFrame(pkReqId);
-    
-    if (isGiveUp) { window.openPkMenu(); return; }
-    
+// 측정 종료 시 랭킹 등록
+window.submitPkScore = async () => {
     let finalScore = Math.floor(pkState.score);
     let className = pkState.unit.cls.type;
     
@@ -1285,6 +1293,21 @@ window.endPkGame = async (isGiveUp) => {
     window.showPkRanking();
 };
 
+// 중도 포기 또는 결과창에서 그냥 로비로
+window.discardPkScore = () => {
+    document.getElementById('pk-game').style.display = 'none';
+    window.openPkMenu();
+};
+
+window.endPkGame = (isGiveUp) => {
+    pkState.active = false;
+    cancelAnimationFrame(pkReqId);
+    if (isGiveUp) { 
+        document.getElementById('pk-game').style.display = 'none';
+        window.openPkMenu(); 
+    }
+};
+
 function drawPk() {
     let pkCanvas = document.getElementById('pkCanvas');
     let pkCtx = pkCanvas.getContext('2d');
@@ -1296,17 +1319,9 @@ function drawPk() {
     pkCtx.lineJoin = "round";
     pkCtx.beginPath(); pkCtx.rect(25, 25, 450, 450); pkCtx.stroke();
     
-    let u = pkState.unit;
     let m = pkState.scarecrow;
     
-    // 허수아비가 스폰되는 1칸짜리 박스 시각화 (몹 경로 상단)
-    pkCtx.fillStyle = 'rgba(255, 82, 82, 0.3)';
-    pkCtx.fillRect(m.x - 25, m.y - 25, 50, 50);
-    pkCtx.strokeStyle = 'rgba(255, 82, 82, 0.8)';
-    pkCtx.lineWidth = 2;
-    pkCtx.strokeRect(m.x - 25, m.y - 25, 50, 50);
-    
-    // 허수아비 렌더링
+    // 3시 방향 허수아비 렌더링 (빨간 박스 삭제, 텍스트만 표시)
     pkCtx.font = "30px NanumSquare";
     pkCtx.textAlign = "center"; pkCtx.textBaseline = "middle";
     pkCtx.fillText("🎃", m.x, m.y); 
