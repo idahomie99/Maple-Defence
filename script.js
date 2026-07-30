@@ -631,7 +631,6 @@ function loop() {
         if (hitEffects[i].timer <= 0) hitEffects.splice(i, 1);
     }
 
-    // 데스폴트 데미지 및 쉐이크 (타이머가 끝났을 때 발동!)
     for (let i = visualEffects.length - 1; i >= 0; i--) {
         visualEffects[i].timer -= dt;
         if (visualEffects[i].timer <= 0) {
@@ -731,8 +730,8 @@ function loop() {
                     
                     if (t.cls.type === '전사' && skillLevels.war_death > 0) {
                         let gdmg = baseDmg * (1 + skillLevels.war_death * 0.1);
-                        // 타이머를 0.7초로 늘려서 딜레이 효과를 줍니다!
-                        visualEffects.push({ type: 'death', timer: 0.7, dmg: gdmg });
+                        // 총 1.2초 (0.2초 차징 + 1초 홀드)
+                        visualEffects.push({ type: 'death', timer: 1.2, dmg: gdmg });
                         t.globalCooldown = 60000;
                     }
                     else if (t.cls.type === '법사' && skillLevels.mage_thunder > 0) {
@@ -908,18 +907,17 @@ function draw() {
     visualEffects.forEach(v => {
         ctx.save();
         if (v.type === 'death') {
-            // 경과 시간에 따른 비율 계산 (0.7에서 0으로 줄어드므로 경과시간은 0.7 - v.timer)
-            let elapsed = 0.7 - v.timer;
-            let progress = Math.min(1, elapsed / 0.2); // 0.2초만에 1(100%)까지 도달
+            let elapsed = 1.2 - v.timer;
+            let progress = Math.min(1, elapsed / 0.2); // 0.2초만에 1(100%)까지 도달, 남은 1초는 유지
             
             ctx.fillStyle = `rgba(0, 0, 0, 0.4)`; 
             ctx.fillRect(0,0,500,500);
 
-            ctx.strokeStyle = "#ffeb3b"; // 데스폴트 노란색 검기
-            ctx.lineWidth = 12; // 얇게 조절
+            ctx.strokeStyle = "#ffeb3b"; 
+            ctx.lineWidth = 8; 
             ctx.lineCap = "round";
             ctx.shadowColor = "#f57f17";
-            ctx.shadowBlur = 15;
+            ctx.shadowBlur = 10;
 
             let startX = -50, startY = 450;
             let endX = 550, endY = 50;
@@ -932,8 +930,8 @@ function draw() {
             ctx.lineTo(currentX, currentY);
             ctx.stroke();
 
-            ctx.strokeStyle = "#fff"; // 검기 내부 하얀 코어 선
-            ctx.lineWidth = 4; // 얇게 조절
+            ctx.strokeStyle = "#fff"; 
+            ctx.lineWidth = 2; 
             ctx.beginPath();
             ctx.moveTo(startX, startY);
             ctx.lineTo(currentX, currentY);
@@ -942,8 +940,6 @@ function draw() {
             ctx.fillStyle = `rgba(0, 229, 255, ${v.timer})`; ctx.fillRect(0,0,500,500);
             ctx.strokeStyle = `rgba(255, 255, 255, ${v.timer * 2})`; ctx.lineWidth = 15;
             ctx.beginPath(); ctx.moveTo(250,0); ctx.lineTo(200,250); ctx.lineTo(300,250); ctx.lineTo(250,500); ctx.stroke();
-        } else if (v.type === 'fuma') {
-            ctx.fillStyle = `rgba(171, 71, 188, ${v.timer})`; ctx.fillRect(0,0,500,500);
         }
         ctx.restore();
     });
@@ -1260,7 +1256,6 @@ function pkLoop() {
         let finalScore = Math.floor(pkState.score);
         let scoreHtml = finalScore.toLocaleString();
         
-        // 최고 기록 달성 시 신기록 텍스트 추가!
         if (finalScore > pkState.bestScore && finalScore > 0) {
             scoreHtml += ' <span style="font-size:16px; color:#ffeb3b; text-shadow:1px 1px 2px #000;">(신기록!)</span>';
         }
@@ -1303,7 +1298,7 @@ function pkLoop() {
             let baseDmg = pkBaseDmg * u.grade.mult * cardMulti * rageMulti; 
             if (u.cls.type === '전사' && skillLevels.war_death > 0) {
                 let gdmg = baseDmg * (1 + skillLevels.war_death * 0.1);
-                pkState.vfx.push({ type: 'death', timer: 0.7, dmg: gdmg }); // 0.7초로 연장
+                pkState.vfx.push({ type: 'death', timer: 1.2, dmg: gdmg }); // 1.2초로 변경
                 u.globalCooldown = 60000;
             } else if (u.cls.type === '법사' && skillLevels.mage_thunder > 0) {
                 let gdmg = baseDmg * (1 + skillLevels.mage_thunder * 0.1);
@@ -1374,7 +1369,6 @@ function pkLoop() {
         if (pkState.dmgTexts[i].timer <= 0) pkState.dmgTexts.splice(i, 1);
     }
     
-    // 펀치킹용 딜레이 데미지 & 흔들림 (타이머 종료 시 적용)
     for (let i = pkState.vfx.length - 1; i >= 0; i--) {
         pkState.vfx[i].timer -= dt;
         if (pkState.vfx[i].timer <= 0) {
@@ -1474,11 +1468,9 @@ function drawPk() {
     
     let m = pkState.scarecrow;
     
-    // 벨룸 이미지 적용
-    let bImg = bossImages["벨룸"];
     let size = 25; 
     
-    if (bImg && bImg.complete && bImg.naturalWidth > 0) {
+    if (husooabiImg && husooabiImg.complete && husooabiImg.naturalWidth > 0) {
         pkCtx.save();
         pkCtx.translate(m.x, m.y);
         if (m.freezeTimer > 0) {
@@ -1486,13 +1478,13 @@ function drawPk() {
             pkCtx.fillRect(-size * 1.5, -size * 1.5, size * 3, size * 3);
             pkCtx.globalAlpha = 1.0;
         }
-        pkCtx.drawImage(bImg, -size * 1.5, -size * 1.5, size * 3, size * 3);
+        pkCtx.drawImage(husooabiImg, -size * 1.5, -size * 1.5, size * 3, size * 3);
         pkCtx.restore();
     } else {
         pkCtx.font = "40px NanumSquare";
         pkCtx.textAlign = "center";
         pkCtx.textBaseline = "middle";
-        pkCtx.fillText("🐉", m.x, m.y); 
+        pkCtx.fillText("🎃", m.x, m.y); 
     }
     
     if (m.freezeTimer > 0) {
@@ -1542,18 +1534,17 @@ function drawPk() {
     pkState.vfx.forEach(v => {
         pkCtx.save();
         if (v.type === 'death') {
-            // 0.2초만에 그려지고 나머지 0.5초 동안 유지
-            let elapsed = 0.7 - v.timer;
+            let elapsed = 1.2 - v.timer;
             let progress = Math.min(1, elapsed / 0.2); 
             
             pkCtx.fillStyle = `rgba(0, 0, 0, 0.4)`; 
             pkCtx.fillRect(0,0,500,500);
 
-            pkCtx.strokeStyle = "#ffeb3b"; // 데스폴트 노란색 검기
-            pkCtx.lineWidth = 12; // 얇게 조절
+            pkCtx.strokeStyle = "#ffeb3b"; 
+            pkCtx.lineWidth = 8; 
             pkCtx.lineCap = "round";
             pkCtx.shadowColor = "#f57f17";
-            pkCtx.shadowBlur = 15;
+            pkCtx.shadowBlur = 10;
 
             let startX = -50, startY = 450;
             let endX = 550, endY = 50;
@@ -1566,8 +1557,8 @@ function drawPk() {
             pkCtx.lineTo(currentX, currentY);
             pkCtx.stroke();
 
-            pkCtx.strokeStyle = "#fff"; // 검기 내부 하얀 코어 선
-            pkCtx.lineWidth = 4; // 얇게 조절
+            pkCtx.strokeStyle = "#fff"; 
+            pkCtx.lineWidth = 2; 
             pkCtx.beginPath();
             pkCtx.moveTo(startX, startY);
             pkCtx.lineTo(currentX, currentY);
