@@ -6,7 +6,6 @@
     <title>메이플 디펜스</title>
     <link rel="stylesheet" href="style.css">
     <style>
-        /* 새로운 마일드 쉐이크 애니메이션 추가 (데스폴트 검기용) */
         @keyframes mild-shake {
             0%, 100% { transform: translate(0, 0) rotate(0deg); }
             20% { transform: translate(-2px, 0px) rotate(0.5deg); }
@@ -18,7 +17,6 @@
     </style>
 </head>
 <body>
-    <!-- 1. 구글 로그인 화면 -->
     <div id="login-screen" style="display:flex; flex-direction:column; justify-content:center; align-items:center; position:fixed; top:0; left:0; width:100%; height:100%; z-index:950; background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.8)), url('image/wallpaper.png') no-repeat center center; background-size: cover;">
         <img src="image/titlelogo.png" alt="메이플 디펜스" style="width: 80%; max-width: 400px; margin-bottom: 40px; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.6));">
         <div style="background: rgba(0,0,0,0.6); padding: 30px; border-radius: 12px; border: 2px solid #8d6e63; text-align: center;">
@@ -31,7 +29,6 @@
         </div>
     </div>
 
-    <!-- 2. 로비 화면 -->
     <div id="start-screen" style="display:none; flex-direction:column; justify-content:center; align-items:center; position:fixed; top:0; left:0; width:100%; height:100%; z-index:900; background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('image/wallpaper.png') no-repeat center center; background-size: cover;">
         <div style="position:absolute; top:20px; right:20px; color:#fff; font-weight:bold; font-size:14px; background:rgba(0,0,0,0.5); padding:5px 10px; border-radius:4px; display: flex; align-items: center; gap: 10px;">
             <span>접속중: <span id="current-user-name" style="color:#ffeb3b;">용사님</span></span>
@@ -52,9 +49,7 @@
         </div>
     </div>
 
-    <!-- 월드 펀치킹 전용 메뉴 오버레이 -->
     <div id="pk-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:2000; flex-direction:column; align-items:center;">
-        
         <div id="pk-menu" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 20vh;">
             <h3>🥊 월드 펀치킹 🥊</h3>
             <p style="font-size:12px; color:#555; margin-bottom:15px;">혼줌/보스추뎀 제외, 전 직업 기본공격 완전 동일!<br>순수 도감과 스킬 내실로 승부합니다. (1분)</p>
@@ -80,9 +75,7 @@
         </div>
     </div>
 
-    <!-- 디펜스 본판과 100% 동일한 디자인의 펀치킹 인게임 화면 -->
     <div id="pk-game" style="display:none; flex-direction:column; width:100%; max-width:500px; height:auto; min-height:100vh; background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('image/punchkingwallpaper.png') no-repeat center center; background-size: cover; padding-bottom: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.8);">
-        
         <div id="pk-header" class="maple-panel" style="margin: 10px 10px 0 10px; padding: 12px; font-size: 15px; font-weight: bold; background: rgba(253, 245, 230, 0.9);">
             <div class="stat-row">
                 <div>점수: <span id="pk-score" class="highlight">0</span></div>
@@ -100,19 +93,17 @@
                 <div class="grid-cell glow-8" style="width: 100%; height: 100%; background: transparent; box-shadow: none; cursor:default; border:none; display:flex; flex-direction:column; justify-content:center; align-items:center;">
                     <div id="pk-unit-icon" style="font-size: clamp(14px, 4vw, 20px); text-shadow:1px 1px 2px rgba(0,0,0,0.5);">🗡️</div>
                     <div id="pk-unit-name" style="color:#ffd54f; font-size: clamp(8px, 2.5vw, 10px); margin-top:2px; font-weight:800;">데스티니</div>
-                    <!-- 글로벌 바 렌더링 영역 (전사 데스폴트 기준 기본 추가) -->
                     <div style="width: 80%; height: 3px; background: #333; margin-top: 2px; border-radius: 1.5px; overflow: hidden; border: 1px solid #111; display:none;" id="pk-global-bar-container"><div id="pk-global-bar" style="width: 0%; height: 100%; background: #ffeb3b;"></div></div>
                 </div>
             </div>
-
-            <div style="position: absolute; top: 43%; left: 71%; width: 14%; height: 14%; background-color: rgba(255, 82, 82, 0.15); border: 2px solid rgba(255, 82, 82, 0.4); z-index: 4; border-radius: 4px; box-sizing: border-box;"></div>
+            <!-- 삭제됨: 빨간색 스폰 존 렌더링 삭제 -->
         </div>
         
         <div class="maple-panel" style="margin: 10px; padding: 12px; background: rgba(253, 245, 230, 0.9);">
             <button class="maple-btn huge danger-btn" style="width: 100%; margin-bottom: 15px;" onclick="endPkGame(true)">포기하고 로비로</button>
             
             <div style="background: rgba(0,0,0,0.7); border-radius: 8px; padding: 10px;">
-                <h4 style="color: #ffeb3b; margin: 0 0 10px 0; text-align: center; font-size: 16px; font-weight:900;">🏆 펀치킹 실시간 TOP 10 🏆</h4>
+                <h4 style="color: #ffeb3b; margin: 0 0 10px 0; text-align: center; font-size: 16px; font-weight:900;">🏆 펀킹 실시간 TOP 10 🏆</h4>
                 <div id="pk-live-ranking-list" style="display:flex; flex-direction:column; gap:5px; font-size:13px; max-height: 200px; overflow-y: auto;">
                     <div style="text-align:center; color:#ccc;">랭킹을 불러오는 중...</div>
                 </div>
@@ -120,18 +111,14 @@
         </div>
     </div>
 
-    <!-- 펀치킹 결과 팝업 모달 -->
     <div id="pk-result-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:2050;"></div>
     <div id="pk-result-modal" class="maple-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:2100; width:80%; max-width:300px;">
         <h3 style="color:#e65100;">측정 종료!</h3>
         <div style="font-size:16px; margin-bottom:10px; color:#5a3c22; font-weight:bold;">나의 최종 DPS 점수</div>
         <div id="pk-final-score" style="font-size:42px; font-weight:900; color:#c62828; text-shadow:1px 1px 0 #fff; margin-bottom:20px; display:flex; flex-direction:column; align-items:center;">0</div>
-        
-        <!-- 버리고 로비로 버튼 삭제, 등록 버튼 단일화 -->
         <button id="btn-submit-pk" class="maple-btn huge primary" style="width:100%; margin-bottom:10px;" onclick="submitPkScore()">랭킹 등록하고 로비로</button>
     </div>
 
-    <!-- 기존 디펜스 모드 오버레이 및 게임 화면 -->
     <div id="summon-toast"></div>
     <div id="boss-toast"></div>
     
@@ -197,7 +184,6 @@
     
     <div id="overlay" onclick="closeAllModals()"></div>
 
-    <!-- 모달들 -->
     <div id="book-modal" class="maple-modal" style="max-height: 85vh; display: none; flex-direction: column;">
         <h3>📖 몬스터 도감 📖</h3>
         <div id="book-total-grade" style="font-weight:900; color:#1565c0; font-size: 14px;">총 등급 합계: <span id="ui-total-grade">0</span> (코인: <span id="ui-book-coins">0</span>)</div>

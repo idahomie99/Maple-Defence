@@ -631,6 +631,7 @@ function loop() {
         if (hitEffects[i].timer <= 0) hitEffects.splice(i, 1);
     }
 
+    // 데스폴트 검기 및 데미지 지연 처리 로직 추가
     for (let i = visualEffects.length - 1; i >= 0; i--) {
         visualEffects[i].timer -= dt;
         if (visualEffects[i].timer <= 0) {
@@ -710,12 +711,12 @@ function loop() {
         if (t.gradeIdx === 6) {
             t.bindCooldown -= dt * 1000;
             let bar = document.getElementById(`bind-bar-${t.idx}`);
-            if (bar) bar.style.width = Math.max(0, Math.min(100, ((60000 - t.bindCooldown) / 60000) * 100)) + '%';
+            if (bar) bar.style.width = Math.max(0, Math.min(100, ((75000 - t.bindCooldown) / 75000) * 100)) + '%';
             if (t.bindCooldown <= 0 && monsters.length > 0) {
                 let target = null;
                 for (let m of monsters) { if (m.bindTimer <= 0) { target = m; break; } }
                 if (!target) target = monsters[0]; 
-                if (target) { target.bindTimer = 10; t.bindCooldown = 60000; }
+                if (target) { target.bindTimer = 10; t.bindCooldown = 75000; }
             }
         }
 
@@ -730,8 +731,7 @@ function loop() {
                     
                     if (t.cls.type === '전사' && skillLevels.war_death > 0) {
                         let gdmg = baseDmg * (1 + skillLevels.war_death * 0.1);
-                        // 총 1.2초 (0.2초 차징 + 1초 홀드)
-                        visualEffects.push({ type: 'death', timer: 1.2, dmg: gdmg });
+                        visualEffects.push({ type: 'death', timer: 1.2, dmg: gdmg }); // 지연 데미지 전달 (1.2초)
                         t.globalCooldown = 60000;
                     }
                     else if (t.cls.type === '법사' && skillLevels.mage_thunder > 0) {
@@ -908,16 +908,15 @@ function draw() {
         ctx.save();
         if (v.type === 'death') {
             let elapsed = 1.2 - v.timer;
-            let progress = Math.min(1, elapsed / 0.2); // 0.2초만에 1(100%)까지 도달, 남은 1초는 유지
+            let progress = Math.min(1, elapsed / 0.2); // 0.2초만에 1(100%)까지 도달
             
-            ctx.fillStyle = `rgba(0, 0, 0, 0.4)`; 
-            ctx.fillRect(0,0,500,500);
+            // 암전 효과 삭제!! (투명하게 유지)
 
-            ctx.strokeStyle = "#ffeb3b"; 
-            ctx.lineWidth = 8; 
+            ctx.strokeStyle = "#ffeb3b"; // 데스폴트 노란색 검기
+            ctx.lineWidth = 12; // 두께 감소
             ctx.lineCap = "round";
             ctx.shadowColor = "#f57f17";
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = 15;
 
             let startX = -50, startY = 450;
             let endX = 550, endY = 50;
@@ -930,8 +929,8 @@ function draw() {
             ctx.lineTo(currentX, currentY);
             ctx.stroke();
 
-            ctx.strokeStyle = "#fff"; 
-            ctx.lineWidth = 2; 
+            ctx.strokeStyle = "#fff"; // 검기 내부 하얀 코어 선
+            ctx.lineWidth = 4; // 두께 감소
             ctx.beginPath();
             ctx.moveTo(startX, startY);
             ctx.lineTo(currentX, currentY);
@@ -1199,7 +1198,7 @@ window.startPkGame = (clsName) => {
     window.switchScreen('pk-game');
     window.loadPkLiveRanking();
     
-    let grade = GRADES[8]; // 데스티니 고정
+    let grade = GRADES[8]; 
     let cls = CLASSES[clsName];
     
     document.getElementById('pk-unit-icon').innerText = cls.icon;
@@ -1298,7 +1297,7 @@ function pkLoop() {
             let baseDmg = pkBaseDmg * u.grade.mult * cardMulti * rageMulti; 
             if (u.cls.type === '전사' && skillLevels.war_death > 0) {
                 let gdmg = baseDmg * (1 + skillLevels.war_death * 0.1);
-                pkState.vfx.push({ type: 'death', timer: 1.2, dmg: gdmg }); // 1.2초로 변경
+                pkState.vfx.push({ type: 'death', timer: 1.2, dmg: gdmg }); // 1.2초 타이머
                 u.globalCooldown = 60000;
             } else if (u.cls.type === '법사' && skillLevels.mage_thunder > 0) {
                 let gdmg = baseDmg * (1 + skillLevels.mage_thunder * 0.1);
@@ -1369,6 +1368,7 @@ function pkLoop() {
         if (pkState.dmgTexts[i].timer <= 0) pkState.dmgTexts.splice(i, 1);
     }
     
+    // 펀치킹용 딜레이 데미지 & 흔들림 
     for (let i = pkState.vfx.length - 1; i >= 0; i--) {
         pkState.vfx[i].timer -= dt;
         if (pkState.vfx[i].timer <= 0) {
@@ -1442,12 +1442,6 @@ window.submitPkScore = async () => {
     window.loadPkLiveRanking(); 
 };
 
-window.exitPkToLobby = () => {
-    document.getElementById('pk-result-overlay').style.display = 'none';
-    document.getElementById('pk-result-modal').style.display = 'none';
-    window.switchScreen('start-screen'); 
-};
-
 window.endPkGame = (isGiveUp) => {
     pkState.active = false;
     cancelAnimationFrame(pkReqId);
@@ -1467,7 +1461,6 @@ function drawPk() {
     pkCtx.beginPath(); pkCtx.rect(25, 25, 450, 450); pkCtx.stroke();
     
     let m = pkState.scarecrow;
-    
     let size = 25; 
     
     if (husooabiImg && husooabiImg.complete && husooabiImg.naturalWidth > 0) {
@@ -1537,14 +1530,13 @@ function drawPk() {
             let elapsed = 1.2 - v.timer;
             let progress = Math.min(1, elapsed / 0.2); 
             
-            pkCtx.fillStyle = `rgba(0, 0, 0, 0.4)`; 
-            pkCtx.fillRect(0,0,500,500);
+            // 암전 효과 완전 삭제.
 
             pkCtx.strokeStyle = "#ffeb3b"; 
-            pkCtx.lineWidth = 8; 
+            pkCtx.lineWidth = 12; 
             pkCtx.lineCap = "round";
             pkCtx.shadowColor = "#f57f17";
-            pkCtx.shadowBlur = 10;
+            pkCtx.shadowBlur = 15;
 
             let startX = -50, startY = 450;
             let endX = 550, endY = 50;
@@ -1558,7 +1550,7 @@ function drawPk() {
             pkCtx.stroke();
 
             pkCtx.strokeStyle = "#fff"; 
-            pkCtx.lineWidth = 2; 
+            pkCtx.lineWidth = 4; 
             pkCtx.beginPath();
             pkCtx.moveTo(startX, startY);
             pkCtx.lineTo(currentX, currentY);
