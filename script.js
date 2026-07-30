@@ -19,6 +19,15 @@ const database = getDatabase(app);
 let currentUserName = "이름없는 용사";
 let currentUserUid = null;
 
+// ★ 이어하기 버튼 갱신을 위한 함수! ★
+window.checkSave = () => {
+    let btn = document.getElementById('btn-continue');
+    if (btn) {
+        if (localStorage.getItem('mapleDefenseSave')) btn.style.display = 'block';
+        else btn.style.display = 'none';
+    }
+};
+
 window.switchScreen = (screenId) => {
     const screens = ['login-screen', 'start-screen', 'game-container', 'pk-game'];
     screens.forEach(id => {
@@ -28,6 +37,9 @@ window.switchScreen = (screenId) => {
     if (screenId) {
         const activeEl = document.getElementById(screenId);
         if (activeEl) activeEl.style.display = 'flex';
+        
+        // 로비 켜질 때마다 이어하기 버튼 갱신!
+        if (screenId === 'start-screen') window.checkSave();
     }
 };
 
@@ -169,8 +181,8 @@ function initGrid() {
 }
 initGrid();
 
-function checkSave() { if (localStorage.getItem('mapleDefenseSave')) document.getElementById('btn-continue').style.display = 'block'; }
-checkSave();
+// 초기 로딩 시에도 체크
+window.checkSave();
 
 function saveGameData() {
     if (state.status === 'GAMEOVER' || state.status === 'TITLE') return;
@@ -222,17 +234,15 @@ window.startNewGame = () => {
     updateUI(); mainReqId = requestAnimationFrame(loop);
 };
 
-// ★ 게임오버 팝업 안 꺼지던 버그 수정 ★
 window.goToLobby = () => { 
     saveGameData(); 
     state.status = 'TITLE';
     cancelAnimationFrame(mainReqId);
     
-    // 게임오버 팝업 및 오버레이 명시적 강제 종료
     document.getElementById('gameover-modal').style.display = 'none';
     document.getElementById('overlay').style.display = 'none';
-    
     window.closeAllModals();
+    
     window.switchScreen('start-screen');
 };
 
@@ -1041,7 +1051,6 @@ let pkState = {
     projectiles: [], dmgTexts: [], vfx: []
 };
 
-// 펀치킹 실시간 랭킹 로드 (로비 TOP 10 갱신용)
 window.loadPkLiveRanking = async () => {
     let list = document.getElementById('pk-live-ranking-list');
     if(!list) return;
@@ -1095,7 +1104,6 @@ window.showPkClassSelect = () => {
     document.getElementById('pk-class-select').style.display = 'block';
 };
 
-// 메인 랭킹 보드 보기
 window.showPkRanking = async () => {
     document.getElementById('pk-menu').style.display = 'none';
     document.getElementById('pk-class-select').style.display = 'none';
@@ -1205,7 +1213,6 @@ function pkLoop() {
     let sharpChance = skillLevels.common_sharp * 0.05;
     let windReduc = 1 + (skillLevels.common_wind * 0.2);
     
-    // ★ 펀치킹 밸런스 평준화: 모든 직업 기본공격력 20, 쿨타임 1초(1000ms) 고정 ★
     let pkBaseDmg = 20; 
     let pkBaseCd = 1000;
     
@@ -1299,49 +1306,55 @@ function pkApplyDmg(dmg, isCrit) {
     pkState.score += (dmg / 10000);
     document.getElementById('pk-score').innerText = Math.floor(pkState.score).toLocaleString();
     
-    let ox = (Math.random() - 0.5) * 50;
-    let oy = (Math.random() - 0.5) * 30;
+    let ox = (Math.random() - 0.5) * 10; 
+    let oy = (Math.random() - 0.5) * 10; 
     pkState.dmgTexts.push({ val: Math.floor(dmg), x: pkState.scarecrow.x + ox, y: pkState.scarecrow.y - 40 + oy, timer: 0.6, isCrit: isCrit });
 }
 
 window.submitPkScore = async () => {
-    document.getElementById('pk-result-overlay').style.display = 'none';
-    document.getElementById('pk-result-modal').style.display = 'none';
-    window.switchScreen('start-screen');
-    
-    document.getElementById('pk-overlay').style.display = 'flex';
-    document.getElementById('pk-menu').style.display = 'none';
-    document.getElementById('pk-class-select').style.display = 'none';
-    document.getElementById('pk-ranking').style.display = 'flex';
-    document.getElementById('pk-ranking-list').innerHTML = '<div style="text-align:center; padding:20px; color:#fff;">기록을 서버에 저장하는 중...</div>';
-    
     let finalScore = Math.floor(pkState.score);
     let className = pkState.unit.cls.type;
     
-    if (currentUserUid) {
-        try {
-            const dbRef = ref(database);
-            const snapshot = await get(child(dbRef, `pk_rankings/${currentUserUid}`));
-            
-            if (snapshot.exists()) {
-                const data = snapshot.val();
-                if (finalScore > data.score) {
-                    await set(ref(database, `pk_rankings/${currentUserUid}`), {
-                        nickname: currentUserName, class: className, score: finalScore, date: new Date().toLocaleDateString()
-                    });
-                }
-            } else {
+    if (!currentUserUid) {
+        alert("로그인이 끊어졌습니다.");
+        window.switchScreen('start-screen');
+        return;
+    }
+
+    const btnSubmit = document.getElementById('btn-submit-pk');
+    const btnDiscard = document.getElementById('btn-discard-pk');
+    if(btnSubmit) { btnSubmit.disabled = true; btnSubmit.innerText = "서버에 저장 중..."; }
+    if(btnDiscard) { btnDiscard.disabled = true; }
+
+    try {
+        const dbRef = ref(database);
+        const snapshot = await get(child(dbRef, `pk_rankings/${currentUserUid}`));
+        
+        if (snapshot.exists()) {
+            const data = snapshot.val();
+            if (finalScore > data.score) {
                 await set(ref(database, `pk_rankings/${currentUserUid}`), {
                     nickname: currentUserName, class: className, score: finalScore, date: new Date().toLocaleDateString()
                 });
             }
-        } catch(e) {
-            console.error(e);
-            alert("서버 통신 중 오류가 발생했습니다.");
+        } else {
+            await set(ref(database, `pk_rankings/${currentUserUid}`), {
+                nickname: currentUserName, class: className, score: finalScore, date: new Date().toLocaleDateString()
+            });
         }
+        alert("서버에 랭킹이 성공적으로 등록되었습니다!");
+    } catch(e) {
+        console.error(e);
+        alert("서버 통신 중 오류가 발생했습니다.");
     }
     
-    window.showPkRanking();
+    if(btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerText = "랭킹 등록하고 로비로"; }
+    if(btnDiscard) { btnDiscard.disabled = false; }
+    
+    document.getElementById('pk-result-overlay').style.display = 'none';
+    document.getElementById('pk-result-modal').style.display = 'none';
+    window.switchScreen('start-screen');
+    window.loadPkLiveRanking(); 
 };
 
 window.exitPkToLobby = () => {
@@ -1369,8 +1382,6 @@ function drawPk() {
     pkCtx.beginPath(); pkCtx.rect(25, 25, 450, 450); pkCtx.stroke();
     
     let m = pkState.scarecrow;
-    
-    // 허수아비 이미지 렌더링
     let size = 25; 
     
     if (husooabiImg && husooabiImg.complete && husooabiImg.naturalWidth > 0) {
@@ -1416,8 +1427,8 @@ function drawPk() {
             pkCtx.lineTo(0, 6); pkCtx.lineTo(6, -6); pkCtx.lineTo(12, 0); pkCtx.stroke();
         } else if (p.type === '도적') {
             pkCtx.rotate(p.angle); pkCtx.fillStyle = "#4a148c"; pkCtx.beginPath();
-            pkCtx.moveTo(0, -10); pkCtx.lineTo(3, -3); pkCtx.lineTo(10, 0); pkCtx.lineTo(3, 3);
-            pkCtx.lineTo(0, 10); pkCtx.lineTo(-3, 3); pkCtx.lineTo(-10, 0); pkCtx.lineTo(-3, -3);
+            ctx.moveTo(0, -10); ctx.lineTo(3, -3); ctx.lineTo(10, 0); ctx.lineTo(3, 3);
+            ctx.lineTo(0, 10); ctx.lineTo(-3, 3); ctx.lineTo(-10, 0); ctx.lineTo(-3, -3);
             pkCtx.closePath(); pkCtx.fill();
         }
         pkCtx.restore();
@@ -1444,7 +1455,7 @@ function drawPk() {
         } else if (v.type === 'thunder') {
             pkCtx.fillStyle = `rgba(0, 229, 255, ${v.timer})`; pkCtx.fillRect(0,0,500,500);
             pkCtx.strokeStyle = `rgba(255, 255, 255, ${v.timer * 2})`; pkCtx.lineWidth = 15;
-            pkCtx.beginPath(); pkCtx.moveTo(250,0); pkCtx.lineTo(200,250); ctx.lineTo(300,250); ctx.lineTo(250,500); pkCtx.stroke();
+            pkCtx.beginPath(); pkCtx.moveTo(250,0); pkCtx.lineTo(200,250); pkCtx.lineTo(300,250); pkCtx.lineTo(250,500); pkCtx.stroke();
         } else if (v.type === 'fuma') {
             pkCtx.fillStyle = `rgba(171, 71, 188, ${v.timer})`; pkCtx.fillRect(0,0,500,500);
         }
