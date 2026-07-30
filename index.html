@@ -5,6 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>메이플 디펜스</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* 새로운 마일드 쉐이크 애니메이션 추가 (데스폴트 검기용) */
+        @keyframes mild-shake {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            20% { transform: translate(-2px, 0px) rotate(0.5deg); }
+            40% { transform: translate(1px, -1px) rotate(0.5deg); }
+            60% { transform: translate(-2px, 1px) rotate(0deg); }
+            80% { transform: translate(-1px, -1px) rotate(0.5deg); }
+        }
+        .mild-shake-active { animation: mild-shake 0.3s cubic-bezier(.36,.07,.19,.97) both; }
+    </style>
 </head>
 <body>
     <!-- 1. 구글 로그인 화면 -->
@@ -89,6 +100,8 @@
                 <div class="grid-cell glow-8" style="width: 100%; height: 100%; background: transparent; box-shadow: none; cursor:default; border:none; display:flex; flex-direction:column; justify-content:center; align-items:center;">
                     <div id="pk-unit-icon" style="font-size: clamp(14px, 4vw, 20px); text-shadow:1px 1px 2px rgba(0,0,0,0.5);">🗡️</div>
                     <div id="pk-unit-name" style="color:#ffd54f; font-size: clamp(8px, 2.5vw, 10px); margin-top:2px; font-weight:800;">데스티니</div>
+                    <!-- 글로벌 바 렌더링 영역 (전사 데스폴트 기준 기본 추가) -->
+                    <div style="width: 80%; height: 3px; background: #333; margin-top: 2px; border-radius: 1.5px; overflow: hidden; border: 1px solid #111; display:none;" id="pk-global-bar-container"><div id="pk-global-bar" style="width: 0%; height: 100%; background: #ffeb3b;"></div></div>
                 </div>
             </div>
 
@@ -112,10 +125,10 @@
     <div id="pk-result-modal" class="maple-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:2100; width:80%; max-width:300px;">
         <h3 style="color:#e65100;">측정 종료!</h3>
         <div style="font-size:16px; margin-bottom:10px; color:#5a3c22; font-weight:bold;">나의 최종 DPS 점수</div>
-        <div id="pk-final-score" style="font-size:42px; font-weight:900; color:#c62828; text-shadow:1px 1px 0 #fff; margin-bottom:20px;">0</div>
+        <div id="pk-final-score" style="font-size:42px; font-weight:900; color:#c62828; text-shadow:1px 1px 0 #fff; margin-bottom:20px; display:flex; flex-direction:column; align-items:center;">0</div>
         
+        <!-- 버리고 로비로 버튼 삭제, 등록 버튼 단일화 -->
         <button id="btn-submit-pk" class="maple-btn huge primary" style="width:100%; margin-bottom:10px;" onclick="submitPkScore()">랭킹 등록하고 로비로</button>
-        <button id="btn-discard-pk" class="maple-btn danger-btn" style="width:100%;" onclick="exitPkToLobby()">기록 버리고 로비로</button>
     </div>
 
     <!-- 기존 디펜스 모드 오버레이 및 게임 화면 -->
@@ -212,7 +225,6 @@
         <button class="maple-btn" onclick="closeAllModals()" style="margin-top:15px; width:100%;">닫기</button>
     </div>
     
-    <!-- 일괄 판매 색상 수정 -->
     <div id="bulk-sell-modal" class="maple-modal">
         <h3>일괄 판매 선택</h3>
         <p style="font-size:12px; margin-bottom:10px;">(5차 이상은 판매되지 않습니다)</p>

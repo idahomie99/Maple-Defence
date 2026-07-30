@@ -179,8 +179,6 @@ function initGrid() {
 }
 initGrid();
 
-window.checkSave();
-
 function saveGameData() {
     if (state.status === 'GAMEOVER' || state.status === 'TITLE') return;
     let saveObj = {
@@ -348,6 +346,7 @@ window.upgradeSkill = (key, category) => {
         localStorage.setItem('mapleDefenseSkills', JSON.stringify(skillLevels));
         localStorage.setItem('mapleDefenseSpentCoins', spentCoins);
         window.renderShop(category);
+        renderGrid(); // 스킬 구매 즉시 쿨타임 바를 보여주기 위해 업데이트 호출
     }
 };
 
@@ -503,9 +502,10 @@ function renderGrid() {
             if (u.gradeIdx === 6) {
                 barsHtml += `<div style="width: 80%; height: 3px; background: #333; margin-top: 2px; border-radius: 1.5px; overflow: hidden; border: 1px solid #111;"><div id="bind-bar-${u.idx}" style="width: 0%; height: 100%; background: #00e5ff;"></div></div>`;
             }
+            // 스킬 구매 시 즉시 쿨타임 바 노출 (노란색/하늘색/보라색)
             if (u.gradeIdx >= 5) {
                 if ((u.cls.type === '전사' && skillLevels.war_death > 0) || (u.cls.type === '법사' && skillLevels.mage_thunder > 0) || (u.cls.type === '도적' && skillLevels.thief_fuma > 0)) {
-                    let color = u.cls.type === '전사' ? '#ff3d00' : (u.cls.type === '법사' ? '#ffeb3b' : '#ab47bc');
+                    let color = u.cls.type === '전사' ? '#ffeb3b' : (u.cls.type === '법사' ? '#00e5ff' : '#ab47bc');
                     barsHtml += `<div style="width: 80%; height: 3px; background: #333; margin-top: 2px; border-radius: 1.5px; overflow: hidden; border: 1px solid #111;"><div id="global-bar-${u.idx}" style="width: 0%; height: 100%; background: ${color};"></div></div>`;
                 }
             }
@@ -516,6 +516,17 @@ function renderGrid() {
                 ${barsHtml}
             `;
         } else { cells[i].innerHTML = ''; }
+    }
+    
+    // 펀치킹 맵의 중앙 글로벌 바도 갱신
+    let pkBarContainer = document.getElementById('pk-global-bar-container');
+    if(pkBarContainer && pkState && pkState.active && pkState.unit) {
+        let u = pkState.unit;
+        if ((u.cls.type === '전사' && skillLevels.war_death > 0) || (u.cls.type === '법사' && skillLevels.mage_thunder > 0) || (u.cls.type === '도적' && skillLevels.thief_fuma > 0)) {
+            pkBarContainer.style.display = 'block';
+            let color = u.cls.type === '전사' ? '#ffeb3b' : (u.cls.type === '법사' ? '#00e5ff' : '#ab47bc');
+            document.getElementById('pk-global-bar').style.background = color;
+        }
     }
 }
 
@@ -620,9 +631,23 @@ function loop() {
         if (hitEffects[i].timer <= 0) hitEffects.splice(i, 1);
     }
 
+    // 데스폴트 검기 및 데미지 지연 처리 로직 추가
     for (let i = visualEffects.length - 1; i >= 0; i--) {
         visualEffects[i].timer -= dt;
-        if (visualEffects[i].timer <= 0) visualEffects.splice(i, 1);
+        if (visualEffects[i].timer <= 0) {
+            let v = visualEffects[i];
+            if (v.type === 'death') {
+                monsters.forEach(m => m.hp -= v.dmg);
+                let container = document.getElementById('game-container');
+                if (container) {
+                    container.classList.add('mild-shake-active');
+                    setTimeout(() => container.classList.remove('mild-shake-active'), 300);
+                }
+            } else if (v.type === 'thunder') {
+                monsters.forEach(m => m.hp -= v.dmg);
+            }
+            visualEffects.splice(i, 1);
+        }
     }
 
     for (let i = damageTexts.length - 1; i >= 0; i--) {
@@ -706,14 +731,12 @@ function loop() {
                     
                     if (t.cls.type === '전사' && skillLevels.war_death > 0) {
                         let gdmg = baseDmg * (1 + skillLevels.war_death * 0.1);
-                        monsters.forEach(m => m.hp -= gdmg);
-                        visualEffects.push({ type: 'death', timer: 0.5 });
+                        visualEffects.push({ type: 'death', timer: 0.5, dmg: gdmg }); // 지연 데미지 전달
                         t.globalCooldown = 60000;
                     }
                     else if (t.cls.type === '법사' && skillLevels.mage_thunder > 0) {
                         let gdmg = baseDmg * (1 + skillLevels.mage_thunder * 0.1);
-                        monsters.forEach(m => m.hp -= gdmg);
-                        visualEffects.push({ type: 'thunder', timer: 0.5 });
+                        visualEffects.push({ type: 'thunder', timer: 0.5, dmg: gdmg });
                         t.globalCooldown = 60000;
                     }
                     else if (t.cls.type === '도적' && skillLevels.thief_fuma > 0) {
@@ -884,14 +907,39 @@ function draw() {
     visualEffects.forEach(v => {
         ctx.save();
         if (v.type === 'death') {
-            ctx.fillStyle = `rgba(0, 0, 0, ${v.timer})`; ctx.fillRect(0,0,500,500);
-            ctx.strokeStyle = `rgba(255, 0, 0, ${v.timer * 2})`; ctx.lineWidth = 10;
-            ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(500,500); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(500,0); ctx.lineTo(0,500); ctx.stroke();
+            let progress = 1 - (v.timer / 0.5); // 0.5초 동안 0 -> 1
+            ctx.fillStyle = `rgba(0, 0, 0, 0.4)`; 
+            ctx.fillRect(0,0,500,500);
+
+            ctx.strokeStyle = "#ffeb3b"; // 데스폴트 노란색 검기
+            ctx.lineWidth = 20;
+            ctx.lineCap = "round";
+            ctx.shadowColor = "#f57f17";
+            ctx.shadowBlur = 15;
+
+            let startX = -50, startY = 450;
+            let endX = 550, endY = 50;
+
+            let currentX = startX + (endX - startX) * progress;
+            let currentY = startY + (endY - startY) * progress;
+
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(currentX, currentY);
+            ctx.stroke();
+
+            ctx.strokeStyle = "#fff"; // 검기 내부 하얀 코어 선
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(currentX, currentY);
+            ctx.stroke();
         } else if (v.type === 'thunder') {
             ctx.fillStyle = `rgba(0, 229, 255, ${v.timer})`; ctx.fillRect(0,0,500,500);
             ctx.strokeStyle = `rgba(255, 255, 255, ${v.timer * 2})`; ctx.lineWidth = 15;
             ctx.beginPath(); ctx.moveTo(250,0); ctx.lineTo(200,250); ctx.lineTo(300,250); ctx.lineTo(250,500); ctx.stroke();
+        } else if (v.type === 'fuma') {
+            ctx.fillStyle = `rgba(171, 71, 188, ${v.timer})`; ctx.fillRect(0,0,500,500);
         }
         ctx.restore();
     });
@@ -1043,12 +1091,11 @@ function gameOver(msg) {
 // ==========================================
 let pkReqId;
 let pkState = {
-    active: false, time: 60, score: 0, lastTime: 0, speed: 1,
+    active: false, time: 60, score: 0, lastTime: 0, speed: 1, bestScore: 0,
     unit: null, scarecrow: { x: 390, y: 250, size: 20, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0 },
     projectiles: [], dmgTexts: [], vfx: []
 };
 
-// 펀치킹 실시간 랭킹 로드 (로비 TOP 10 갱신용)
 window.loadPkLiveRanking = async () => {
     let list = document.getElementById('pk-live-ranking-list');
     if(!list) return;
@@ -1102,7 +1149,6 @@ window.showPkClassSelect = () => {
     document.getElementById('pk-class-select').style.display = 'block';
 };
 
-// 메인 랭킹 보드 보기
 window.showPkRanking = async () => {
     document.getElementById('pk-menu').style.display = 'none';
     document.getElementById('pk-class-select').style.display = 'none';
@@ -1151,7 +1197,6 @@ window.togglePkSpeed = () => {
 window.startPkGame = (clsName) => {
     document.getElementById('pk-overlay').style.display = 'none'; 
     window.switchScreen('pk-game');
-    
     window.loadPkLiveRanking();
     
     let grade = GRADES[8]; // 데스티니 고정
@@ -1160,9 +1205,29 @@ window.startPkGame = (clsName) => {
     document.getElementById('pk-unit-icon').innerText = cls.icon;
     document.getElementById('pk-unit-name').style.color = cls.color;
     
+    // 시작 전 개인 최고 기록 미리 불러오기 (신기록 비교용)
+    let bestScore = 0;
+    if (currentUserUid) {
+        get(child(ref(database), `pk_rankings/${currentUserUid}`)).then(snapshot => {
+            if(snapshot.exists()) bestScore = snapshot.val().score;
+        }).catch(() => {});
+    }
+
+    // 스킬 쿨타임 바 초기 렌더링
+    let pkBarContainer = document.getElementById('pk-global-bar-container');
+    if (pkBarContainer) {
+        if ((cls.type === '전사' && skillLevels.war_death > 0) || (cls.type === '법사' && skillLevels.mage_thunder > 0) || (cls.type === '도적' && skillLevels.thief_fuma > 0)) {
+            pkBarContainer.style.display = 'block';
+            let color = cls.type === '전사' ? '#ffeb3b' : (cls.type === '법사' ? '#00e5ff' : '#ab47bc');
+            document.getElementById('pk-global-bar').style.background = color;
+            document.getElementById('pk-global-bar').style.width = '0%';
+        } else {
+            pkBarContainer.style.display = 'none';
+        }
+    }
+    
     pkState = {
-        active: true, time: 60, score: 0, lastTime: performance.now(), speed: 1,
-        // 유닛은 9시 방향 칸 정중앙 (x: 110, y: 250), 허수아비는 3시 방향 정중앙 (x: 390, y: 250)
+        active: true, time: 60, score: 0, lastTime: performance.now(), speed: 1, bestScore: bestScore,
         unit: { cls: cls, grade: grade, gradeIdx: 8, x: 110, y: 250, lastAttack: 0, globalCooldown: 0 },
         scarecrow: { x: 390, y: 250, size: 20, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0 },
         projectiles: [], dmgTexts: [], vfx: []
@@ -1190,8 +1255,15 @@ function pkLoop() {
         pkState.active = false;
         cancelAnimationFrame(pkReqId);
         
-        // 팝업 즉시 노출
-        document.getElementById('pk-final-score').innerText = Math.floor(pkState.score).toLocaleString();
+        let finalScore = Math.floor(pkState.score);
+        let scoreHtml = finalScore.toLocaleString();
+        
+        // 최고 기록 경신 시 (신기록) 텍스트 추가
+        if (finalScore > pkState.bestScore && finalScore > 0) {
+            scoreHtml += ' <span style="font-size:16px; color:#ffeb3b; text-shadow:1px 1px 2px #000;">(신기록!)</span>';
+        }
+        
+        document.getElementById('pk-final-score').innerHTML = scoreHtml;
         document.getElementById('pk-result-overlay').style.display = 'block';
         document.getElementById('pk-result-modal').style.display = 'block';
         return; 
@@ -1214,7 +1286,6 @@ function pkLoop() {
     let sharpChance = skillLevels.common_sharp * 0.05;
     let windReduc = 1 + (skillLevels.common_wind * 0.2);
     
-    // ★ 펀치킹 밸런스 평준화: 모든 직업 기본공격력 20, 쿨타임 1초(1000ms) 고정 ★
     let pkBaseDmg = 20; 
     let pkBaseCd = 1000;
     
@@ -1223,14 +1294,19 @@ function pkLoop() {
         (u.cls.type === '도적' && skillLevels.thief_fuma > 0)) {
         
         u.globalCooldown -= dt * 1000;
+        let pbar = document.getElementById('pk-global-bar');
+        if (pbar) pbar.style.width = Math.max(0, Math.min(100, ((60000 - u.globalCooldown) / 60000) * 100)) + '%';
+        
         if (u.globalCooldown <= 0) {
             let baseDmg = pkBaseDmg * u.grade.mult * cardMulti * rageMulti; 
             if (u.cls.type === '전사' && skillLevels.war_death > 0) {
                 let gdmg = baseDmg * (1 + skillLevels.war_death * 0.1);
-                pkApplyDmg(gdmg, false); pkState.vfx.push({ type: 'death', timer: 0.5 }); u.globalCooldown = 60000;
+                pkState.vfx.push({ type: 'death', timer: 0.5, dmg: gdmg });
+                u.globalCooldown = 60000;
             } else if (u.cls.type === '법사' && skillLevels.mage_thunder > 0) {
                 let gdmg = baseDmg * (1 + skillLevels.mage_thunder * 0.1);
-                pkApplyDmg(gdmg, false); pkState.vfx.push({ type: 'thunder', timer: 0.5 }); u.globalCooldown = 60000;
+                pkState.vfx.push({ type: 'thunder', timer: 0.5, dmg: gdmg });
+                u.globalCooldown = 60000;
             } else if (u.cls.type === '도적' && skillLevels.thief_fuma > 0) {
                 let gdmg = baseDmg * (1 + skillLevels.thief_fuma * 0.1);
                 pkApplyDmg(gdmg, false); pkState.vfx.push({ type: 'fuma', timer: 0.5 }); u.globalCooldown = 60000;
@@ -1292,19 +1368,92 @@ function pkLoop() {
     
     for (let i = pkState.dmgTexts.length - 1; i >= 0; i--) {
         pkState.dmgTexts[i].timer -= dt;
-        pkState.dmgTexts[i].y -= dt * 40;
+        pkState.dmgTexts[i].y -= dt * 30; // 데미지가 떨리지 않게 X축은 고정, Y축만 위로 올라감
         if (pkState.dmgTexts[i].timer <= 0) pkState.dmgTexts.splice(i, 1);
     }
+    
+    // 펀치킹 맵의 데스폴트 검기 딜레이 데미지 적용
     for (let i = pkState.vfx.length - 1; i >= 0; i--) {
         pkState.vfx[i].timer -= dt;
-        if (pkState.vfx[i].timer <= 0) pkState.vfx.splice(i, 1);
+        if (pkState.vfx[i].timer <= 0) {
+            let v = pkState.vfx[i];
+            if (v.type === 'death') {
+                pkApplyDmg(v.dmg, false);
+                let container = document.getElementById('pk-game');
+                if(container) {
+                    container.classList.add('mild-shake-active');
+                    setTimeout(() => container.classList.remove('mild-shake-active'), 300);
+                }
+            } else if (v.type === 'thunder') {
+                pkApplyDmg(v.dmg, false);
+            }
+            pkState.vfx.splice(i, 1);
+        }
     }
     
     drawPk();
     pkReqId = requestAnimationFrame(pkLoop);
 }
 
-// 오타 수정: 도적의 투사체 경로도 pkCtx에 정상 렌더링되도록 수정 (메인 캔버스 겹침 현상 해결)
+function pkApplyDmg(dmg, isCrit) {
+    pkState.score += (dmg / 10000);
+    document.getElementById('pk-score').innerText = Math.floor(pkState.score).toLocaleString();
+    
+    let ox = (Math.random() - 0.5) * 15; // X축 무작위 분산 극소화
+    let oy = (Math.random() - 0.5) * 15; // Y축 분산
+    pkState.dmgTexts.push({ val: Math.floor(dmg), x: pkState.scarecrow.x + ox, y: pkState.scarecrow.y - 40 + oy, timer: 0.6, isCrit: isCrit });
+}
+
+window.submitPkScore = async () => {
+    let finalScore = Math.floor(pkState.score);
+    let className = pkState.unit.cls.type;
+    
+    if (!currentUserUid) {
+        alert("로그인이 끊어졌습니다.");
+        window.switchScreen('start-screen');
+        return;
+    }
+
+    const btnSubmit = document.getElementById('btn-submit-pk');
+    if(btnSubmit) { btnSubmit.disabled = true; btnSubmit.innerText = "서버에 저장 중..."; }
+
+    try {
+        const dbRef = ref(database);
+        const snapshot = await get(child(dbRef, `pk_rankings/${currentUserUid}`));
+        
+        if (snapshot.exists()) {
+            const data = snapshot.val();
+            if (finalScore > data.score) {
+                await set(ref(database, `pk_rankings/${currentUserUid}`), {
+                    nickname: currentUserName, class: className, score: finalScore, date: new Date().toLocaleDateString()
+                });
+            }
+        } else {
+            await set(ref(database, `pk_rankings/${currentUserUid}`), {
+                nickname: currentUserName, class: className, score: finalScore, date: new Date().toLocaleDateString()
+            });
+        }
+    } catch(e) {
+        console.error(e);
+        alert("서버 통신 중 오류가 발생했습니다.");
+    }
+    
+    if(btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerText = "랭킹 등록하고 로비로"; }
+    
+    document.getElementById('pk-result-overlay').style.display = 'none';
+    document.getElementById('pk-result-modal').style.display = 'none';
+    window.switchScreen('start-screen');
+    window.loadPkLiveRanking(); 
+};
+
+window.endPkGame = (isGiveUp) => {
+    pkState.active = false;
+    cancelAnimationFrame(pkReqId);
+    if (isGiveUp) { 
+        window.switchScreen('start-screen'); 
+    }
+};
+
 function drawPk() {
     let pkCanvas = document.getElementById('pkCanvas');
     let pkCtx = pkCanvas.getContext('2d');
@@ -1316,7 +1465,6 @@ function drawPk() {
     pkCtx.beginPath(); pkCtx.rect(25, 25, 450, 450); pkCtx.stroke();
     
     let m = pkState.scarecrow;
-    
     let size = 25; 
     
     if (husooabiImg && husooabiImg.complete && husooabiImg.naturalWidth > 0) {
@@ -1362,7 +1510,6 @@ function drawPk() {
             pkCtx.lineTo(0, 6); pkCtx.lineTo(6, -6); pkCtx.lineTo(12, 0); pkCtx.stroke();
         } else if (p.type === '도적') {
             pkCtx.rotate(p.angle); pkCtx.fillStyle = "#4a148c"; pkCtx.beginPath();
-            // 이곳이 버그의 핵심이었습니다! ctx -> pkCtx 로 전부 수정했습니다.
             pkCtx.moveTo(0, -10); pkCtx.lineTo(3, -3); pkCtx.lineTo(10, 0); pkCtx.lineTo(3, 3);
             pkCtx.lineTo(0, 10); pkCtx.lineTo(-3, 3); pkCtx.lineTo(-10, 0); pkCtx.lineTo(-3, -3);
             pkCtx.closePath(); pkCtx.fill();
@@ -1384,10 +1531,33 @@ function drawPk() {
     pkState.vfx.forEach(v => {
         pkCtx.save();
         if (v.type === 'death') {
-            pkCtx.fillStyle = `rgba(0, 0, 0, ${v.timer})`; pkCtx.fillRect(0,0,500,500);
-            pkCtx.strokeStyle = `rgba(255, 0, 0, ${v.timer * 2})`; pkCtx.lineWidth = 10;
-            pkCtx.beginPath(); pkCtx.moveTo(0,0); pkCtx.lineTo(500,500); pkCtx.stroke();
-            pkCtx.beginPath(); pkCtx.moveTo(500,0); pkCtx.lineTo(0,500); pkCtx.stroke();
+            let progress = 1 - (v.timer / 0.5); // 0.5초 동안 0 -> 1
+            pkCtx.fillStyle = `rgba(0, 0, 0, 0.4)`; 
+            pkCtx.fillRect(0,0,500,500);
+
+            pkCtx.strokeStyle = "#ffeb3b"; // 데스폴트 노란색 검기
+            pkCtx.lineWidth = 20;
+            pkCtx.lineCap = "round";
+            pkCtx.shadowColor = "#f57f17";
+            pkCtx.shadowBlur = 15;
+
+            let startX = -50, startY = 450;
+            let endX = 550, endY = 50;
+
+            let currentX = startX + (endX - startX) * progress;
+            let currentY = startY + (endY - startY) * progress;
+
+            pkCtx.beginPath();
+            pkCtx.moveTo(startX, startY);
+            pkCtx.lineTo(currentX, currentY);
+            pkCtx.stroke();
+
+            pkCtx.strokeStyle = "#fff"; // 검기 내부 하얀 코어 선
+            pkCtx.lineWidth = 6;
+            pkCtx.beginPath();
+            pkCtx.moveTo(startX, startY);
+            pkCtx.lineTo(currentX, currentY);
+            pkCtx.stroke();
         } else if (v.type === 'thunder') {
             pkCtx.fillStyle = `rgba(0, 229, 255, ${v.timer})`; pkCtx.fillRect(0,0,500,500);
             pkCtx.strokeStyle = `rgba(255, 255, 255, ${v.timer * 2})`; pkCtx.lineWidth = 15;
@@ -1398,72 +1568,3 @@ function drawPk() {
         pkCtx.restore();
     });
 }
-
-function pkApplyDmg(dmg, isCrit) {
-    pkState.score += (dmg / 10000);
-    document.getElementById('pk-score').innerText = Math.floor(pkState.score).toLocaleString();
-    
-    let ox = (Math.random() - 0.5) * 10; 
-    let oy = (Math.random() - 0.5) * 10; 
-    pkState.dmgTexts.push({ val: Math.floor(dmg), x: pkState.scarecrow.x + ox, y: pkState.scarecrow.y - 40 + oy, timer: 0.6, isCrit: isCrit });
-}
-
-window.submitPkScore = async () => {
-    let finalScore = Math.floor(pkState.score);
-    let className = pkState.unit.cls.type;
-    
-    if (!currentUserUid) {
-        alert("로그인이 끊어졌습니다.");
-        window.switchScreen('start-screen');
-        return;
-    }
-
-    const btnSubmit = document.getElementById('btn-submit-pk');
-    const btnDiscard = document.getElementById('btn-discard-pk');
-    if(btnSubmit) { btnSubmit.disabled = true; btnSubmit.innerText = "서버에 저장 중..."; }
-    if(btnDiscard) { btnDiscard.disabled = true; }
-
-    try {
-        const dbRef = ref(database);
-        const snapshot = await get(child(dbRef, `pk_rankings/${currentUserUid}`));
-        
-        if (snapshot.exists()) {
-            const data = snapshot.val();
-            if (finalScore > data.score) {
-                await set(ref(database, `pk_rankings/${currentUserUid}`), {
-                    nickname: currentUserName, class: className, score: finalScore, date: new Date().toLocaleDateString()
-                });
-            }
-        } else {
-            await set(ref(database, `pk_rankings/${currentUserUid}`), {
-                nickname: currentUserName, class: className, score: finalScore, date: new Date().toLocaleDateString()
-            });
-        }
-        alert("서버에 랭킹이 성공적으로 등록되었습니다!");
-    } catch(e) {
-        console.error(e);
-        alert("서버 통신 중 오류가 발생했습니다.");
-    }
-    
-    if(btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerText = "랭킹 등록하고 로비로"; }
-    if(btnDiscard) { btnDiscard.disabled = false; }
-    
-    document.getElementById('pk-result-overlay').style.display = 'none';
-    document.getElementById('pk-result-modal').style.display = 'none';
-    window.switchScreen('start-screen');
-    window.loadPkLiveRanking(); 
-};
-
-window.exitPkToLobby = () => {
-    document.getElementById('pk-result-overlay').style.display = 'none';
-    document.getElementById('pk-result-modal').style.display = 'none';
-    window.switchScreen('start-screen'); 
-};
-
-window.endPkGame = (isGiveUp) => {
-    pkState.active = false;
-    cancelAnimationFrame(pkReqId);
-    if (isGiveUp) { 
-        window.switchScreen('start-screen'); 
-    }
-};
