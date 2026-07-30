@@ -19,7 +19,6 @@ const database = getDatabase(app);
 let currentUserName = "이름없는 용사";
 let currentUserUid = null;
 
-// 중앙 통제형 화면 전환 함수 (화면 2분할 버그 완전 차단)
 window.switchScreen = (screenId) => {
     const screens = ['login-screen', 'start-screen', 'game-container', 'pk-game'];
     screens.forEach(id => {
@@ -69,15 +68,15 @@ let skillLevels = JSON.parse(localStorage.getItem('mapleDefenseSkills')) || {
 };
 
 const SKILL_INFO = {
-    common_wind: { name: "윈드 부스트", max: 5, desc: "공격 속도 20%p 증가", img: "image/skill_wind.png" },
-    common_sharp: { name: "샤프 아이즈", max: 5, desc: "치명타 5%p 증가 (1.2배 피해)", img: "image/skill_sharp.png" },
-    common_rage: { name: "분노", max: 5, desc: "최종 공격력 1%p 증가", img: "image/skill_rage.png" },
-    war_final: { name: "파이널 어택", max: 5, desc: "3%p 확률로 2배 피해 (전사)", img: "image/skill_final.png" },
-    war_death: { name: "데스폴트", max: 5, desc: "60초마다 전역 피해 (전사 5차↑)", img: "image/skill_death.png" },
-    mage_freeze: { name: "프리즈", max: 5, desc: "적 빙결 및 도트 피해 (법사)", img: "image/skill_freeze.png" },
-    mage_thunder: { name: "썬더 브레이크", max: 5, desc: "60초마다 전역 피해 (법사 5차↑)", img: "image/skill_thunder.png" },
-    thief_shadow: { name: "섀도우 파트너", max: 5, desc: "3%p 확률로 투사체 추가 (도적)", img: "image/skill_shadow.png" },
-    thief_fuma: { name: "풍마 수리검", max: 5, desc: "60초마다 맵 순회 수리검 (도적 5차↑)", img: "image/skill_fuma.png" }
+    common_wind: { name: "윈드 부스트", max: 5, desc: "공격 속도 20%p 증가", img: "image/windboost.png" },
+    common_sharp: { name: "샤프 아이즈", max: 5, desc: "치명타 5%p 증가 (1.2배 피해)", img: "image/sharpeyes.png" },
+    common_rage: { name: "분노", max: 5, desc: "최종 공격력 1%p 증가", img: "image/rage.png" },
+    war_final: { name: "파이널 어택", max: 5, desc: "3%p 확률로 2배 피해 (전사)", img: "image/finalattack.png" },
+    war_death: { name: "데스폴트", max: 5, desc: "60초마다 전역 피해 (전사 5차↑)", img: "image/despolt.png" },
+    mage_freeze: { name: "프리즈", max: 5, desc: "적 빙결 및 도트 피해 (법사)", img: "image/freeze.png" },
+    mage_thunder: { name: "썬더 브레이크", max: 5, desc: "60초마다 전역 피해 (법사 5차↑)", img: "image/thunderbreak.png" },
+    thief_shadow: { name: "섀도우 파트너", max: 5, desc: "3%p 확률로 투사체 추가 (도적)", img: "image/shadowpartner.png" },
+    thief_fuma: { name: "풍마 수리검", max: 5, desc: "60초마다 맵 순회 수리검 (도적 5차↑)", img: "image/fumashuriken.png" }
 };
 
 const bossImages = {
@@ -92,6 +91,9 @@ bossImages["자쿰"].src = "image/zakum.png"; bossImages["혼테일"].src = "ima
 bossImages["시그너스"].src = "image/signus.png"; bossImages["반반"].src = "image/banban.png";
 bossImages["피에르"].src = "image/pierr.png"; bossImages["블러드퀸"].src = "image/bloodqueen.png";
 bossImages["벨룸"].src = "image/velroom.png";
+
+const husooabiImg = new Image();
+husooabiImg.src = "image/husooabi.png";
 
 const GRADES = [
     { name: "초보자", prob: 50.0, sell: 3, mult: 1, rangeMul: 1 },
@@ -220,10 +222,16 @@ window.startNewGame = () => {
     updateUI(); mainReqId = requestAnimationFrame(loop);
 };
 
+// ★ 게임오버 팝업 안 꺼지던 버그 수정 ★
 window.goToLobby = () => { 
     saveGameData(); 
     state.status = 'TITLE';
     cancelAnimationFrame(mainReqId);
+    
+    // 게임오버 팝업 및 오버레이 명시적 강제 종료
+    document.getElementById('gameover-modal').style.display = 'none';
+    document.getElementById('overlay').style.display = 'none';
+    
     window.closeAllModals();
     window.switchScreen('start-screen');
 };
@@ -506,7 +514,7 @@ function renderGrid() {
 
 function spawnMonster() {
     let bInfo = getBossInfo(state.wave);
-    let hpBase = bInfo ? bInfo.hp : Math.floor(state.wave * 45 + Math.pow(state.wave, 1.4) * 8);
+    let hpBase = bInfo ? bInfo.hp : Math.floor(state.wave * 60 + Math.pow(state.wave, 1.5) * 12);
     monsters.push({
         hp: hpBase, maxHp: hpBase, x: PATH[0].x, y: PATH[0].y,
         targetNode: 1, speed: bInfo ? 25 : 50, isBoss: !!bInfo, bindTimer: 0, stunTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0, name: bInfo ? bInfo.name : null, facingRight: true
@@ -660,7 +668,8 @@ function loop() {
         } else { m.x += (dx/dist)*move; m.y += (dy/dist)*move; }
     }
     
-    if(monsters.length >= 200) { gameOver("몬스터 200마리 초과! 게임 오버"); return; }
+    if(monsters.length >= 50) { gameOver("몬스터 50마리 초과! 게임 오버"); return; }
+    
     let cardMulti = 1 + (getTotalCardBonus() / 100);
     let rageMulti = 1 + (skillLevels.common_rage * 0.01);
     let sharpChance = skillLevels.common_sharp * 0.05;
@@ -844,7 +853,7 @@ function loop() {
     }
     
     draw();
-    document.getElementById('ui-mobs').innerText = `${monsters.length} / 200`;
+    document.getElementById('ui-mobs').innerText = `${monsters.length} / 50`;
     mainReqId = requestAnimationFrame(loop);
 }
 
@@ -1136,7 +1145,6 @@ window.startPkGame = (clsName) => {
     document.getElementById('pk-overlay').style.display = 'none'; 
     window.switchScreen('pk-game');
     
-    // 게임 시작 시, 미니 랭킹판 정보 미리 업데이트
     window.loadPkLiveRanking();
     
     let grade = GRADES[8]; // 데스티니 고정
@@ -1147,7 +1155,6 @@ window.startPkGame = (clsName) => {
     
     pkState = {
         active: true, time: 60, score: 0, lastTime: performance.now(), speed: 1,
-        // 9시(유닛): x 110, y 250 / 3시(보스): x 390, y 250
         unit: { cls: cls, grade: grade, gradeIdx: 8, x: 110, y: 250, lastAttack: 0, globalCooldown: 0 },
         scarecrow: { x: 390, y: 250, size: 20, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0 },
         projectiles: [], dmgTexts: [], vfx: []
@@ -1175,7 +1182,6 @@ function pkLoop() {
         pkState.active = false;
         cancelAnimationFrame(pkReqId);
         
-        // 팝업 즉시 노출
         document.getElementById('pk-final-score').innerText = Math.floor(pkState.score).toLocaleString();
         document.getElementById('pk-result-overlay').style.display = 'block';
         document.getElementById('pk-result-modal').style.display = 'block';
@@ -1299,12 +1305,10 @@ function pkApplyDmg(dmg, isCrit) {
 }
 
 window.submitPkScore = async () => {
-    // 저장하기 위해 팝업을 즉시 내리고 로비로 이동 (화면 마비 방지)
     document.getElementById('pk-result-overlay').style.display = 'none';
     document.getElementById('pk-result-modal').style.display = 'none';
     window.switchScreen('start-screen');
     
-    // 랭킹 메뉴를 띄운 뒤 "저장중" 안내 (사용자가 불안하지 않게 피드백)
     document.getElementById('pk-overlay').style.display = 'flex';
     document.getElementById('pk-menu').style.display = 'none';
     document.getElementById('pk-class-select').style.display = 'none';
@@ -1337,7 +1341,6 @@ window.submitPkScore = async () => {
         }
     }
     
-    // 저장이 끝나면 랭킹 다시 불러오기
     window.showPkRanking();
 };
 
@@ -1367,11 +1370,10 @@ function drawPk() {
     
     let m = pkState.scarecrow;
     
-    // 벨룸 이미지 렌더링 (이미지 오류 방지용 fallback)
-    let bImg = bossImages["벨룸"];
-    let size = 20; 
+    // 허수아비 이미지 렌더링
+    let size = 25; 
     
-    if (bImg && bImg.complete && bImg.naturalWidth > 0) {
+    if (husooabiImg && husooabiImg.complete && husooabiImg.naturalWidth > 0) {
         pkCtx.save();
         pkCtx.translate(m.x, m.y);
         if (m.freezeTimer > 0) {
@@ -1379,13 +1381,13 @@ function drawPk() {
             pkCtx.fillRect(-size * 1.5, -size * 1.5, size * 3, size * 3);
             pkCtx.globalAlpha = 1.0;
         }
-        pkCtx.drawImage(bImg, -size * 1.5, -size * 1.5, size * 3, size * 3);
+        pkCtx.drawImage(husooabiImg, -size * 1.5, -size * 1.5, size * 3, size * 3);
         pkCtx.restore();
     } else {
         pkCtx.font = "40px NanumSquare";
         pkCtx.textAlign = "center";
         pkCtx.textBaseline = "middle";
-        pkCtx.fillText("🐉", m.x, m.y); 
+        pkCtx.fillText("🎃", m.x, m.y); 
     }
     
     if (m.freezeTimer > 0) {
@@ -1442,7 +1444,7 @@ function drawPk() {
         } else if (v.type === 'thunder') {
             pkCtx.fillStyle = `rgba(0, 229, 255, ${v.timer})`; pkCtx.fillRect(0,0,500,500);
             pkCtx.strokeStyle = `rgba(255, 255, 255, ${v.timer * 2})`; pkCtx.lineWidth = 15;
-            pkCtx.beginPath(); pkCtx.moveTo(250,0); pkCtx.lineTo(200,250); pkCtx.lineTo(300,250); pkCtx.lineTo(250,500); pkCtx.stroke();
+            pkCtx.beginPath(); pkCtx.moveTo(250,0); pkCtx.lineTo(200,250); ctx.lineTo(300,250); ctx.lineTo(250,500); pkCtx.stroke();
         } else if (v.type === 'fuma') {
             pkCtx.fillStyle = `rgba(171, 71, 188, ${v.timer})`; pkCtx.fillRect(0,0,500,500);
         }
