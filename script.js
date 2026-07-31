@@ -179,6 +179,8 @@ function initGrid() {
 }
 initGrid();
 
+window.checkSave();
+
 function saveGameData() {
     if (state.status === 'GAMEOVER' || state.status === 'TITLE') return;
     let saveObj = {
@@ -195,6 +197,10 @@ window.loadAndStartGame = () => {
     state.wave = saved.wave; state.meso = saved.meso; state.mp = saved.mp;
     state.mpTotal = saved.mpTotal; state.kills = saved.kills;
     state.upgrades = saved.upgrades; state.tickets = saved.tickets;
+    
+    // UI 버튼 및 상태 배속 초기화
+    state.speed = 1;
+    document.getElementById('btn-speed').innerText = "1배속";
     
     grid = new Array(25).fill(null); towers = [];
     saved.gridData.forEach((u) => { if(u) window.addUnit(u.idx, u.gradeIdx, u.clsName, true); });
@@ -215,6 +221,10 @@ window.startNewGame = () => {
         upgrades: { '전사': {val: 0, cost: 10}, '법사': {val: 0, cost: 10}, '도적': {val: 0, cost: 10} },
         tickets: []
     };
+    
+    // UI 버튼 배속 초기화
+    document.getElementById('btn-speed').innerText = "1배속";
+    
     grid = new Array(25).fill(null);
     monsters = []; projectiles = []; towers = [];
     hitEffects = []; visualEffects = []; fumaList = []; damageTexts = [];
@@ -1090,7 +1100,6 @@ let pkState = {
     projectiles: [], dmgTexts: [], vfx: []
 };
 
-// 펀치킹 실시간 랭킹 로드 (로비 TOP 10 갱신용)
 window.loadPkLiveRanking = async () => {
     let list = document.getElementById('pk-live-ranking-list');
     if(!list) return;
@@ -1189,13 +1198,12 @@ window.togglePkSpeed = () => {
     document.getElementById('pk-btn-speed').innerText = pkState.speed + "배속";
 };
 
-// 동기화 버그 (신기록 판정 오류) 해결! await 로 먼저 확실히 가져옵니다.
 window.startPkGame = async (clsName) => {
     document.getElementById('pk-overlay').style.display = 'none'; 
     window.switchScreen('pk-game');
     window.loadPkLiveRanking();
     
-    let grade = GRADES[8]; // 데스티니 고정
+    let grade = GRADES[8]; 
     let cls = CLASSES[clsName];
     
     document.getElementById('pk-unit-icon').innerText = cls.icon;
