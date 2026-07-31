@@ -198,7 +198,6 @@ window.loadAndStartGame = () => {
     state.mpTotal = saved.mpTotal; state.kills = saved.kills;
     state.upgrades = saved.upgrades; state.tickets = saved.tickets;
     
-    // UI 버튼 및 상태 배속 초기화
     state.speed = 1;
     document.getElementById('btn-speed').innerText = "1배속";
     
@@ -222,7 +221,6 @@ window.startNewGame = () => {
         tickets: []
     };
     
-    // UI 버튼 배속 초기화
     document.getElementById('btn-speed').innerText = "1배속";
     
     grid = new Array(25).fill(null);
@@ -916,7 +914,7 @@ function draw() {
         if (v.type === 'death') {
             let elapsed = 1.2 - v.timer;
             let progress = Math.min(1, elapsed / 0.2); 
-            
+
             ctx.strokeStyle = "#ffeb3b"; 
             ctx.lineWidth = 8; 
             ctx.lineCap = "round";
@@ -1153,6 +1151,7 @@ window.showPkClassSelect = () => {
     document.getElementById('pk-class-select').style.display = 'block';
 };
 
+// 메인 랭킹 보드 보기
 window.showPkRanking = async () => {
     document.getElementById('pk-menu').style.display = 'none';
     document.getElementById('pk-class-select').style.display = 'none';
@@ -1534,7 +1533,7 @@ function drawPk() {
         if (v.type === 'death') {
             let elapsed = 1.2 - v.timer;
             let progress = Math.min(1, elapsed / 0.2); 
-            
+
             pkCtx.strokeStyle = "#ffeb3b"; 
             pkCtx.lineWidth = 8; 
             pkCtx.lineCap = "round";
