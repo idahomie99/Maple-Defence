@@ -1,0 +1,21 @@
+{
+  "name": "메이플 디펜스",
+  "short_name": "메이플디펜스",
+  "description": "월드 펀치킹에 도전하세요!",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#3e2723",
+  "icons": [
+    {
+      "src": "image/appicon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "image/appicon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

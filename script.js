@@ -19,6 +19,19 @@ const database = getDatabase(app);
 let currentUserName = "이름없는 용사";
 let currentUserUid = null;
 
+// 파이어베이스 클라우드에 현재 모든 데이터 백업하는 함수
+window.syncToCloud = async () => {
+    if (!currentUserUid) return;
+    let cloudProfile = {
+        save: localStorage.getItem('mapleDefenseSave') || null,
+        cards: localStorage.getItem('mapleDefenseCards') || null,
+        skills: localStorage.getItem('mapleDefenseSkills') || null,
+        coins: localStorage.getItem('mapleDefenseSpentCoins') || null,
+        bestWave: localStorage.getItem('mapleDefenseBestWave') || null
+    };
+    await set(ref(database, `users/${currentUserUid}/cloudData`), cloudProfile);
+};
+
 window.checkSave = () => {
     let btn = document.getElementById('btn-continue');
     if (btn) {
@@ -44,21 +57,46 @@ window.switchScreen = (screenId) => {
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUserUid = user.uid;
-        
-        // 닉네임 DB 확인
         const dbRef = ref(database);
-        const snapshot = await get(child(dbRef, `users/${currentUserUid}/nickname`));
         
-        if (snapshot.exists()) {
-            currentUserName = snapshot.val();
+        // 1. 닉네임 로드
+        const nickSnap = await get(child(dbRef, `users/${currentUserUid}/nickname`));
+        if (nickSnap.exists()) {
+            currentUserName = nickSnap.val();
             document.getElementById('current-user-name').innerText = currentUserName;
-            if (document.getElementById('login-screen').style.display !== 'none') {
-                window.switchScreen('start-screen');
-            }
         } else {
-            // 닉네임이 없으면 모달 띄우기
             document.getElementById('nickname-overlay').style.display = 'block';
             document.getElementById('nickname-modal').style.display = 'block';
+        }
+
+        // 2. 클라우드 세이브 데이터 동기화 (기기 연동)
+        const cloudSnap = await get(child(dbRef, `users/${currentUserUid}/cloudData`));
+        if (cloudSnap.exists()) {
+            let cloud = cloudSnap.val();
+            let localBest = parseInt(localStorage.getItem('mapleDefenseBestWave')) || 0;
+            let cloudBest = parseInt(cloud.bestWave) || 0;
+            
+            // 클라우드 최고 기록이 더 높거나 같으면 로컬을 클라우드 데이터로 덮어쓰기 (기기 변경 시)
+            if (cloudBest >= localBest || !localStorage.getItem('mapleDefenseSave')) {
+                if (cloud.save) localStorage.setItem('mapleDefenseSave', cloud.save);
+                if (cloud.cards) { localStorage.setItem('mapleDefenseCards', cloud.cards); cardData = JSON.parse(cloud.cards); }
+                if (cloud.skills) { localStorage.setItem('mapleDefenseSkills', cloud.skills); skillLevels = JSON.parse(cloud.skills); }
+                if (cloud.coins) { localStorage.setItem('mapleDefenseSpentCoins', cloud.coins); spentCoins = parseInt(cloud.coins); }
+                if (cloud.bestWave) { localStorage.setItem('mapleDefenseBestWave', cloud.bestWave); bestWave = parseInt(cloud.bestWave); }
+                
+                document.getElementById('best-record').innerText = `내 최고 기록: ${bestWave} 웨이브`;
+                window.checkSave();
+            } else {
+                // 현재 기기(로컬)의 기록이 더 높다면 클라우드 갱신
+                window.syncToCloud();
+            }
+        } else {
+            // 클라우드 데이터가 아예 없으면 최초 업로드
+            window.syncToCloud();
+        }
+
+        if (document.getElementById('login-screen').style.display !== 'none') {
+            window.switchScreen('start-screen');
         }
     } else {
         currentUserUid = null;
@@ -221,6 +259,7 @@ function saveGameData() {
         gridData: grid.map(u => u ? { idx: u.idx, gradeIdx: u.gradeIdx, clsName: u.cls.type } : null)
     };
     localStorage.setItem('mapleDefenseSave', JSON.stringify(saveObj));
+    if (currentUserUid) window.syncToCloud();
 }
 
 window.loadAndStartGame = () => {
@@ -280,6 +319,7 @@ window.goToLobby = () => {
     
     document.getElementById('best-record').innerText = `내 최고 기록: ${bestWave} 웨이브`;
     window.switchScreen('start-screen');
+    if (currentUserUid) window.syncToCloud();
 };
 
 setInterval(() => { if(state.status === 'PLAY' || state.status === 'PREP') saveGameData(); }, 3000);
@@ -307,8 +347,14 @@ window.openBookModal = () => {
 window.renderBook = () => {
     let list = document.getElementById('book-list');
     list.innerHTML = '';
-    let allBosses = Object.keys(BOSS_WAVES).map(k => BOSS_WAVES[k].name);
-    allBosses.push("어둠의 늑대");
+    
+    // 도감 순서 직접 지정 (혼테일과 시그너스 사이에 어둠의 늑대 배치)
+    const BOOK_ORDER = [
+        "킹 슬라임", "알리샤르", "파풀라투스", "피아누스", "자쿰", 
+        "혼테일", "어둠의 늑대", "시그너스", "반반", "피에르", "블러드퀸", "벨룸"
+    ];
+    
+    let allBosses = [...BOOK_ORDER];
     for(let k in cardData) { if(!allBosses.includes(k)) allBosses.push(k); }
     
     allBosses.forEach(bName => {
@@ -343,6 +389,7 @@ window.upgradeCard = (bName) => {
     if(data.grade < 10 && data.owned >= req) {
         data.owned -= req; data.grade++;
         localStorage.setItem('mapleDefenseCards', JSON.stringify(cardData));
+        if (currentUserUid) window.syncToCloud();
         window.renderBook();
     }
 };
@@ -365,7 +412,7 @@ window.renderShop = (category) => {
             let lvl = skillLevels[key];
             let canUpgrade = lvl < info.max && getAvailableCoins() > 0;
             let btnText = lvl === info.max ? 'MAX' : `강화 (1코인)`;
-            let displayLv = lvl === 0 ? 1 : lvl; // 0렙이면 1렙 효과 미리보기
+            let displayLv = lvl === 0 ? 1 : lvl; 
             
             list.innerHTML += `
             <div style="background:#fff; border:2px solid #8d6e63; border-radius:6px; padding:6px 8px; display:flex; justify-content:space-between; align-items:center;">
@@ -388,6 +435,7 @@ window.upgradeSkill = (key, category) => {
         spentCoins++;
         localStorage.setItem('mapleDefenseSkills', JSON.stringify(skillLevels));
         localStorage.setItem('mapleDefenseSpentCoins', spentCoins);
+        if (currentUserUid) window.syncToCloud();
         window.renderShop(category);
         renderGrid(); 
     }
@@ -605,6 +653,7 @@ function nextWave() {
         bestWave = state.wave; 
         localStorage.setItem('mapleDefenseBestWave', bestWave);
         document.getElementById('best-record').innerText = `내 최고 기록: ${bestWave} 웨이브`;
+        if (currentUserUid) window.syncToCloud();
     }
     
     if(state.isBoss) { showBossToast(bInfo.name); spawnMonster(); }
@@ -916,6 +965,7 @@ function loop() {
                     cardData[bInfo.name] = cardData[bInfo.name] || { owned: 0, grade: 0 };
                     cardData[bInfo.name].owned++;
                     localStorage.setItem('mapleDefenseCards', JSON.stringify(cardData));
+                    if (currentUserUid) window.syncToCloud();
                     showBossToast(bInfo.name, true);
                 }
             }
@@ -1122,6 +1172,7 @@ function gameOver(msg) {
     document.getElementById('gameover-msg').innerText = msg;
     document.getElementById('overlay').style.display = 'block';
     document.getElementById('gameover-modal').style.display = 'block';
+    if (currentUserUid) window.syncToCloud();
 }
 
 
