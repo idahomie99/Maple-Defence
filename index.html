@@ -25,8 +25,8 @@
 
         /* 프리미엄 버튼 공통 스타일 (로비용 큰 버튼) */
         .premium-btn {
-            box-sizing: border-box; /* 패딩이 너비를 초과하지 않도록 꽉 잡아줌 */
-            white-space: nowrap; /* 글자가 다음 줄로 넘어가는 것 절대 방지 */
+            box-sizing: border-box; 
+            white-space: nowrap; 
             width: 100%;
             padding: 16px 20px;
             border-radius: 12px;
@@ -168,6 +168,11 @@
                 <div class="btn-left"><span class="btn-icon">🏆</span> 월드 펀치킹</div>
                 <span class="btn-arrow">〉</span>
             </button>
+        </div>
+
+        <!-- 버전 표기 (아이폰 스와이프 바 안전영역 확보) -->
+        <div style="position: absolute; bottom: max(env(safe-area-inset-bottom, 15px), 20px); right: 15px; color: rgba(255,255,255,0.4); font-size: 11px; font-weight: bold; pointer-events: none; letter-spacing: 0.5px; z-index: 100;">
+            Beta v1.0.1
         </div>
     </div>
 
