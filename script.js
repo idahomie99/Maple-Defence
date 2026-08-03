@@ -35,7 +35,7 @@ window.syncToCloud = async () => {
 window.checkSave = () => {
     let btn = document.getElementById('btn-continue');
     if (btn) {
-        if (localStorage.getItem('mapleDefenseSave')) btn.style.display = 'block';
+        if (localStorage.getItem('mapleDefenseSave')) btn.style.display = 'flex';
         else btn.style.display = 'none';
     }
 };
@@ -84,7 +84,7 @@ onAuthStateChanged(auth, async (user) => {
                 if (cloud.coins) { localStorage.setItem('mapleDefenseSpentCoins', cloud.coins); spentCoins = parseInt(cloud.coins); }
                 if (cloud.bestWave) { localStorage.setItem('mapleDefenseBestWave', cloud.bestWave); bestWave = parseInt(cloud.bestWave); }
                 
-                document.getElementById('best-record').innerText = `내 최고 기록: ${bestWave} 웨이브`;
+                document.getElementById('best-record').innerText = bestWave;
                 window.checkSave();
             } else {
                 // 현재 기기(로컬)의 기록이 더 높다면 클라우드 갱신
@@ -129,7 +129,7 @@ window.loginWithGoogle = () => {
 window.logout = () => { signOut(auth).then(() => { location.reload(); }); };
 
 let bestWave = parseInt(localStorage.getItem('mapleDefenseBestWave')) || 0;
-document.getElementById('best-record').innerText = `내 최고 기록: ${bestWave} 웨이브`;
+document.getElementById('best-record').innerText = bestWave;
 
 let cardData = JSON.parse(localStorage.getItem('mapleDefenseCards')) || {};
 const CARD_REQ = [1, 2, 4, 8, 12, 16, 20, 24, 28, 32]; 
@@ -317,7 +317,7 @@ window.goToLobby = () => {
     document.getElementById('overlay').style.display = 'none';
     window.closeAllModals();
     
-    document.getElementById('best-record').innerText = `내 최고 기록: ${bestWave} 웨이브`;
+    document.getElementById('best-record').innerText = bestWave;
     window.switchScreen('start-screen');
     if (currentUserUid) window.syncToCloud();
 };
@@ -334,8 +334,10 @@ function getTotalCardBonus() {
     for(let k in cardData) { if(cardData[k].grade > 0) bonus += 1 + (cardData[k].grade - 1) * 0.5; }
     return bonus;
 }
+
+// 📌 코인 획득량 공식 1등급당 1개로 변경 (미지급분 자동 소급 적용)
 function getAvailableCoins() {
-    return Math.floor(getTotalGrade() / 2) - spentCoins;
+    return getTotalGrade() - spentCoins;
 }
 
 window.openBookModal = () => {
@@ -652,7 +654,7 @@ function nextWave() {
     if (state.wave > bestWave) {
         bestWave = state.wave; 
         localStorage.setItem('mapleDefenseBestWave', bestWave);
-        document.getElementById('best-record').innerText = `내 최고 기록: ${bestWave} 웨이브`;
+        document.getElementById('best-record').innerText = bestWave;
         if (currentUserUid) window.syncToCloud();
     }
     
@@ -703,9 +705,10 @@ window.useTicket = (choice) => {
     window.addUnit(emptyIdx, tier, cls); window.closeAllModals(); updateUI();
 };
 
+// 📌 배속 옵션 10배, 15배로 변경
 window.toggleSpeed = () => {
-    if (state.speed === 1) state.speed = 4;
-    else if (state.speed === 4) state.speed = 7;
+    if (state.speed === 1) state.speed = 10;
+    else if (state.speed === 10) state.speed = 15;
     else state.speed = 1;
     document.getElementById('btn-speed').innerText = state.speed + "배속";
 };
@@ -1277,9 +1280,10 @@ window.showPkRanking = async () => {
     }
 };
 
+// 📌 펀치킹 배속 옵션 10배, 15배로 동일 변경
 window.togglePkSpeed = () => {
-    if (pkState.speed === 1) pkState.speed = 4;
-    else if (pkState.speed === 4) pkState.speed = 7;
+    if (pkState.speed === 1) pkState.speed = 10;
+    else if (pkState.speed === 10) pkState.speed = 15;
     else pkState.speed = 1;
     document.getElementById('pk-btn-speed').innerText = pkState.speed + "배속";
 };
