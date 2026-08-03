@@ -41,20 +41,47 @@ window.switchScreen = (screenId) => {
     }
 };
 
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUserUid = user.uid;
-        currentUserName = user.displayName || "용사";
-        document.getElementById('current-user-name').innerText = currentUserName;
         
-        if (document.getElementById('login-screen').style.display !== 'none') {
-            window.switchScreen('start-screen');
+        // 닉네임 DB 확인
+        const dbRef = ref(database);
+        const snapshot = await get(child(dbRef, `users/${currentUserUid}/nickname`));
+        
+        if (snapshot.exists()) {
+            currentUserName = snapshot.val();
+            document.getElementById('current-user-name').innerText = currentUserName;
+            if (document.getElementById('login-screen').style.display !== 'none') {
+                window.switchScreen('start-screen');
+            }
+        } else {
+            // 닉네임이 없으면 모달 띄우기
+            document.getElementById('nickname-overlay').style.display = 'block';
+            document.getElementById('nickname-modal').style.display = 'block';
         }
     } else {
         currentUserUid = null;
         window.switchScreen('login-screen');
     }
 });
+
+window.submitNickname = async () => {
+    let input = document.getElementById('nickname-input').value.trim();
+    if (!input) { alert("닉네임을 입력해주세요."); return; }
+    if (input.length > 10) { alert("닉네임은 10자 이하로 해주세요."); return; }
+    
+    try {
+        await set(ref(database, `users/${currentUserUid}/nickname`), input);
+        currentUserName = input;
+        document.getElementById('current-user-name').innerText = currentUserName;
+        document.getElementById('nickname-overlay').style.display = 'none';
+        document.getElementById('nickname-modal').style.display = 'none';
+        window.switchScreen('start-screen');
+    } catch (e) {
+        alert("닉네임 저장 중 오류가 발생했습니다.");
+    }
+};
 
 window.loginWithGoogle = () => {
     const provider = new GoogleAuthProvider();
@@ -63,7 +90,7 @@ window.loginWithGoogle = () => {
 
 window.logout = () => { signOut(auth).then(() => { location.reload(); }); };
 
-let bestWave = localStorage.getItem('mapleDefenseBestWave') || 0;
+let bestWave = parseInt(localStorage.getItem('mapleDefenseBestWave')) || 0;
 document.getElementById('best-record').innerText = `내 최고 기록: ${bestWave} 웨이브`;
 
 let cardData = JSON.parse(localStorage.getItem('mapleDefenseCards')) || {};
@@ -78,29 +105,29 @@ let skillLevels = JSON.parse(localStorage.getItem('mapleDefenseSkills')) || {
 };
 
 const SKILL_INFO = {
-    common_wind: { name: "윈드 부스트", max: 5, desc: "공격 속도 20%p 증가", img: "image/windboost.png" },
-    common_sharp: { name: "샤프 아이즈", max: 5, desc: "치명타 5%p 증가 (1.2배 피해)", img: "image/sharpeyes.png" },
-    common_rage: { name: "분노", max: 5, desc: "최종 공격력 1%p 증가", img: "image/rage.png" },
-    war_final: { name: "파이널 어택", max: 5, desc: "3%p 확률로 2배 피해 (전사)", img: "image/finalattack.png" },
-    war_death: { name: "데스폴트", max: 5, desc: "60초마다 전역 피해 (전사 5차↑)", img: "image/despolt.png" },
-    mage_freeze: { name: "프리즈", max: 5, desc: "적 빙결 및 도트 피해 (법사)", img: "image/freeze.png" },
-    mage_thunder: { name: "썬더 브레이크", max: 5, desc: "60초마다 전역 피해 (법사 5차↑)", img: "image/thunderbreak.png" },
-    thief_shadow: { name: "섀도우 파트너", max: 5, desc: "3%p 확률로 투사체 추가 (도적)", img: "image/shadowpartner.png" },
-    thief_fuma: { name: "풍마 수리검", max: 5, desc: "60초마다 맵 순회 수리검 (도적 5차↑)", img: "image/fumashuriken.png" }
+    common_wind: { name: "윈드 부스트", max: 5, getDesc: (lv) => `공격 속도 ${lv * 20}%p 증가`, img: "image/windboost.png" },
+    common_sharp: { name: "샤프 아이즈", max: 5, getDesc: (lv) => `치명타 ${lv * 5}%p 증가 (1.2배 피해)`, img: "image/sharpeyes.png" },
+    common_rage: { name: "분노", max: 5, getDesc: (lv) => `최종 공격력 ${lv * 1}%p 증가`, img: "image/rage.png" },
+    war_final: { name: "파이널 어택", max: 5, getDesc: (lv) => `${lv * 3}%p 확률로 2배 피해 (전사)`, img: "image/finalattack.png" },
+    war_death: { name: "데스폴트", max: 5, getDesc: (lv) => `60초마다 전역 피해 +${lv * 10}% (전사 5차↑)`, img: "image/despolt.png" },
+    mage_freeze: { name: "프리즈", max: 5, getDesc: (lv) => `적 빙결 및 도트 피해 (${lv}단계)`, img: "image/freeze.png" },
+    mage_thunder: { name: "썬더 브레이크", max: 5, getDesc: (lv) => `60초마다 전역 피해 +${lv * 10}% (법사 5차↑)`, img: "image/thunderbreak.png" },
+    thief_shadow: { name: "섀도우 파트너", max: 5, getDesc: (lv) => `${lv * 3}%p 확률로 투사체 추가 (도적)`, img: "image/shadowpartner.png" },
+    thief_fuma: { name: "풍마 수리검", max: 5, getDesc: (lv) => `60초마다 맵 순회 수리검 +${lv * 10}% (도적 5차↑)`, img: "image/fumashuriken.png" }
 };
 
 const bossImages = {
     "킹 슬라임": new Image(), "알리샤르": new Image(), "파풀라투스": new Image(),
     "피아누스": new Image(), "자쿰": new Image(), "혼테일": new Image(),
     "시그너스": new Image(), "반반": new Image(), "피에르": new Image(),
-    "블러드퀸": new Image(), "벨룸": new Image()
+    "블러드퀸": new Image(), "벨룸": new Image(), "어둠의 늑대": new Image()
 };
 bossImages["킹 슬라임"].src = "image/kingslime.png"; bossImages["알리샤르"].src = "image/alishar.png";
 bossImages["파풀라투스"].src = "image/papulatus.png"; bossImages["피아누스"].src = "image/pianus.png";
 bossImages["자쿰"].src = "image/zakum.png"; bossImages["혼테일"].src = "image/horntail.png";
 bossImages["시그너스"].src = "image/signus.png"; bossImages["반반"].src = "image/banban.png";
 bossImages["피에르"].src = "image/pierr.png"; bossImages["블러드퀸"].src = "image/bloodqueen.png";
-bossImages["벨룸"].src = "image/velroom.png";
+bossImages["벨룸"].src = "image/velroom.png"; bossImages["어둠의 늑대"].src = "image/darkwolf.png";
 
 const husooabiImg = new Image();
 husooabiImg.src = "image/husooabi.png";
@@ -142,7 +169,12 @@ function getBossInfo(w) {
     if (w >= 100 && w % 5 === 0) {
         let n = (w - 100) / 5;
         let calculatedHp = 2000000 + (n * 1000000) + (Math.pow(n, 2) * 150000);
-        let bName = BOSS_WAVES[w] ? BOSS_WAVES[w].name : `심연의 보스 (${w}층)`;
+        
+        let bName;
+        if (BOSS_WAVES[w]) bName = BOSS_WAVES[w].name;
+        else if (w % 10 === 5) bName = "어둠의 늑대";
+        else bName = `심연의 보스 (${w}층)`;
+
         let bMeso = BOSS_WAVES[w] ? BOSS_WAVES[w].meso : 150;
         let bTicket = BOSS_WAVES[w] ? BOSS_WAVES[w].ticket : 5;
         return { hp: Math.floor(calculatedHp), meso: bMeso, ticket: bTicket, name: bName };
@@ -227,7 +259,7 @@ window.startNewGame = () => {
     monsters = []; projectiles = []; towers = [];
     hitEffects = []; visualEffects = []; fumaList = []; damageTexts = [];
     waveTimer = 0; spawnTimer = 0; selectedUnitIdx = -1;
-    bestWave = localStorage.getItem('mapleDefenseBestWave') || 0;
+    bestWave = parseInt(localStorage.getItem('mapleDefenseBestWave')) || 0;
     
     initGrid();
     window.switchScreen('game-container');
@@ -246,6 +278,7 @@ window.goToLobby = () => {
     document.getElementById('overlay').style.display = 'none';
     window.closeAllModals();
     
+    document.getElementById('best-record').innerText = `내 최고 기록: ${bestWave} 웨이브`;
     window.switchScreen('start-screen');
 };
 
@@ -275,6 +308,7 @@ window.renderBook = () => {
     let list = document.getElementById('book-list');
     list.innerHTML = '';
     let allBosses = Object.keys(BOSS_WAVES).map(k => BOSS_WAVES[k].name);
+    allBosses.push("어둠의 늑대");
     for(let k in cardData) { if(!allBosses.includes(k)) allBosses.push(k); }
     
     allBosses.forEach(bName => {
@@ -331,6 +365,7 @@ window.renderShop = (category) => {
             let lvl = skillLevels[key];
             let canUpgrade = lvl < info.max && getAvailableCoins() > 0;
             let btnText = lvl === info.max ? 'MAX' : `강화 (1코인)`;
+            let displayLv = lvl === 0 ? 1 : lvl; // 0렙이면 1렙 효과 미리보기
             
             list.innerHTML += `
             <div style="background:#fff; border:2px solid #8d6e63; border-radius:6px; padding:6px 8px; display:flex; justify-content:space-between; align-items:center;">
@@ -338,7 +373,7 @@ window.renderShop = (category) => {
                     <img src="${info.img}" onerror="this.src='image/mepo.png'" style="width:30px; height:30px; object-fit:contain; margin-right:8px; flex-shrink:0;">
                     <div style="overflow:hidden;">
                         <div style="font-weight:900; color:#3e2723; font-size:13px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">${info.name} <span style="color:#c62828;">Lv.${lvl}</span></div>
-                        <div style="font-size:10.5px; color:#666; margin-top:2px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">${info.desc}</div>
+                        <div style="font-size:10px; color:#666; margin-top:2px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">${info.getDesc(displayLv)}</div>
                     </div>
                 </div>
                 <button class="maple-btn small ${canUpgrade ? 'primary' : ''}" ${!canUpgrade ? 'disabled' : ''} style="white-space:nowrap; flex-shrink:0; margin-left:5px; min-width:70px;" onclick="upgradeSkill('${key}', '${category}')">${btnText}</button>
@@ -372,7 +407,7 @@ window.openActiveSkillsModal = () => {
                 <img src="${SKILL_INFO[key].img}" onerror="this.src='image/mepo.png'" style="width:30px; height:30px; object-fit:contain; margin-right:8px; flex-shrink:0;">
                 <div style="overflow:hidden;">
                     <div style="font-weight:900; color:#3e2723; font-size:13px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">${SKILL_INFO[key].name} <span style="color:#c62828;">Lv.${skillLevels[key]}</span></div>
-                    <div style="font-size:10.5px; color:#666; margin-top:2px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">${SKILL_INFO[key].desc}</div>
+                    <div style="font-size:10.5px; color:#666; margin-top:2px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">${SKILL_INFO[key].getDesc(skillLevels[key])}</div>
                 </div>
             </div>`;
         }
@@ -567,7 +602,9 @@ function nextWave() {
     state.isBoss = !!bInfo;
     
     if (state.wave > bestWave) {
-        bestWave = state.wave; localStorage.setItem('mapleDefenseBestWave', bestWave);
+        bestWave = state.wave; 
+        localStorage.setItem('mapleDefenseBestWave', bestWave);
+        document.getElementById('best-record').innerText = `내 최고 기록: ${bestWave} 웨이브`;
     }
     
     if(state.isBoss) { showBossToast(bInfo.name); spawnMonster(); }
@@ -1151,7 +1188,6 @@ window.showPkClassSelect = () => {
     document.getElementById('pk-class-select').style.display = 'block';
 };
 
-// 메인 랭킹 보드 보기
 window.showPkRanking = async () => {
     document.getElementById('pk-menu').style.display = 'none';
     document.getElementById('pk-class-select').style.display = 'none';

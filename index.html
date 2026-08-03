@@ -29,6 +29,15 @@
         </div>
     </div>
 
+    <!-- 닉네임 설정 모달 추가 -->
+    <div id="nickname-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:2150;"></div>
+    <div id="nickname-modal" class="maple-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:2200; width:80%; max-width:300px;">
+        <h3 style="color:#1565c0; margin-top:0;">닉네임 설정</h3>
+        <p style="font-size:12px; color:#555; margin-bottom:15px; font-weight:bold;">월드 펀치킹 랭킹에 등록될<br>멋진 닉네임을 정해주세요!</p>
+        <input type="text" id="nickname-input" style="width:90%; padding:10px; margin-bottom:15px; border:2px solid #8d6e63; border-radius:4px; font-weight:bold; text-align:center; font-size:16px;" maxlength="10" placeholder="최대 10자">
+        <button class="maple-btn huge primary" style="width:100%;" onclick="submitNickname()">결정</button>
+    </div>
+
     <div id="start-screen" style="display:none; flex-direction:column; justify-content:center; align-items:center; position:fixed; top:0; left:0; width:100%; height:100%; z-index:900; background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('image/wallpaper.png') no-repeat center center; background-size: cover;">
         <div style="position:absolute; top:20px; right:20px; color:#fff; font-weight:bold; font-size:14px; background:rgba(0,0,0,0.5); padding:5px 10px; border-radius:4px; display: flex; align-items: center; gap: 10px;">
             <span>접속중: <span id="current-user-name" style="color:#ffeb3b;">용사님</span></span>
@@ -57,7 +66,6 @@
             <button class="maple-btn huge" style="width:100%; height:55px; display:flex; align-items:center; justify-content:center; margin-bottom:10px; background: linear-gradient(to bottom, #42a5f5, #1565c0); border-color:#0d47a1; color:#fff;" onclick="showPkClassSelect()">시작하기</button>
             <button class="maple-btn huge" style="width:100%; height:55px; display:flex; align-items:center; justify-content:center; margin-bottom:15px; background: linear-gradient(to bottom, #ffa726, #fb8c00); border-color:#e65100; color:#fff;" onclick="showPkRanking()">🏆 서버 랭킹 보드</button>
             
-            <!-- 로비로 돌아가기 버튼을 얇고 컴팩트하게 수정 -->
             <button class="maple-btn danger-btn" style="width:100%; padding: 8px; font-size: 14px;" onclick="closePk()">로비로 돌아가기</button>
         </div>
         
