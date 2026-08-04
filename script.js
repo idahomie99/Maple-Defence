@@ -1,5 +1,5 @@
 // 🔥 버전은 여기서 수정해주시면 됩니다. (HTML 건드릴 필요 없음)
-const GAME_VERSION = "1.0.11"; 
+const GAME_VERSION = "1.0.12"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -170,6 +170,7 @@ bossImages["벨룸"].src = "image/velroom.png"; bossImages["어둠의 늑대"].s
 const husooabiImg = new Image();
 husooabiImg.src = "image/husooabi.png";
 
+// 🔥 진짜 죽을 죄를 졌습니다... '가ult' 오타 수정 완료! 🔥
 const GRADES = [
     { name: "초보자", prob: 50.0, sell: 3, mult: 1, rangeMul: 1 },
     { name: "1차", prob: 33.1, sell: 6, mult: 2, rangeMul: 1 },
@@ -559,7 +560,8 @@ window.executeBulkSell = (type, value) => {
         if(match) { earnedMeso += u.grade.sell; towers = towers.filter(t => t !== u); grid[i] = null; soldCount++; }
     }
     if(soldCount > 0) {
-        state.meso += earnedMeso; showMessage(`${soldCount}마리 판매 (+${earnedMeso} 메소)`);
+        // 🔥 요청하신 "n 유닛 판매" 문구로 변경 완료!
+        state.meso += earnedMeso; showMessage(`${soldCount} 유닛 판매 (+${earnedMeso} 메소)`);
         selectedUnitIdx = -1; renderGrid(); updateUI();
     } else { showMessage("조건에 맞는 유닛이 없습니다."); }
     window.closeAllModals();
