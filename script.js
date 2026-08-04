@@ -1,4 +1,4 @@
-// 🔥 1.0.18 버전 - AI 랭크 게임 및 UI 개선 반영
+// 🔥 1.0.19 버전 - 2x5 랭크 맵, 매칭 인트로, UI 픽스
 const GAME_VERSION = "1.0.19"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
@@ -227,21 +227,20 @@ let state = {
     tickets: [], isRank: false
 };
 
-let grid = new Array(25).fill(null);
+// 🔥 글로벌 상태 변수
+let grid = [];
+let oppGrid = [];
 let monsters = [], projectiles = [], towers = [];
 let hitEffects = [], visualEffects = [], fumaList = [], damageTexts = [];
 let lastTime = 0, waveTimer = 0, spawnTimer = 0;
 let selectedUnitIdx = -1; 
 let mainReqId; 
 
-// 🔥 전역 변수 초기화 완벽 유지
 let pkState;
 let pkReqId;
 let rankState = { active: false };
 
-// 🔥 AI 상대방 상태 변수들
 let oppState = { wave: 1, meso: 100, isDead: false, isBoss: false };
-let oppGrid = new Array(25).fill(null);
 let oppMonsters = [], oppProjectiles = [], oppTowers = [];
 let oppVisualEffects = [], oppFumaList = [], oppDamageTexts = [];
 let oppWaveTimer = 0, oppSpawnTimer = 0;
@@ -252,7 +251,46 @@ const ctx = canvas.getContext('2d');
 const oppCanvas = document.getElementById('oppCanvas');
 const oppCtx = oppCanvas ? oppCanvas.getContext('2d') : null;
 const gridContainer = document.getElementById('grid-container');
-const PATH = [ {x:25,y:25}, {x:475,y:25}, {x:475,y:475}, {x:25,y:475} ];
+
+// 🔥 2x5 직사각형 맵 처리 로직 추가
+let currentPath = [];
+
+function setGridMode(mode) {
+    let isRankGrid = (mode === 'RANK');
+    let canvasHeight = isRankGrid ? 290 : 500;
+    let gridSize = isRankGrid ? 10 : 25;
+    
+    canvas.height = canvasHeight;
+    document.getElementById('board-area').style.aspectRatio = isRankGrid ? "500/290" : "1/1";
+    
+    gridContainer.style.gridTemplateRows = isRankGrid ? "repeat(2, 1fr)" : "repeat(5, 1fr)";
+    gridContainer.style.top = isRankGrid ? "25.86%" : "15%";
+    gridContainer.style.height = isRankGrid ? "48.27%" : "70%";
+    
+    currentPath = isRankGrid ? 
+        [ {x:25,y:25}, {x:475,y:25}, {x:475,y:265}, {x:25,y:265} ] : 
+        [ {x:25,y:25}, {x:475,y:25}, {x:475,y:475}, {x:25,y:475} ];
+        
+    grid = new Array(gridSize).fill(null);
+    oppGrid = new Array(gridSize).fill(null);
+    
+    gridContainer.innerHTML = '';
+    let oppGridContainer = document.getElementById('opp-grid-container');
+    if(oppGridContainer) oppGridContainer.innerHTML = '';
+    
+    for(let i=0; i<gridSize; i++) {
+        let cell = document.createElement('div');
+        cell.className = 'grid-cell';
+        cell.onclick = () => window.onCellClick(i);
+        gridContainer.appendChild(cell);
+        
+        if (oppGridContainer) {
+            let oppCell = document.createElement('div');
+            oppCell.className = 'grid-cell';
+            oppGridContainer.appendChild(oppCell);
+        }
+    }
+}
 
 // 🔥 온라인 모드 창 로직 🔥
 window.openOnlineMenu = () => {
@@ -275,27 +313,6 @@ window.openRankLobbyFromOnline = () => {
     window.openRankLobby();
 };
 
-// 그리드 최초 세팅 (상대방 그리드 포함)
-function initGrid() {
-    gridContainer.innerHTML = '';
-    let oppGridContainer = document.getElementById('opp-grid-container');
-    if (oppGridContainer) oppGridContainer.innerHTML = '';
-    
-    for(let i=0; i<25; i++) {
-        let cell = document.createElement('div');
-        cell.className = 'grid-cell';
-        cell.onclick = () => window.onCellClick(i);
-        gridContainer.appendChild(cell);
-        
-        if (oppGridContainer) {
-            let oppCell = document.createElement('div');
-            oppCell.className = 'grid-cell';
-            oppGridContainer.appendChild(oppCell);
-        }
-    }
-}
-initGrid();
-
 window.saveGameData = () => {
     if (state.status === 'GAMEOVER' || state.status === 'TITLE' || state.isRank) return;
     let saveObj = {
@@ -310,6 +327,9 @@ window.saveGameData = () => {
 window.loadAndStartGame = () => {
     let saved = JSON.parse(localStorage.getItem('mapleDefenseSave'));
     if(!saved) { window.startNewGame(); return; }
+    
+    setGridMode('ADVENTURE'); // 모험모드 5x5 세팅
+    
     state.isRank = false;
     state.wave = saved.wave; state.meso = saved.meso; state.mp = saved.mp;
     state.mpTotal = saved.mpTotal; state.kills = saved.kills;
@@ -320,11 +340,12 @@ window.loadAndStartGame = () => {
     document.getElementById('btn-speed').style.display = 'block';
     
     document.getElementById('btn-exit').style.display = 'block';
-    document.getElementById('rank-opp-ui').style.display = 'none';
     document.getElementById('opp-board-wrapper').style.display = 'none';
     
-    grid = new Array(25).fill(null); towers = [];
-    saved.gridData.forEach((u) => { if(u) window.addUnit(u.idx, u.gradeIdx, u.clsName, true); });
+    towers = [];
+    if(saved.gridData && Array.isArray(saved.gridData)) {
+        saved.gridData.forEach((u) => { if(u) window.addUnit(u.idx, u.gradeIdx, u.clsName, true); });
+    }
     
     window.switchScreen('game-container');
     state.status = 'PREP'; state.time = 5; 
@@ -337,6 +358,8 @@ window.loadAndStartGame = () => {
 window.startNewGame = () => {
     localStorage.removeItem('mapleDefenseSave');
     
+    setGridMode('ADVENTURE'); // 모험모드 5x5 세팅
+    
     state = {
         status: 'PREP', meso: 25, mp: 0, mpTotal: 0, kills: 0, wave: 1, time: 5, speed: 1, isBoss: false,
         upgrades: { '전사': {val: 0, cost: 10}, '법사': {val: 0, cost: 10}, '도적': {val: 0, cost: 10} },
@@ -345,12 +368,9 @@ window.startNewGame = () => {
     
     document.getElementById('btn-speed').innerText = "1배속";
     document.getElementById('btn-speed').style.display = 'block';
-    
     document.getElementById('btn-exit').style.display = 'block';
-    document.getElementById('rank-opp-ui').style.display = 'none';
     document.getElementById('opp-board-wrapper').style.display = 'none';
     
-    grid = new Array(25).fill(null);
     monsters = []; projectiles = []; towers = [];
     hitEffects = []; visualEffects = []; fumaList = []; damageTexts = [];
     waveTimer = 0; spawnTimer = 0; selectedUnitIdx = -1;
@@ -399,7 +419,7 @@ function getAvailableCoins() {
 
 window.openBookModal = () => {
     document.getElementById('overlay').style.display = 'block';
-    document.getElementById('book-modal').style.display = 'flex';
+    document.getElementById('book-modal').style.display = 'block'; // 🔥 망가짐 완벽 수정!
     window.renderBook();
 };
 
@@ -454,7 +474,7 @@ window.upgradeCard = (bName) => {
 
 window.openShopModal = () => {
     document.getElementById('overlay').style.display = 'block';
-    document.getElementById('shop-modal').style.display = 'flex';
+    document.getElementById('shop-modal').style.display = 'block'; // 🔥 망가짐 완벽 수정!
     window.renderShop('common');
 };
 
@@ -501,7 +521,7 @@ window.upgradeSkill = (key, category) => {
 
 window.openActiveSkillsModal = () => {
     document.getElementById('overlay').style.display = 'block';
-    document.getElementById('active-skills-modal').style.display = 'flex';
+    document.getElementById('active-skills-modal').style.display = 'block'; // 🔥 망가짐 완벽 수정!
     let list = document.getElementById('active-skills-list');
     list.innerHTML = '';
     let hasSkill = false;
@@ -547,6 +567,17 @@ window.summonUnit = () => {
     let clsNames = Object.keys(CLASSES);
     let clsName = clsNames[Math.floor(Math.random() * clsNames.length)];
     window.addUnit(emptyIdx, gradeIdx, clsName);
+    
+    // 🔥 AI 동시 소환 로직 (플레이어가 뽑을 때마다 상대도 한 마리 소환)
+    if (state.isRank) {
+        let oppEmptyIdx = oppGrid.findIndex(v => v === null);
+        if (oppEmptyIdx !== -1) {
+            let oppGradeIdx = getGradeByProb();
+            let oppClsName = clsNames[Math.floor(Math.random() * clsNames.length)];
+            addUnitOpp(oppEmptyIdx, oppGradeIdx, oppClsName);
+        }
+    }
+    
     updateUI();
 };
 
@@ -588,7 +619,6 @@ window.addUnit = (idx, gradeIdx, clsName, isLoad = false) => {
     renderGrid();
 };
 
-// 상대방(AI) 유닛 추가
 function addUnitOpp(idx, gradeIdx, clsName) {
     let grade = GRADES[gradeIdx];
     let cls = CLASSES[clsName];
@@ -642,7 +672,7 @@ window.openBulkSellModal = () => {
 
 window.executeBulkSell = (type, value) => {
     let soldCount = 0; let earnedMeso = 0;
-    for(let i = 0; i < 25; i++) {
+    for(let i = 0; i < grid.length; i++) {
         let u = grid[i];
         if(!u || u.grade.sell === 0) continue; 
         let match = false;
@@ -660,7 +690,7 @@ window.executeBulkSell = (type, value) => {
 function renderGrid() {
     let cells = gridContainer.children;
     if(!cells || cells.length === 0) return;
-    for(let i=0; i<25; i++) {
+    for(let i=0; i<grid.length; i++) {
         let u = grid[i];
         cells[i].className = 'grid-cell';
         if (i === selectedUnitIdx) cells[i].classList.add('selected');
@@ -700,20 +730,22 @@ function renderGrid() {
     }
 }
 
-// 상대방 렌더링
 function renderOppGrid() {
     let oppGridContainer = document.getElementById('opp-grid-container');
     if(!oppGridContainer) return;
     let cells = oppGridContainer.children;
     if(!cells || cells.length === 0) return;
-    for(let i=0; i<25; i++) {
+    for(let i=0; i<oppGrid.length; i++) {
         let u = oppGrid[i];
         cells[i].className = 'grid-cell';
         if(u) {
             if (u.gradeIdx === 6) cells[i].classList.add('glow-6');
             if (u.gradeIdx === 7) cells[i].classList.add('glow-7');
             if (u.gradeIdx === 8) cells[i].classList.add('glow-8');
-            cells[i].innerHTML = `<div style="font-size:14px; text-shadow:1px 1px 2px rgba(0,0,0,0.5);">${u.cls.icon}</div>`;
+            cells[i].innerHTML = `
+                <div style="font-size:18px; text-shadow:1px 1px 2px rgba(0,0,0,0.5);">${u.cls.icon}</div>
+                <div style="color:${u.cls.color}; font-size:9px; margin-top:2px;">${u.grade.name}</div>
+            `;
         } else { cells[i].innerHTML = ''; }
     }
 }
@@ -722,7 +754,7 @@ function spawnMonster() {
     let bInfo = getBossInfo(state.wave);
     let hpBase = bInfo ? bInfo.hp : Math.floor(state.wave * 60 + Math.pow(state.wave, 1.5) * 12);
     monsters.push({
-        hp: hpBase, maxHp: hpBase, x: PATH[0].x, y: PATH[0].y,
+        hp: hpBase, maxHp: hpBase, x: currentPath[0].x, y: currentPath[0].y,
         targetNode: 1, speed: bInfo ? 25 : 50, isBoss: !!bInfo, bindTimer: 0, stunTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0, name: bInfo ? bInfo.name : null, facingRight: true
     });
 }
@@ -813,7 +845,6 @@ window.toggleSpeed = () => {
     document.getElementById('btn-speed').innerText = state.speed + "배속";
 };
 
-// AI 상대방 틱 처리 (loop 안에 포함됨)
 function processOpponentTick(dt) {
     if(oppState.isDead) return;
 
@@ -831,11 +862,11 @@ function processOpponentTick(dt) {
         oppState.isBoss = !!bInfo;
         if(oppState.isBoss) {
             let hpBase = bInfo.hp;
-            oppMonsters.push({ hp: hpBase, maxHp: hpBase, x: PATH[0].x, y: PATH[0].y, targetNode: 1, speed: 25, isBoss: true, bindTimer: 0, stunTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0, name: bInfo.name, facingRight: true });
+            oppMonsters.push({ hp: hpBase, maxHp: hpBase, x: currentPath[0].x, y: currentPath[0].y, targetNode: 1, speed: 25, isBoss: true, bindTimer: 0, stunTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0, name: bInfo.name, facingRight: true });
         }
     } else if(!oppState.isBoss && oppSpawnTimer >= 1.5) { 
         let hpBase = Math.floor(oppState.wave * 60 + Math.pow(oppState.wave, 1.5) * 12);
-        oppMonsters.push({ hp: hpBase, maxHp: hpBase, x: PATH[0].x, y: PATH[0].y, targetNode: 1, speed: 50, isBoss: false, bindTimer: 0, stunTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0, name: null, facingRight: true });
+        oppMonsters.push({ hp: hpBase, maxHp: hpBase, x: currentPath[0].x, y: currentPath[0].y, targetNode: 1, speed: 50, isBoss: false, bindTimer: 0, stunTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0, name: null, facingRight: true });
         oppSpawnTimer = 0; 
     }
 
@@ -859,14 +890,14 @@ function processOpponentTick(dt) {
         if (m.freezeTimer > 0) { m.freezeTimer -= dt; m.freezeTickTimer -= dt; if (m.freezeTickTimer <= 0) { m.hp -= m.freezeDmgVal; m.freezeTickTimer = 1; } }
         if (m.bindTimer > 0) { m.bindTimer -= dt; continue; }
         if (m.stunTimer > 0) { m.stunTimer -= dt; continue; }
-        let t = PATH[m.targetNode];
+        let t = currentPath[m.targetNode];
         let dx = t.x - m.x, dy = t.y - m.y;
         let dist = Math.hypot(dx, dy);
         let currentSpeed = m.speed;
         if (m.freezeTimer > 0) currentSpeed *= 0.5;
         let move = currentSpeed * dt;
         if (dx > 0) m.facingRight = true; else if (dx < 0) m.facingRight = false;
-        if(dist <= move) { m.x = t.x; m.y = t.y; m.targetNode = (m.targetNode + 1) % PATH.length;
+        if(dist <= move) { m.x = t.x; m.y = t.y; m.targetNode = (m.targetNode + 1) % currentPath.length;
         } else { m.x += (dx/dist)*move; m.y += (dy/dist)*move; }
     }
 
@@ -892,7 +923,7 @@ function processOpponentTick(dt) {
                     let baseDmg = t.cls.baseDmg * t.grade.mult * cardMulti * rageMulti;
                     if (t.cls.type === '전사' && oppSkillLevels.war_death > 0) { let gdmg = baseDmg * (1 + oppSkillLevels.war_death * 0.1); oppVisualEffects.push({ type: 'death', timer: 1.2, dmg: gdmg }); t.globalCooldown = 60000; }
                     else if (t.cls.type === '법사' && oppSkillLevels.mage_thunder > 0) { let gdmg = baseDmg * (1 + oppSkillLevels.mage_thunder * 0.1); oppVisualEffects.push({ type: 'thunder', timer: 0.5, dmg: gdmg }); t.globalCooldown = 60000; }
-                    else if (t.cls.type === '도적' && oppSkillLevels.thief_fuma > 0) { let gdmg = baseDmg * (1 + oppSkillLevels.thief_fuma * 0.1); oppFumaList.push({ x: PATH[0].x, y: PATH[0].y, targetNode: 1, dmg: gdmg, hitSet: new Set(), angle: 0 }); t.globalCooldown = 60000; }
+                    else if (t.cls.type === '도적' && oppSkillLevels.thief_fuma > 0) { let gdmg = baseDmg * (1 + oppSkillLevels.thief_fuma * 0.1); oppFumaList.push({ x: currentPath[0].x, y: currentPath[0].y, targetNode: 1, dmg: gdmg, hitSet: new Set(), angle: 0 }); t.globalCooldown = 60000; }
                 }
             }
         }
@@ -916,9 +947,9 @@ function processOpponentTick(dt) {
 
     for(let i=oppFumaList.length-1; i>=0; i--) {
         let f = oppFumaList[i]; f.angle += 10 * dt; 
-        let t = PATH[f.targetNode]; let dx = t.x - f.x, dy = t.y - f.y; let dist = Math.hypot(dx, dy); let move = 300 * dt; 
+        let t = currentPath[f.targetNode]; let dx = t.x - f.x, dy = t.y - f.y; let dist = Math.hypot(dx, dy); let move = 300 * dt; 
         oppMonsters.forEach(m => { if (!f.hitSet.has(m) && Math.hypot(m.x - f.x, m.y - f.y) <= 40) { m.hp -= f.dmg; f.hitSet.add(m); } });
-        if(dist <= move) { f.x = t.x; f.y = t.y; f.targetNode++; if (f.targetNode >= PATH.length) f.targetNode = 0; if (f.targetNode === 1 && f.hitSet.size > 0) oppFumaList.splice(i, 1);
+        if(dist <= move) { f.x = t.x; f.y = t.y; f.targetNode++; if (f.targetNode >= currentPath.length) f.targetNode = 0; if (f.targetNode === 1 && f.hitSet.size > 0) oppFumaList.splice(i, 1);
         } else { f.x += (dx/dist)*move; f.y += (dy/dist)*move; }
     }
 
@@ -1017,7 +1048,7 @@ function loop() {
         if (m.bindTimer > 0) { m.bindTimer -= dt; continue; }
         if (m.stunTimer > 0) { m.stunTimer -= dt; continue; }
 
-        let t = PATH[m.targetNode];
+        let t = currentPath[m.targetNode];
         let dx = t.x - m.x, dy = t.y - m.y;
         let dist = Math.hypot(dx, dy);
         
@@ -1030,7 +1061,7 @@ function loop() {
         else if (dx < 0) m.facingRight = false;
         
         if(dist <= move) {
-            m.x = t.x; m.y = t.y; m.targetNode = (m.targetNode + 1) % PATH.length;
+            m.x = t.x; m.y = t.y; m.targetNode = (m.targetNode + 1) % currentPath.length;
         } else { m.x += (dx/dist)*move; m.y += (dy/dist)*move; }
     }
     
@@ -1080,7 +1111,7 @@ function loop() {
                     }
                     else if (t.cls.type === '도적' && skillLevels.thief_fuma > 0) {
                         let gdmg = baseDmg * (1 + skillLevels.thief_fuma * 0.1);
-                        fumaList.push({ x: PATH[0].x, y: PATH[0].y, targetNode: 1, dmg: gdmg, hitSet: new Set(), angle: 0 });
+                        fumaList.push({ x: currentPath[0].x, y: currentPath[0].y, targetNode: 1, dmg: gdmg, hitSet: new Set(), angle: 0 });
                         t.globalCooldown = 60000;
                     }
                 }
@@ -1129,7 +1160,7 @@ function loop() {
     for(let i=fumaList.length-1; i>=0; i--) {
         let f = fumaList[i];
         f.angle += 10 * dt; 
-        let t = PATH[f.targetNode];
+        let t = currentPath[f.targetNode];
         let dx = t.x - f.x, dy = t.y - f.y;
         let dist = Math.hypot(dx, dy);
         let move = 300 * dt; 
@@ -1144,7 +1175,7 @@ function loop() {
         if(dist <= move) {
             f.x = t.x; f.y = t.y; 
             f.targetNode++;
-            if (f.targetNode >= PATH.length) f.targetNode = 0;
+            if (f.targetNode >= currentPath.length) f.targetNode = 0;
             if (f.targetNode === 1 && f.hitSet.size > 0) fumaList.splice(i, 1);
         } else {
             f.x += (dx/dist)*move; f.y += (dy/dist)*move;
@@ -1243,7 +1274,7 @@ function drawOpp() {
     oppCtx.strokeStyle = "rgba(188, 170, 164, 0.2)";
     oppCtx.lineWidth = 35;
     oppCtx.lineJoin = "round";
-    oppCtx.beginPath(); oppCtx.rect(25, 25, 450, 450); oppCtx.stroke();
+    oppCtx.beginPath(); oppCtx.rect(25, 25, 450, oppCanvas.height - 50); oppCtx.stroke();
     
     oppVisualEffects.forEach(v => {
         oppCtx.save();
@@ -1305,7 +1336,7 @@ function draw() {
     ctx.strokeStyle = "rgba(188, 170, 164, 0.2)";
     ctx.lineWidth = 35;
     ctx.lineJoin = "round";
-    ctx.beginPath(); ctx.rect(25, 25, 450, 450); ctx.stroke();
+    ctx.beginPath(); ctx.rect(25, 25, 450, canvas.height - 50); ctx.stroke();
     
     if (selectedUnitIdx !== -1 && grid[selectedUnitIdx]) {
         let u = grid[selectedUnitIdx];
@@ -1539,7 +1570,7 @@ window.closePk = () => {
     document.getElementById('pk-overlay').style.display = 'none';
     pkState.active = false;
     cancelAnimationFrame(pkReqId);
-    window.openOnlineMenu(); // 🔥 온라인 메뉴로 복귀하도록 수정 완료
+    window.openOnlineMenu();
 };
 
 window.showPkClassSelect = () => {
@@ -1898,52 +1929,12 @@ function drawPk() {
         pkCtx.fillText(d.val, d.x, d.y);
         pkCtx.restore();
     });
-    
-    pkState.vfx.forEach(v => {
-        pkCtx.save();
-        if (v.type === 'death') {
-            let elapsed = 1.2 - v.timer;
-            let progress = Math.min(1, elapsed / 0.2); 
-
-            pkCtx.strokeStyle = "#ffeb3b"; 
-            pkCtx.lineWidth = 8; 
-            pkCtx.lineCap = "round";
-            pkCtx.shadowColor = "#f57f17";
-            pkCtx.shadowBlur = 10;
-
-            let startX = -50, startY = 450;
-            let endX = 550, endY = 50;
-
-            let currentX = startX + (endX - startX) * progress;
-            let currentY = startY + (endY - startY) * progress;
-
-            pkCtx.beginPath();
-            pkCtx.moveTo(startX, startY);
-            pkCtx.lineTo(currentX, currentY);
-            pkCtx.stroke();
-
-            pkCtx.strokeStyle = "#fff"; 
-            pkCtx.lineWidth = 2; 
-            pkCtx.beginPath();
-            pkCtx.moveTo(startX, startY);
-            pkCtx.lineTo(currentX, currentY);
-            pkCtx.stroke();
-        } else if (v.type === 'thunder') {
-            pkCtx.fillStyle = `rgba(0, 229, 255, ${v.timer})`; pkCtx.fillRect(0,0,500,500);
-            pkCtx.strokeStyle = `rgba(255, 255, 255, ${v.timer * 2})`; pkCtx.lineWidth = 15;
-            pkCtx.beginPath(); pkCtx.moveTo(250,0); pkCtx.lineTo(200,250); pkCtx.lineTo(300,250); pkCtx.lineTo(250,500); pkCtx.stroke();
-        } else if (v.type === 'fuma') {
-            pkCtx.fillStyle = `rgba(171, 71, 188, ${v.timer})`; pkCtx.fillRect(0,0,500,500);
-        }
-        pkCtx.restore();
-    });
 }
 
 // ==========================================
-// 🔥 실시간 1:1 PVP 랭크 게임 시스템 (AI 기반으로 변경) 🔥
+// 🔥 실시간 1:1 PVP AI 랭크 게임 시스템 🔥
 // ==========================================
 window.openRankLobby = () => {
-    // 하루 10회 카운트 로직
     let today = new Date().toLocaleDateString();
     let lastDate = localStorage.getItem('mapleDefenseRankDate');
     let playCount = parseInt(localStorage.getItem('mapleDefenseRankCount')) || 0;
@@ -1963,7 +1954,7 @@ window.openRankLobby = () => {
 
 window.closeRankMenu = () => {
     document.getElementById('rank-overlay').style.display = 'none';
-    window.openOnlineMenu(); // 🔥 온라인 메뉴로 복귀
+    window.openOnlineMenu(); 
 };
 
 window.openRankShop = () => {
@@ -2003,6 +1994,25 @@ window.exchangeMonsterCoin = () => {
     }
 };
 
+// 🔥 매칭 화면 전환 및 인트로 페이드(Fade) 효과 함수
+function showMatchIntro(oppName, oppRp, callback) {
+    let intro = document.getElementById('match-intro-overlay');
+    document.getElementById('intro-player').innerText = `${currentUserName} (${userRankData.rp} RP)`;
+    document.getElementById('intro-opp').innerText = `${oppName} (${oppRp} RP)`;
+    
+    intro.style.display = 'flex';
+    void intro.offsetWidth; // 브라우저 렌더링 리플로우 강제 (애니메이션 정상 작동용)
+    intro.style.opacity = '1';
+    
+    setTimeout(() => {
+        intro.style.opacity = '0';
+        setTimeout(() => {
+            intro.style.display = 'none';
+            callback();
+        }, 500); // 서서히 사라짐
+    }, 2000); // 2초 유지
+}
+
 window.startRankMatchmaking = async () => {
     let today = new Date().toLocaleDateString();
     let playCount = parseInt(localStorage.getItem('mapleDefenseRankCount')) || 0;
@@ -2015,11 +2025,10 @@ window.startRankMatchmaking = async () => {
     document.getElementById('rank-lobby-modal').style.display = 'none';
     document.getElementById('rank-waiting-modal').style.display = 'block';
     
-    // AI 매칭 로직 (서버에서 나와 RP가 비슷한 유저 데이터를 가져와 적용)
     let oppName = "의문의 용사 (AI)";
     let oppRp = userRankData.rp + Math.floor(Math.random() * 40 - 20);
     oppCardData = {}; 
-    oppSkillLevels = { ...skillLevels }; // 서버 실패 시 내 스킬과 동일하게 세팅
+    oppSkillLevels = { ...skillLevels };
     
     try {
         const snap = await get(child(ref(database), `users`));
@@ -2034,7 +2043,6 @@ window.startRankMatchmaking = async () => {
             });
             users.sort((a,b) => a.diff - b.diff);
             if(users.length > 0) {
-                // 상위 3명 중 1명 랜덤 픽
                 let aiUser = users[Math.floor(Math.random() * Math.min(3, users.length))]; 
                 oppName = aiUser.nickname + " (AI)";
                 oppRp = parseInt(aiUser.cloudData.rp) || 1000;
@@ -2044,36 +2052,35 @@ window.startRankMatchmaking = async () => {
         }
     } catch(e) { console.log("AI 데이터 로드 실패, 기본값 사용"); }
 
-    setTimeout(() => { // 매칭 딜레이 (1.5초 연출)
+    setTimeout(() => { 
         document.getElementById('rank-waiting-modal').style.display = 'none';
-        
         playCount++; 
         localStorage.setItem('mapleDefenseRankCount', playCount);
         
-        enterRankGameAI(oppName, oppRp);
+        // 🔥 매칭 성사 인트로 연출 후 랭크 게임 진입
+        showMatchIntro(oppName, oppRp, () => {
+            enterRankGameAI(oppName, oppRp);
+        });
     }, 1500);
 };
 
 function enterRankGameAI(oppName, oppRp) {
     document.getElementById('rank-overlay').style.display = 'none';
-    
     rankState.active = true;
     
-    // 플레이어 초기화
+    setGridMode('RANK'); // 🔥 2x5 그리드 세팅
+    
     state = {
         status: 'PREP', meso: 100, mp: 0, mpTotal: 0, kills: 0, wave: 1, time: 5, speed: 15, isBoss: false,
         upgrades: { '전사': {val: 0, cost: 10}, '법사': {val: 0, cost: 10}, '도적': {val: 0, cost: 10} },
         tickets: [], isRank: true
     };
     
-    grid = new Array(25).fill(null);
     monsters = []; projectiles = []; towers = [];
     hitEffects = []; visualEffects = []; fumaList = []; damageTexts = [];
     waveTimer = 0; spawnTimer = 0; selectedUnitIdx = -1;
     
-    // AI 상대방 초기화
     oppState = { wave: 1, meso: 100, isDead: false, isBoss: false };
-    oppGrid = new Array(25).fill(null);
     oppMonsters = []; oppProjectiles = []; oppTowers = [];
     oppVisualEffects = []; oppFumaList = []; oppDamageTexts = [];
     oppWaveTimer = 0; oppSpawnTimer = 0;
@@ -2082,25 +2089,12 @@ function enterRankGameAI(oppName, oppRp) {
     window.switchScreen('game-container');
     
     document.getElementById('btn-speed').style.display = 'none';
-    document.getElementById('btn-exit').style.display = 'none'; // 튀기 금지
+    document.getElementById('btn-exit').style.display = 'none'; 
     
-    // UI 표시 세팅
     document.getElementById('opp-board-wrapper').style.display = 'block';
     document.getElementById('opp-name').innerText = oppName;
     document.getElementById('opp-wave').innerText = '1';
     document.getElementById('opp-mobs').innerText = '0';
-
-    // AI 자동 10회 소환 로직 
-    for(let i=0; i<10; i++) {
-        let emptyIdx = oppGrid.findIndex(v => v === null);
-        if(emptyIdx !== -1) {
-            let gradeIdx = getGradeByProb();
-            let clsNames = Object.keys(CLASSES);
-            let clsName = clsNames[Math.floor(Math.random() * clsNames.length)];
-            addUnitOpp(emptyIdx, gradeIdx, clsName);
-            oppState.meso -= 10;
-        }
-    }
 
     lastTime = performance.now(); 
     cancelAnimationFrame(mainReqId);
