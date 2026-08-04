@@ -1,5 +1,5 @@
 // 🔥 향후 코드를 수정할 때마다 이 숫자를 올려주시면 사용자의 폰이 스스로 업데이트를 진행합니다 🔥
-const GAME_VERSION = "1.0.2"; 
+const GAME_VERSION = "1.0.3"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -28,29 +28,24 @@ document.getElementById('version-display').innerText = `Beta v${GAME_VERSION}`;
 // 🚀 핵심: 캐시 무시 강제 업데이트 로직
 async function checkAndUpdate() {
     try {
-        // 서버에서 무조건 최신 script.js 텍스트로 긁어오기 (난수 파라미터로 캐시 완벽 무시)
         let res = await fetch('script.js?t=' + new Date().getTime());
         let text = await res.text();
         
-        // 정규식으로 서버 코드 안의 GAME_VERSION 찾기
         let match = text.match(/const\s+GAME_VERSION\s*=\s*["']([^"']+)["']/);
         
         if (match && match[1] !== GAME_VERSION) {
-            // 버전이 다르면(업데이트 있으면)
             document.getElementById('update-title').innerText = "업데이트 발견!";
             document.getElementById('update-desc').innerText = `최신 버전(v${match[1]})을 적용합니다...`;
             
-            // 주소창에 쿼리를 달아서 PWA 캐시를 깨부수고 강제 새로고침
             setTimeout(() => {
                 window.location.href = window.location.pathname + '?update=' + new Date().getTime();
             }, 1000);
-            return true; // 업데이트 진행 중이므로 아래 게임 로직 차단
+            return true; 
         }
     } catch (e) {
         console.log("업데이트 체크 실패, 기존 캐시 버전으로 진행");
     }
     
-    // 버전이 같으면(최신 상태면) 화면 가리개 치우기
     setTimeout(() => {
         document.getElementById('update-overlay').style.display = 'none';
     }, 400);
@@ -122,7 +117,6 @@ checkAndUpdate().then((isUpdating) => {
                     if (cloud.bestWave) { localStorage.setItem('mapleDefenseBestWave', cloud.bestWave); bestWave = parseInt(cloud.bestWave); }
                     
                     document.getElementById('best-record').innerText = bestWave;
-                    window.checkSave();
                 } else {
                     window.syncToCloud();
                 }
@@ -130,9 +124,9 @@ checkAndUpdate().then((isUpdating) => {
                 window.syncToCloud();
             }
 
-            if (document.getElementById('login-screen').style.display !== 'none') {
-                window.switchScreen('start-screen');
-            }
+            // 🐛 버그 수정: 조건 따지지 않고 무조건 로비 화면 띄우기
+            window.switchScreen('start-screen');
+            
         } else {
             currentUserUid = null;
             window.switchScreen('login-screen');
