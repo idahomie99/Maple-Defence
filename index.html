@@ -163,14 +163,25 @@
                     <span class="btn-arrow">〉</span>
                 </button>
             </div>
-            <!-- 🔥 랭크 게임 버튼 변경 -->
-            <button class="premium-btn premium-dark" onclick="openRankLobby()">
-                <div class="btn-left"><span class="btn-icon">🏆</span> 실시간 랭크 게임</div>
+            <!-- 🔥 온라인 모드 버튼 추가 -->
+            <button class="premium-btn premium-dark" onclick="openOnlineMenu()">
+                <div class="btn-left"><span class="btn-icon">🌐</span> 온라인 모드</div>
                 <span class="btn-arrow">〉</span>
             </button>
         </div>
 
         <div id="version-display" style="margin-top: 20px; color: rgba(255,255,255,0.4); font-size: 11px; font-weight: bold; pointer-events: none; letter-spacing: 0.5px;"></div>
+    </div>
+
+    <!-- 🌐 온라인 모드 선택 화면 -->
+    <div id="online-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:1900; flex-direction:column; align-items:center;">
+        <div id="online-menu-modal" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 25vh; width: 85%; max-width: 320px;">
+            <h3 style="color:#60a5fa;">🌐 온라인 모드 🌐</h3>
+            <p style="font-size:12px; color:#ccc; margin-bottom:15px; line-height:1.4;">다른 용사들과 실력을 겨뤄보세요!</p>
+            <button class="ingame-btn premium-dark" style="width:100%; height:55px; margin-bottom:10px; font-size:16px;" onclick="openPkMenuFromOnline()">🏆 월드 펀치킹 (데미지 측정)</button>
+            <button class="ingame-btn premium-red" style="width:100%; height:55px; margin-bottom:15px; font-size:16px;" onclick="openRankLobbyFromOnline()">⚔️ 실시간 랭크 게임 (1:1 대전)</button>
+            <button class="ingame-btn premium-white" style="width:100%; padding: 10px;" onclick="closeOnlineMenu()">로비로 돌아가기</button>
+        </div>
     </div>
 
     <!-- 🏆 랭크 게임 로비 오버레이 -->
@@ -193,7 +204,7 @@
             
             <button class="ingame-btn premium-blue" style="width:100%; height:55px; margin-bottom:10px; font-size:18px;" onclick="startRankMatchmaking()">⚔️ 랭크 매칭 시작</button>
             <button class="ingame-btn premium-purple" style="width:100%; height:50px; margin-bottom:15px;" onclick="openRankShop()">🛒 랭크 전용 상점</button>
-            <button class="ingame-btn premium-dark" style="width:100%; padding: 10px;" onclick="closeRankMenu()">로비로 돌아가기</button>
+            <button class="ingame-btn premium-dark" style="width:100%; padding: 10px;" onclick="closeRankMenu()">온라인 메뉴로 돌아가기</button>
         </div>
 
         <!-- 랭크 상점 모달 -->
@@ -227,6 +238,35 @@
             <h3 style="color:#1e3a8a; border:none; padding:0;">상대방을 찾는 중...</h3>
             <p style="font-size:13px; color:#555; margin-bottom:20px;">자신과 비슷한 실력의 용사님을<br>수색하고 있습니다.</p>
             <button class="ingame-btn premium-red" style="width:100%; padding: 12px;" onclick="cancelRankMatchmaking()">매칭 취소</button>
+        </div>
+    </div>
+
+    <!-- 월드 펀치킹 화면 -->
+    <div id="pk-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:2000; flex-direction:column; align-items:center;">
+        <div id="pk-menu" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 20vh;">
+            <h3>월드 펀치킹</h3>
+            <p style="font-size:12px; color:#555; margin-bottom:15px;">혼줌/보스추뎀 제외, 전 직업 기본공격 완전 동일!<br>순수 도감과 스킬 내실로 승부합니다. (1분)</p>
+            <button class="ingame-btn premium-blue" style="width:100%; height:55px; margin-bottom:10px;" onclick="showPkClassSelect()">시작하기</button>
+            <button class="ingame-btn premium-orange" style="width:100%; height:55px; margin-bottom:15px;" onclick="showPkRanking()">🏆 서버 랭킹 보드</button>
+            <button class="ingame-btn premium-dark" style="width:100%; padding: 8px; font-size: 14px;" onclick="closePk()">온라인 메뉴로 돌아가기</button>
+        </div>
+        
+        <div id="pk-class-select" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 20vh;">
+            <h3>직업 선택 (데스티니)</h3>
+            <div style="display:flex; gap:10px; margin-bottom:15px;">
+                <button class="ingame-btn premium-red" style="flex:1;" onclick="startPkGame('전사')">전사</button>
+                <button class="ingame-btn premium-blue" style="flex:1;" onclick="startPkGame('법사')">법사</button>
+                <button class="ingame-btn premium-purple" style="flex:1;" onclick="startPkGame('도적')">도적</button>
+            </div>
+            <button class="ingame-btn premium-dark" style="width:100%;" onclick="openPkMenu()">뒤로</button>
+        </div>
+
+        <div id="pk-ranking" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 10vh; width:90%; max-width:360px; max-height: 80vh; flex-direction:column;">
+            <h3>🏆 서버 펀치킹 랭킹 🏆</h3>
+            <div style="background: rgba(0,0,0,0.8); border-radius: 8px; padding: 10px; flex:1; display:flex; flex-direction:column; overflow:hidden; margin-bottom:15px;">
+                <div id="pk-ranking-list" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:8px; padding-right:5px;"></div>
+            </div>
+            <button class="ingame-btn premium-dark" style="width:100%;" onclick="openPkMenu()">뒤로</button>
         </div>
     </div>
 
@@ -318,77 +358,50 @@
         </div>
     </div>
     
+    <!-- 펀치킹 인게임 -->
+    <div id="pk-game" style="display:none; flex-direction:column; width:100%; max-width:500px; height:auto; min-height:100vh; background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('image/punchkingwallpaper.png') no-repeat center center; background-size: cover; padding-bottom: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.8);">
+        <div id="pk-header" class="maple-panel" style="margin: 10px 10px 0 10px; padding: 12px; font-size: 15px; font-weight: bold; background: rgba(253, 245, 230, 0.9);">
+            <div class="stat-row">
+                <div>점수: <span id="pk-score" class="highlight">0</span></div>
+                <div>타이머: <span id="pk-time" class="highlight" style="color:#ff5252;">60</span>초</div>
+                <div style="display:flex; gap:5px;">
+                    <button id="pk-btn-speed" class="ingame-btn premium-dark" style="padding: 5px 10px; font-size: 12px;" onclick="togglePkSpeed()">1배속</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="pk-board-area" style="position: relative; width: 100%; aspect-ratio: 1/1; background-color: rgba(55, 71, 79, 0.5); border-top: 4px solid rgba(38, 50, 56, 0.8); border-bottom: 4px solid rgba(38, 50, 56, 0.8); margin-top: 10px;">
+            <canvas id="pkCanvas" width="500" height="500" style="position:absolute; top:0; left:0; width:100%; height:100%; z-index:10; pointer-events:none;"></canvas>
+            <div style="position: absolute; top: 43%; left: 15%; width: 14%; height: 14%; background-color: rgba(220, 190, 170, 0.85); border: 2px solid rgba(120, 80, 60, 0.9); z-index: 5; border-radius: 4px; box-sizing: border-box;">
+                <div class="grid-cell glow-8" style="width: 100%; height: 100%; background: transparent; box-shadow: none; cursor:default; border:none; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+                    <div id="pk-unit-icon" style="font-size: clamp(14px, 4vw, 20px); text-shadow:1px 1px 2px rgba(0,0,0,0.5);">🗡️</div>
+                    <div id="pk-unit-name" style="color:#ffd54f; font-size: clamp(8px, 2.5vw, 10px); margin-top:2px; font-weight:800;">데스티니</div>
+                    <div style="width: 80%; height: 3px; background: #333; margin-top: 2px; border-radius: 1.5px; overflow: hidden; border: 1px solid #111; display:none;" id="pk-global-bar-container"><div id="pk-global-bar" style="width: 0%; height: 100%; background: #ffeb3b;"></div></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="maple-panel" style="margin: 10px; padding: 12px; background: rgba(253, 245, 230, 0.9);">
+            <button class="ingame-btn premium-red" style="width: 100%; margin-bottom: 15px; padding: 15px;" onclick="endPkGame(true)">포기하고 로비로</button>
+            <div style="background: rgba(0,0,0,0.7); border-radius: 8px; padding: 10px;">
+                <h4 style="color: #ffeb3b; margin: 0 0 10px 0; text-align: center; font-size: 16px; font-weight:900;">🏆 펀치킹 실시간 TOP 10 🏆</h4>
+                <div id="pk-live-ranking-list" style="display:flex; flex-direction:column; gap:5px; font-size:13px; max-height: 200px; overflow-y: auto;">
+                    <div style="text-align:center; color:#ccc;">랭킹을 불러오는 중...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 측정 종료 모달 (펀치킹) -->
+    <div id="pk-result-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:2050;"></div>
+    <div id="pk-result-modal" class="maple-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:2100; width:80%; max-width:300px;">
+        <h3 style="color:#e65100;">측정 종료!</h3>
+        <div style="font-size:16px; margin-bottom:10px; color:#5a3c22; font-weight:bold;">나의 최종 DPS 점수</div>
+        <div id="pk-final-score" style="font-size:42px; font-weight:900; color:#c62828; text-shadow:1px 1px 0 #fff; margin-bottom:20px; display:flex; flex-direction:column; align-items:center;">0</div>
+        <button id="btn-submit-pk" class="ingame-btn premium-blue" style="width:100%; margin-bottom:10px; padding:15px;" onclick="submitPkScore()">랭킹 등록하고 로비로</button>
+    </div>
+
     <div id="overlay" onclick="closeAllModals()"></div>
-
-    <!-- 모달: 도감 -->
-    <div id="book-modal" class="maple-modal" style="max-height: 85vh; display: none; flex-direction: column;">
-        <h3>📖 몬스터 도감 📖</h3>
-        <div id="book-total-grade" style="font-weight:900; color:#1565c0; font-size: 14px;">총 등급 합계: <span id="ui-total-grade">0</span> (코인: <span id="ui-book-coins">0</span>)</div>
-        <div id="book-total-bonus" style="font-weight:900; color:#c62828; margin-bottom:10px; font-size: 16px;">총 보유 효과: 공격력 +0%</div>
-        <div id="book-list" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 8px; padding-right: 5px;"></div>
-        <button class="ingame-btn premium-dark" onclick="closeAllModals()" style="margin-top:15px; width:100%;">닫기</button>
-    </div>
-
-    <!-- 모달: 상점 -->
-    <div id="shop-modal" class="maple-modal" style="max-height: 85vh; display: none; flex-direction: column; width: 90%; max-width: 360px;">
-        <h3>🛒 스킬 상점 🛒</h3>
-        <div style="font-weight:900; color:#e65100; margin-bottom:10px; font-size: 15px;">보유 몬스터 코인: <span id="ui-shop-coins">0</span>개</div>
-        <div style="display:flex; gap:4px; margin-bottom:10px;">
-            <button class="ingame-btn premium-white" style="flex:1; font-size:12px; padding:8px;" onclick="renderShop('common')">공통</button>
-            <button class="ingame-btn premium-red" style="flex:1; font-size:12px; padding:8px;" onclick="renderShop('warrior')">전사</button>
-            <button class="ingame-btn premium-blue" style="flex:1; font-size:12px; padding:8px;" onclick="renderShop('mage')">법사</button>
-            <button class="ingame-btn premium-purple" style="flex:1; font-size:12px; padding:8px;" onclick="renderShop('thief')">도적</button>
-        </div>
-        <div id="shop-list" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 8px; padding-right: 5px; text-align:left;"></div>
-        <button class="ingame-btn premium-dark" onclick="closeAllModals()" style="margin-top:15px; width:100%;">닫기</button>
-    </div>
-
-    <!-- 모달: 적용중인 스킬 -->
-    <div id="active-skills-modal" class="maple-modal" style="max-height: 80vh; display: none; flex-direction: column;">
-        <h3>⭐ 적용중인 스킬 ⭐</h3>
-        <div id="active-skills-list" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 8px; padding-right: 5px; text-align:left;"></div>
-        <button class="ingame-btn premium-dark" onclick="closeAllModals()" style="margin-top:15px; width:100%;">닫기</button>
-    </div>
-    
-    <!-- 모달: 일괄판매 -->
-    <div id="bulk-sell-modal" class="maple-modal">
-        <h3>일괄 판매 선택</h3>
-        <p style="font-size:12px; margin-bottom:10px;">(5차 이상은 판매되지 않습니다)</p>
-        <div style="text-align: left; font-size: 14px; font-weight: bold; color: #5a3c22; margin-bottom: 5px;">▶ 직업별 전체 판매</div>
-        <div style="display: flex; gap: 5px; margin-bottom: 15px;">
-            <button class="ingame-btn premium-red" style="flex:1;" onclick="executeBulkSell('class', '전사')">전사</button>
-            <button class="ingame-btn premium-blue" style="flex:1;" onclick="executeBulkSell('class', '법사')">법사</button>
-            <button class="ingame-btn premium-purple" style="flex:1;" onclick="executeBulkSell('class', '도적')">도적</button>
-        </div>
-        <div style="text-align: left; font-size: 14px; font-weight: bold; color: #5a3c22; margin-bottom: 5px;">▶ 등급별 전체 판매</div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
-            <button class="ingame-btn premium-white" onclick="executeBulkSell('grade', 0)">초보자 전체</button>
-            <button class="ingame-btn premium-white" onclick="executeBulkSell('grade', 1)">1차 이하</button>
-            <button class="ingame-btn premium-white" onclick="executeBulkSell('grade', 2)">2차 이하</button>
-            <button class="ingame-btn premium-white" onclick="executeBulkSell('grade', 3)">3차 이하</button>
-        </div>
-        <button class="ingame-btn premium-dark" onclick="closeAllModals()" style="margin-top:15px; width:100%;">취소</button>
-    </div>
-
-    <!-- 모달: 선택권 -->
-    <div id="ticket-modal" class="maple-modal">
-        <h3>선택권 사용 (<span id="ticket-tier" class="highlight"></span>차)</h3>
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 5px;">
-            <button class="ingame-btn premium-red" onclick="useTicket('전사')">전사</button>
-            <button class="ingame-btn premium-blue" onclick="useTicket('법사')">법사</button>
-            <button class="ingame-btn premium-purple" onclick="useTicket('도적')">도적</button>
-            <button class="ingame-btn premium-orange" onclick="useTicket('랜덤')">랜덤(20% 1업)</button>
-        </div>
-        <button class="ingame-btn premium-dark" onclick="closeAllModals()" style="margin-top:15px; width:100%;">닫기</button>
-    </div>
-
-    <!-- 모달: 게임오버 -->
-    <div id="gameover-modal" class="maple-modal">
-        <h3 style="color:#c62828; font-size:24px; border-bottom:none;">💀 게임 오버 💀</h3>
-        <p id="gameover-msg" style="font-size: 16px; margin-bottom: 20px; font-weight: bold;"></p>
-        <button class="ingame-btn premium-blue" style="width:100%; padding: 15px;" onclick="goToLobby()">로비로 돌아가기</button>
-    </div>
-
     <div id="msg-overlay"></div>
     
     <script>
