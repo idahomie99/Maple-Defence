@@ -25,7 +25,7 @@ let currentUserUid = null;
 // UI에 현재 버전 표기 렌더링
 document.getElementById('version-display').innerText = `Beta v${GAME_VERSION}`;
 
-// 🚀 핵심: 캐시 무시 강제 업데이트 로직
+// 🚀 핵심: 캐시 무시 강제 업데이트 로직 (무한 루프 방지 적용)
 async function checkAndUpdate() {
     try {
         let res = await fetch('script.js?t=' + new Date().getTime());
@@ -34,18 +34,30 @@ async function checkAndUpdate() {
         let match = text.match(/const\s+GAME_VERSION\s*=\s*["']([^"']+)["']/);
         
         if (match && match[1] !== GAME_VERSION) {
+            // 사파리 고집 때문에 이미 새로고침을 시도했는데도 실패한 경우 (무한 루프 방지)
+            if (window.location.search.includes('update=')) {
+                document.getElementById('update-title').innerText = "업데이트 적용 대기 중";
+                document.getElementById('update-desc').innerHTML = `최신 데이터가 준비되었습니다.<br>앱을 완전히 종료(위로 스와이프)한 뒤<br>다시 실행해주세요!`;
+                return true; // 여기서 멈춰서 무한 루프 차단
+            }
+
             document.getElementById('update-title').innerText = "업데이트 발견!";
             document.getElementById('update-desc').innerText = `최신 버전(v${match[1]})을 적용합니다...`;
             
             setTimeout(() => {
                 window.location.href = window.location.pathname + '?update=' + new Date().getTime();
-            }, 1000);
+            }, 1500);
             return true; 
         }
     } catch (e) {
         console.log("업데이트 체크 실패, 기존 캐시 버전으로 진행");
     }
     
+    // 업데이트가 성공적으로 끝났다면 주소창 찌꺼기(?update=) 청소
+    if (window.location.search.includes('update=')) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     setTimeout(() => {
         document.getElementById('update-overlay').style.display = 'none';
     }, 400);
@@ -124,7 +136,6 @@ checkAndUpdate().then((isUpdating) => {
                 window.syncToCloud();
             }
 
-            // 🐛 버그 수정: 조건 따지지 않고 무조건 로비 화면 띄우기
             window.switchScreen('start-screen');
             
         } else {
