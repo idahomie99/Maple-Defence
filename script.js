@@ -1,5 +1,5 @@
 // 🔥 버전은 여기서 수정해주시면 됩니다. (HTML 건드릴 필요 없음)
-const GAME_VERSION = "1.0.6"; 
+const GAME_VERSION = "1.0.7"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
