@@ -192,7 +192,7 @@
                 <div style="color:#69f0ae; font-size:14px; font-weight:900; margin-bottom:5px;">[ AI 자동 매칭 ]</div>
                 <div style="color:#eee; font-size:12px; line-height:1.6; word-break:keep-all;">
                     시작 재화 100메소 • 추가 획득 불가<br>
-                    <span style="color:#ffb74d;">15배속 고정</span> • 몹 50마리 초과 시 패배
+                    <span style="color:#ffb74d;">30배속 고정</span> • 몹 50마리 초과 시 패배
                 </div>
             </div>
             
@@ -308,9 +308,10 @@
                 <div>웨이브: <span id="ui-wave" class="highlight">1</span></div>
                 <div>타이머: <span id="ui-timer" class="highlight">60</span>초</div>
                 <div style="display:flex; gap:5px;">
-                    <button id="btn-speed" class="ingame-btn premium-dark" style="padding: 6px 10px; font-size: 11px;" onclick="toggleSpeed()">1배속</button>
-                    <button id="btn-exit" class="ingame-btn premium-orange" style="padding: 6px 10px; font-size: 11px;" onclick="goToLobby()">로비로</button>
-                </div>
+    <button id="btn-speed" class="ingame-btn premium-dark" style="padding: 6px 10px; font-size: 11px;" onclick="toggleSpeed()">1배속</button>
+    <button id="btn-rank-surrender" class="ingame-btn premium-red" style="padding: 6px 10px; font-size: 11px; display:none;" onclick="surrenderRankGame()">항복</button>
+    <button id="btn-exit" class="ingame-btn premium-orange" style="padding: 6px 10px; font-size: 11px;" onclick="goToLobby()">로비로</button>
+</div>
             </div>
             <button class="ingame-btn premium-blue" style="width: 100%; margin: 8px 0; padding: 10px;" onclick="openActiveSkillsModal()">⭐ 적용중인 스킬 효과 보기</button>
             <div class="stat-row">
