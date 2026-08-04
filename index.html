@@ -105,11 +105,11 @@
     </style>
 </head>
 <body>
-    <!-- 🔥 업데이트 확인 화면 (가장 최상단, 게임 켜자마자 보임) 🔥 -->
+    <!-- 🔥 업데이트 확인 화면 -->
     <div id="update-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; z-index:9999; background: linear-gradient(#0f172a, #020617); color:#fff; display:flex; flex-direction:column; justify-content:center; align-items:center;">
         <img src="image/titlelogo.png" style="width:50%; max-width:200px; margin-bottom: 30px; filter: grayscale(30%) drop-shadow(2px 4px 6px rgba(0,0,0,0.8));">
         <h3 id="update-title" style="color: #fbbf24; margin-bottom: 10px;">버전 확인 중...</h3>
-        <p id="update-desc" style="color: #9ca3af; font-size: 13px;">서버에서 최신 데이터를 확인하고 있습니다.</p>
+        <p id="update-desc" style="color: #9ca3af; font-size: 13px; text-align: center; line-height: 1.5;">서버에서 최신 데이터를 확인하고 있습니다.</p>
         <div style="margin-top: 20px; width: 35px; height: 35px; border: 4px solid rgba(255,255,255,0.1); border-top-color: #fbbf24; border-radius: 50%; animation: spin 1s linear infinite;"></div>
     </div>
 
@@ -147,11 +147,11 @@
         
         <img src="image/titlelogo.png" alt="메이플 디펜스" style="width: 75%; max-width: 320px; margin-top: 50px; margin-bottom: 25px; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.6)); position: relative; z-index: 5;">
         
-        <!-- 👑 최고 기록 뱃지 (가로 콤팩트형) -->
-        <div style="background: linear-gradient(to bottom, #1e3a8a, #0f172a); border: 2px solid #3b82f6; border-radius: 20px; padding: 10px 20px; margin-bottom: 25px; box-shadow: 0 4px 10px rgba(0,0,0,0.6); display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px; white-space: nowrap;">
-            <span style="font-size: 18px; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.8)); line-height: 1;">👑</span>
+        <!-- 👑 최고 기록 뱃지 (완벽한 한줄 고정형 / width: max-content 속성 추가) -->
+        <div style="background: linear-gradient(to bottom, #1e3a8a, #0f172a); border: 2px solid #3b82f6; border-radius: 20px; padding: 12px 25px; margin-bottom: 25px; box-shadow: 0 4px 10px rgba(0,0,0,0.6); display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: max-content; white-space: nowrap;">
+            <span style="font-size: 18px; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.8)); margin-top: -2px;">👑</span>
             <span style="font-size: 15px; font-weight: bold; color: #93c5fd;">최고 웨이브 :</span>
-            <span id="best-record" style="font-size: 20px; font-weight: 900; color: #ffffff; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); line-height: 1;">0</span>
+            <span id="best-record" style="font-size: 20px; font-weight: 900; color: #ffffff; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">0</span>
         </div>
 
         <div style="display:flex; flex-direction:column; gap:10px; width: 85%; max-width: 280px;">
@@ -174,7 +174,7 @@
                 </button>
             </div>
             <button class="premium-btn premium-dark" onclick="openPkMenu()">
-                <div class="btn-left"><span class="btn-icon">🏆</span> 월드 펀킹</div>
+                <div class="btn-left"><span class="btn-icon">🏆</span> 월드 펀치킹</div>
                 <span class="btn-arrow">〉</span>
             </button>
         </div>

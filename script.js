@@ -1,5 +1,5 @@
 // 🔥 향후 코드를 수정할 때마다 이 숫자를 올려주시면 사용자의 폰이 스스로 업데이트를 진행합니다 🔥
-const GAME_VERSION = "1.0.4"; 
+const GAME_VERSION = "1.0.5"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
