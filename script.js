@@ -1,5 +1,5 @@
 // 🔥 버전은 여기서 수정해주시면 됩니다. (HTML 건드릴 필요 없음)
-const GAME_VERSION = "1.0.8"; 
+const GAME_VERSION = "1.0.9"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -22,8 +22,10 @@ const database = getDatabase(app);
 let currentUserName = "이름없는 용사";
 let currentUserUid = null;
 
-// UI에 현재 버전 표시
+// UI에 현재 버전 표시 및 로딩 화면(가림막) 치우기! (핵심)
 document.getElementById('version-display').innerText = `Beta v${GAME_VERSION}`;
+let updateOverlay = document.getElementById('update-overlay');
+if(updateOverlay) updateOverlay.style.display = 'none';
 
 window.syncToCloud = async () => {
     if (!currentUserUid) return;
@@ -171,7 +173,7 @@ husooabiImg.src = "image/husooabi.png";
 const GRADES = [
     { name: "초보자", prob: 50.0, sell: 3, mult: 1, rangeMul: 1 },
     { name: "1차", prob: 33.1, sell: 6, mult: 2, rangeMul: 1 },
-    { name: "2차", prob: 10.2, sell: 9, mult: 4, rangeMul: 1 },
+    { name: "2차", prob: 10.2, sell: 9, 가ult: 4, rangeMul: 1 },
     { name: "3차", prob: 5.1, sell: 16, mult: 8, rangeMul: 1.2, speedMul: 0.8 },
     { name: "4차", prob: 0.8, sell: 30, mult: 16, rangeMul: 1.2 },
     { name: "5차", prob: 0.5, sell: 0, mult: 32, rangeMul: 1.2, splash: true },
