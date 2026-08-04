@@ -1,5 +1,5 @@
-// 🔥 1.0.20 버전 - 상대방 미니보드 UI 레이아웃 완벽 수정
-const GAME_VERSION = "1.0.20"; 
+// 🔥 1.0.22 버전 - 랭크게임 상대방 필드 시야 및 디자인 완벽 구현
+const GAME_VERSION = "1.0.22"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -419,7 +419,7 @@ function getAvailableCoins() {
 
 window.openBookModal = () => {
     document.getElementById('overlay').style.display = 'block';
-    document.getElementById('book-modal').style.display = 'block';
+    document.getElementById('book-modal').style.display = 'block'; 
     window.renderBook();
 };
 
@@ -474,7 +474,7 @@ window.upgradeCard = (bName) => {
 
 window.openShopModal = () => {
     document.getElementById('overlay').style.display = 'block';
-    document.getElementById('shop-modal').style.display = 'block';
+    document.getElementById('shop-modal').style.display = 'block'; 
     window.renderShop('common');
 };
 
@@ -521,7 +521,7 @@ window.upgradeSkill = (key, category) => {
 
 window.openActiveSkillsModal = () => {
     document.getElementById('overlay').style.display = 'block';
-    document.getElementById('active-skills-modal').style.display = 'block';
+    document.getElementById('active-skills-modal').style.display = 'block'; 
     let list = document.getElementById('active-skills-list');
     list.innerHTML = '';
     let hasSkill = false;
@@ -1331,161 +1331,12 @@ function drawOpp() {
     });
 }
 
-function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    ctx.strokeStyle = "rgba(188, 170, 164, 0.2)";
-    ctx.lineWidth = 35;
-    ctx.lineJoin = "round";
-    ctx.beginPath(); ctx.rect(25, 25, 450, canvas.height - 50); ctx.stroke();
-    
-    if (selectedUnitIdx !== -1 && grid[selectedUnitIdx]) {
-        let u = grid[selectedUnitIdx];
-        let range = u.cls.range * u.grade.rangeMul;
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-        ctx.beginPath(); ctx.arc(u.x, u.y, range, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-        ctx.lineWidth = 1; ctx.stroke();
-    }
-    
-    visualEffects.forEach(v => {
-        ctx.save();
-        if (v.type === 'death') {
-            let elapsed = 1.2 - v.timer;
-            let progress = Math.min(1, elapsed / 0.2); 
-
-            ctx.strokeStyle = "#ffeb3b"; 
-            ctx.lineWidth = 8; 
-            ctx.lineCap = "round";
-            ctx.shadowColor = "#f57f17";
-            ctx.shadowBlur = 10;
-
-            let startX = -50, startY = 450;
-            let endX = 550, endY = 50;
-
-            let currentX = startX + (endX - startX) * progress;
-            let currentY = startY + (endY - startY) * progress;
-
-            ctx.beginPath();
-            ctx.moveTo(startX, startY);
-            ctx.lineTo(currentX, currentY);
-            ctx.stroke();
-
-            ctx.strokeStyle = "#fff"; 
-            ctx.lineWidth = 2; 
-            ctx.beginPath();
-            ctx.moveTo(startX, startY);
-            ctx.lineTo(currentX, currentY);
-            ctx.stroke();
-        } else if (v.type === 'thunder') {
-            ctx.fillStyle = `rgba(0, 229, 255, ${v.timer})`; ctx.fillRect(0,0,500,500);
-            ctx.strokeStyle = `rgba(255, 255, 255, ${v.timer * 2})`; ctx.lineWidth = 15;
-            ctx.beginPath(); ctx.moveTo(250,0); ctx.lineTo(200,250); ctx.lineTo(300,250); ctx.lineTo(250,500); ctx.stroke();
-        }
-        ctx.restore();
-    });
-
-    fumaList.forEach(f => {
-        ctx.save();
-        ctx.translate(f.x, f.y); ctx.rotate(f.angle);
-        ctx.fillStyle = "#4a148c"; ctx.shadowColor = "#ea80fc"; ctx.shadowBlur = 10;
-        ctx.beginPath();
-        ctx.moveTo(0, -30); ctx.lineTo(8, -8); ctx.lineTo(30, 0); ctx.lineTo(8, 8);
-        ctx.lineTo(0, 30); ctx.lineTo(-8, 8); ctx.lineTo(-30, 0); ctx.lineTo(-8, -8);
-        ctx.closePath(); ctx.fill();
-        ctx.restore();
-    });
-    
-    monsters.forEach(m => {
-        let size = m.isBoss ? 16 : 10; 
-        
-        if (m.isBoss && bossImages[m.name] && bossImages[m.name].complete && bossImages[m.name].naturalWidth > 0) {
-            ctx.save();
-            ctx.translate(m.x, m.y);
-            if (m.facingRight) ctx.scale(-1, 1);
-            
-            if (m.freezeTimer > 0) {
-                ctx.globalAlpha = 0.5; ctx.fillStyle = "#81d4fa";
-                ctx.fillRect(-size * 1.5, -size * 1.5, size * 3, size * 3);
-                ctx.globalAlpha = 1.0;
-            }
-            ctx.drawImage(bossImages[m.name], -size * 1.5, -size * 1.5, size * 3, size * 3);
-            ctx.restore();
-        } else {
-            if (!m.isBoss) {
-                ctx.fillStyle = m.freezeTimer > 0 ? "#81d4fa" : "#81c784";
-                ctx.beginPath(); ctx.arc(m.x, m.y + 2, size, Math.PI, 0);
-                ctx.fillRect(m.x - size, m.y + 2, size*2, size/2); ctx.fill();
-            } else {
-                ctx.fillStyle = m.freezeTimer > 0 ? "#81d4fa" : "#ff8a65"; 
-                ctx.beginPath(); ctx.arc(m.x, m.y - 2, size, Math.PI, 0); ctx.fill();
-                ctx.fillStyle = m.freezeTimer > 0 ? "#b3e5fc" : "#ffe0b2"; ctx.fillRect(m.x - size/2, m.y - 2, size, size - 2);
-            }
-        }
-        
-        if (m.bindTimer > 0) {
-            ctx.fillStyle = "rgba(0, 200, 255, 0.5)"; 
-            ctx.fillRect(m.x - size - 4, m.y - size - 4, (size + 4) * 2, (size + 4) * 2);
-            ctx.fillStyle = "#fff"; ctx.font = "12px NanumSquare";
-            ctx.fillText("❄️", m.x - 7, m.y + 4); 
-        }
-
-        if (m.stunTimer > 0) {
-            ctx.fillStyle = "#fff"; ctx.font = "14px NanumSquare";
-            ctx.fillText("💫", m.x - 7, m.y - size - 12); 
-        }
-
-        ctx.fillStyle = "#000"; ctx.fillRect(m.x-10, m.y-size-8, 20, 3);
-        ctx.fillStyle = "#4caf50"; ctx.fillRect(m.x-10, m.y-size-8, 20 * (m.hp/m.maxHp), 3);
-    });
-    
-    projectiles.forEach(p => {
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        let dx = p.tx - p.x; let dy = p.ty - p.y;
-        let dir = Math.atan2(dy, dx);
-        
-        let scale = p.gradeIdx >= 6 ? 1.5 : 1;
-        if (p.isFinal) { scale *= 1.3; ctx.globalAlpha = 1.0; }
-        else ctx.globalAlpha = 0.8;
-        
-        ctx.scale(scale, scale);
-
-        if (p.type === '전사') {
-            ctx.rotate(dir); ctx.fillStyle = p.isFinal ? "#b71c1c" : "rgba(229, 57, 53, 0.8)";
-            ctx.beginPath(); ctx.arc(0, 0, 15, -Math.PI/2, Math.PI/2);
-            ctx.arc(6, 0, 15, Math.PI/2, -Math.PI/2, true); ctx.fill();
-        } else if (p.type === '법사') {
-            ctx.rotate(dir); ctx.strokeStyle = "#00e5ff"; ctx.lineWidth = p.isFinal ? 5 : 3;
-            ctx.beginPath(); ctx.moveTo(-12, 0); ctx.lineTo(-6, -6);
-            ctx.lineTo(0, 6); ctx.lineTo(6, -6); ctx.lineTo(12, 0); ctx.stroke();
-        } else if (p.type === '도적') {
-            ctx.rotate(p.angle); ctx.fillStyle = "#4a148c"; ctx.beginPath();
-            ctx.moveTo(0, -10); ctx.lineTo(3, -3); ctx.lineTo(10, 0); ctx.lineTo(3, 3);
-            ctx.lineTo(0, 10); ctx.lineTo(-3, 3); ctx.lineTo(-10, 0); ctx.lineTo(-3, -3);
-            ctx.closePath(); ctx.fill();
-        }
-        ctx.restore();
-    });
-
-    hitEffects.forEach(h => {
-        let alpha = h.timer / 0.2; 
-        let radius = 5 + (0.2 - h.timer) * 100; 
-        ctx.save(); ctx.globalAlpha = alpha; ctx.strokeStyle = h.color; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.arc(h.x, h.y, radius, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
-    });
-
-    damageTexts.forEach(d => {
-        ctx.save();
-        ctx.globalAlpha = d.timer / 0.8;
-        ctx.fillStyle = "#ffeb3b"; ctx.font = "bold 16px NanumSquare";
-        ctx.shadowColor = "#c62828"; ctx.shadowBlur = 4;
-        ctx.fillText(d.val, d.x - 10, d.y);
-        ctx.restore();
-    });
-}
-
 function updateUI() {
+    let skipWrapper = document.getElementById('boss-skip-wrapper');
+    // 🔥 랭크 게임 중에는 보스 스킵 불가 처리 (동기화 이슈 방지)
+    if (state.isBoss && monsters.length === 0 && waveTimer > 0 && !state.isRank) skipWrapper.style.display = 'flex';
+    else skipWrapper.style.display = 'none';
+
     document.getElementById('ui-meso').innerText = state.meso;
     document.getElementById('ui-mp').innerText = state.mp;
     document.getElementById('ui-wave').innerText = state.wave;
@@ -1502,10 +1353,6 @@ function updateUI() {
     if (selectedUnitIdx !== -1 && grid[selectedUnitIdx] && grid[selectedUnitIdx].grade.sell > 0) {
         sellBtn.disabled = false;
     } else { sellBtn.disabled = true; }
-    
-    let skipWrapper = document.getElementById('boss-skip-wrapper');
-    if (state.isBoss && monsters.length === 0 && waveTimer > 0) skipWrapper.style.display = 'flex';
-    else skipWrapper.style.display = 'none';
 
     if (state.upgrades) {
         document.getElementById('upg-w-val').innerText = state.upgrades['전사'].val;
