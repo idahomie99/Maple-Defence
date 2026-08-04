@@ -1,5 +1,5 @@
-// 🔥 1.0.15 버전 - 투명 유닛 렌더링 버그 수정
-const GAME_VERSION = "1.0.15"; 
+// 🔥 1.0.17 버전 - 치명적 문법 에러 복구 및 모험모드 정상화
+const GAME_VERSION = "1.0.17"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -21,7 +21,6 @@ const database = getDatabase(app);
 
 let currentUserName = "이름없는 용사";
 let currentUserUid = null;
-
 let userRankData = { rp: 1000, rankMoney: 0, monsterPieces: 0, bonusCoins: 0 };
 
 document.getElementById('version-display').innerText = `Beta v${GAME_VERSION}`;
@@ -214,12 +213,7 @@ function getBossInfo(w) {
     if (w >= 100 && w % 5 === 0) {
         let n = (w - 100) / 5;
         let calculatedHp = 2000000 + (n * 1000000) + (Math.pow(n, 2) * 150000);
-        
-        let bName;
-        if (BOSS_WAVES[w]) bName = BOSS_WAVES[w].name;
-        else if (w % 10 === 5) bName = "어둠의 늑대";
-        else bName = `심연의 보스 (${w}층)`;
-
+        let bName = BOSS_WAVES[w] ? BOSS_WAVES[w].name : (w % 10 === 5 ? "어둠의 늑대" : `심연의 보스 (${w}층)`);
         let bMeso = BOSS_WAVES[w] ? BOSS_WAVES[w].meso : 150;
         let bTicket = BOSS_WAVES[w] ? BOSS_WAVES[w].ticket : 5;
         return { hp: Math.floor(calculatedHp), meso: bMeso, ticket: bTicket, name: bName };
@@ -235,7 +229,7 @@ let state = {
 
 let grid = new Array(25).fill(null);
 let monsters = [], projectiles = [], towers = [];
-let hitEffects = []; let visualEffects = []; let fumaList = []; let damageTexts = [];
+let hitEffects = [], visualEffects = [], fumaList = [], damageTexts = [];
 let lastTime = 0, waveTimer = 0, spawnTimer = 0;
 let selectedUnitIdx = -1; 
 let mainReqId; 
@@ -245,9 +239,7 @@ const ctx = canvas.getContext('2d');
 const gridContainer = document.getElementById('grid-container');
 const PATH = [ {x:25,y:25}, {x:475,y:25}, {x:475,y:475}, {x:25,y:475} ];
 
-// ==========================================
 // 🔥 온라인 모드 창 로직 🔥
-// ==========================================
 window.openOnlineMenu = () => {
     if (!currentUserUid) return alert("로그인이 필요한 서비스입니다.");
     document.getElementById('online-overlay').style.display = 'flex';
@@ -268,7 +260,7 @@ window.openRankLobbyFromOnline = () => {
     window.openRankLobby();
 };
 
-// 최초 1회만 DOM을 생성하도록 유지 (투명 유닛 버그 해결의 핵심)
+// 그리드 최초 세팅
 function initGrid() {
     gridContainer.innerHTML = '';
     for(let i=0; i<25; i++) {
@@ -302,6 +294,9 @@ window.loadAndStartGame = () => {
     state.speed = 1;
     document.getElementById('btn-speed').innerText = "1배속";
     document.getElementById('btn-speed').style.display = 'block';
+    
+    // 🔥 로비 나가기 버튼 부활 🔥
+    document.getElementById('btn-exit').style.display = 'block';
     document.getElementById('rank-opp-ui').style.display = 'none';
     
     grid = new Array(25).fill(null); towers = [];
@@ -319,13 +314,17 @@ window.startNewGame = () => {
     localStorage.removeItem('mapleDefenseSave');
     
     state = {
-        status: 'PREP', meso: 25, mp: 0, mpTotal: 0, kills: 0, wave: 1, time: 30, speed: 1, isBoss: false,
+        // 🔥 대기 시간 5초로 정상화 🔥
+        status: 'PREP', meso: 25, mp: 0, mpTotal: 0, kills: 0, wave: 1, time: 5, speed: 1, isBoss: false,
         upgrades: { '전사': {val: 0, cost: 10}, '법사': {val: 0, cost: 10}, '도적': {val: 0, cost: 10} },
         tickets: [], isRank: false
     };
     
     document.getElementById('btn-speed').innerText = "1배속";
     document.getElementById('btn-speed').style.display = 'block';
+    
+    // 🔥 로비 나가기 버튼 부활 🔥
+    document.getElementById('btn-exit').style.display = 'block';
     document.getElementById('rank-opp-ui').style.display = 'none';
     
     grid = new Array(25).fill(null);
@@ -334,7 +333,6 @@ window.startNewGame = () => {
     waveTimer = 0; spawnTimer = 0; selectedUnitIdx = -1;
     bestWave = parseInt(localStorage.getItem('mapleDefenseBestWave')) || 0;
     
-    // ✨ 투명 유닛 해결: DOM 파괴하는 initGrid() 삭제하고 renderGrid()로 교체
     renderGrid();
     window.switchScreen('game-container');
     lastTime = performance.now(); 
@@ -343,6 +341,7 @@ window.startNewGame = () => {
     updateUI(); mainReqId = requestAnimationFrame(loop);
 };
 
+// 🔥 로비로 나가기 로직 완벽 복구 🔥
 window.goToLobby = () => { 
     if(!state.isRank) window.saveGameData(); 
     state.status = 'TITLE';
@@ -498,6 +497,16 @@ window.openActiveSkillsModal = () => {
     if(!hasSkill) list.innerHTML = `<div style="text-align:center; padding: 20px; font-weight:bold; color:#666;">적용중인 스킬이 없습니다.</div>`;
 };
 
+window.closeAllModals = () => {
+    if (state.status === 'GAMEOVER') return; 
+    document.getElementById('overlay').style.display = 'none';
+    document.getElementById('bulk-sell-modal').style.display = 'none';
+    document.getElementById('ticket-modal').style.display = 'none';
+    document.getElementById('book-modal').style.display = 'none';
+    document.getElementById('shop-modal').style.display = 'none';
+    document.getElementById('active-skills-modal').style.display = 'none';
+};
+
 function getGradeByProb() {
     let rand = Math.random() * 100; let acc = 0;
     for(let i=0; i<GRADES.length; i++) { acc += GRADES[i].prob; if(rand <= acc) return i; }
@@ -562,9 +571,17 @@ window.onCellClick = (idx) => {
         else {
             let target = grid[idx];
             grid[idx] = grid[selectedUnitIdx];
-            grid[idx].idx = idx; grid[idx].x = 75 + (idx % 5) * 70 + 35; grid[idx].y = 75 + Math.floor(idx / 5) * 70 + 35;
+            if (grid[idx]) {
+                grid[idx].idx = idx; 
+                grid[idx].x = 75 + (idx % 5) * 70 + 35; 
+                grid[idx].y = 75 + Math.floor(idx / 5) * 70 + 35;
+            }
             grid[selectedUnitIdx] = target;
-            if(target) { target.idx = selectedUnitIdx; target.x = 75 + (selectedUnitIdx % 5) * 70 + 35; target.y = 75 + Math.floor(selectedUnitIdx / 5) * 70 + 35; }
+            if(target) { 
+                target.idx = selectedUnitIdx; 
+                target.x = 75 + (selectedUnitIdx % 5) * 70 + 35; 
+                target.y = 75 + Math.floor(selectedUnitIdx / 5) * 70 + 35; 
+            }
             selectedUnitIdx = -1; 
         }
     } else { if (grid[idx]) selectedUnitIdx = idx; }
@@ -602,18 +619,9 @@ window.executeBulkSell = (type, value) => {
     window.closeAllModals();
 };
 
-window.closeAllModals = () => {
-    if (state.status === 'GAMEOVER') return; 
-    document.getElementById('overlay').style.display = 'none';
-    document.getElementById('bulk-sell-modal').style.display = 'none';
-    document.getElementById('ticket-modal').style.display = 'none';
-    document.getElementById('book-modal').style.display = 'none';
-    document.getElementById('shop-modal').style.display = 'none';
-    document.getElementById('active-skills-modal').style.display = 'none';
-};
-
 function renderGrid() {
     let cells = gridContainer.children;
+    if(!cells || cells.length === 0) return;
     for(let i=0; i<25; i++) {
         let u = grid[i];
         cells[i].className = 'grid-cell';
@@ -742,7 +750,7 @@ window.useTicket = (choice) => {
 };
 
 window.toggleSpeed = () => {
-    if(state.isRank) return; 
+    if(state.isRank) return; // 랭크 게임은 배속 조절 불가
     if (state.speed === 1) state.speed = 10;
     else if (state.speed === 10) state.speed = 15;
     else state.speed = 1;
@@ -1227,37 +1235,23 @@ function gameOver(msg) {
     if (currentUserUid) window.syncToCloud();
 }
 
-
 // ==========================================
 // 월드 펀치킹 시스템
 // ==========================================
-let pkReqId;
-let pkState = {
-    active: false, time: 60, score: 0, lastTime: 0, speed: 1, bestScore: 0,
-    unit: null, scarecrow: { x: 390, y: 250, size: 20, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0 },
-    projectiles: [], dmgTexts: [], vfx: []
-};
-
 window.loadPkLiveRanking = async () => {
     let list = document.getElementById('pk-live-ranking-list');
     if(!list) return;
     try {
-        const dbRef = ref(database);
-        const snapshot = await get(child(dbRef, `pk_rankings`));
-        if (snapshot.exists()) {
+        const snap = await get(child(ref(database), `pk_rankings`));
+        if (snap.exists()) {
             let ranks = [];
-            snapshot.forEach(childSnap => { ranks.push(childSnap.val()); });
+            snap.forEach(c => ranks.push(c.val()));
             ranks.sort((a, b) => b.score - a.score);
             ranks = ranks.slice(0, 10);
-            
             list.innerHTML = '';
             ranks.forEach((entry, idx) => {
                 let color = idx === 0 ? '#ffd700' : (idx === 1 ? '#e0e0e0' : (idx === 2 ? '#cd7f32' : '#fff'));
-                list.innerHTML += `
-                <div style="display:flex; justify-content:space-between; background:rgba(255,255,255,0.1); padding:6px 10px; border-radius:4px; color:${color}; font-weight:bold;">
-                    <span>${idx + 1}. ${entry.nickname} <span style="font-size:10px; color:#aaa;">(${entry.class})</span></span>
-                    <span>${entry.score.toLocaleString()}점</span>
-                </div>`;
+                list.innerHTML += `<div style="display:flex; justify-content:space-between; background:rgba(255,255,255,0.1); padding:6px 10px; border-radius:4px; color:${color}; font-weight:bold;"><span>${idx + 1}. ${entry.nickname} <span style="font-size:10px; color:#aaa;">(${entry.class})</span></span><span>${entry.score.toLocaleString()}점</span></div>`;
             });
         } else {
             list.innerHTML = '<div style="text-align:center; color:#ccc;">아직 등록된 랭킹이 없습니다.</div>';
@@ -1298,11 +1292,10 @@ window.showPkRanking = async () => {
     list.innerHTML = '<div style="text-align:center; padding:20px; color:#fff;">서버에서 랭킹을 불러오는 중...</div>';
     
     try {
-        const dbRef = ref(database);
-        const snapshot = await get(child(dbRef, `pk_rankings`));
-        if (snapshot.exists()) {
+        const snap = await get(child(ref(database), `pk_rankings`));
+        if (snap.exists()) {
             let ranks = [];
-            snapshot.forEach(childSnap => { ranks.push(childSnap.val()); });
+            snap.forEach(c => ranks.push(c.val()));
             ranks.sort((a, b) => b.score - a.score);
             ranks = ranks.slice(0, 10);
             list.innerHTML = '';
@@ -1324,6 +1317,7 @@ window.togglePkSpeed = () => {
 window.startPkGame = async (clsName) => {
     document.getElementById('pk-overlay').style.display = 'none'; 
     window.switchScreen('pk-game');
+    window.loadPkLiveRanking();
     
     let grade = GRADES[8]; let cls = CLASSES[clsName];
     document.getElementById('pk-unit-icon').innerText = cls.icon;
@@ -1332,8 +1326,8 @@ window.startPkGame = async (clsName) => {
     let bestScore = 0;
     if (currentUserUid) {
         try {
-            let snapshot = await get(child(ref(database), `pk_rankings/${currentUserUid}`));
-            if(snapshot.exists()) bestScore = snapshot.val().score;
+            let snap = await get(child(ref(database), `pk_rankings/${currentUserUid}`));
+            if(snap.exists()) bestScore = snap.val().score;
         } catch(e) {}
     }
 
@@ -1530,11 +1524,10 @@ window.submitPkScore = async () => {
     if(btnSubmit) { btnSubmit.disabled = true; btnSubmit.innerText = "서버에 저장 중..."; }
 
     try {
-        const dbRef = ref(database);
-        const snapshot = await get(child(dbRef, `pk_rankings/${currentUserUid}`));
+        const snap = await get(child(ref(database), `pk_rankings/${currentUserUid}`));
         
-        if (snapshot.exists()) {
-            const data = snapshot.val();
+        if (snap.exists()) {
+            const data = snap.val();
             if (finalScore > data.score) {
                 await set(ref(database, `pk_rankings/${currentUserUid}`), {
                     nickname: currentUserName, class: className, score: finalScore, date: new Date().toLocaleDateString()
@@ -1618,7 +1611,7 @@ function drawPk() {
             pkCtx.arc(6, 0, 15, Math.PI/2, -Math.PI/2, true); pkCtx.fill();
         } else if (p.type === '법사') {
             pkCtx.rotate(dir); pkCtx.strokeStyle = "#00e5ff"; pkCtx.lineWidth = p.isFinal ? 5 : 3;
-            ctx.beginPath(); pkCtx.moveTo(-12, 0); pkCtx.lineTo(-6, -6);
+            pkCtx.beginPath(); pkCtx.moveTo(-12, 0); pkCtx.lineTo(-6, -6);
             pkCtx.lineTo(0, 6); pkCtx.lineTo(6, -6); pkCtx.lineTo(12, 0); pkCtx.stroke();
         } else if (p.type === '도적') {
             pkCtx.rotate(p.angle); pkCtx.fillStyle = "#4a148c"; pkCtx.beginPath();
@@ -1680,69 +1673,9 @@ function drawPk() {
     });
 }
 
-
 // ==========================================
 // 🔥 실시간 1:1 PVP 랭크 게임 시스템 🔥
 // ==========================================
-let rankState = {
-    active: false,
-    roomId: null,
-    opponentUid: null,
-    myStatus: 'WAITING', // PLAYING, DEAD
-    oppStatus: 'WAITING',
-    myBossDamage: 0,
-    syncInterval: null
-};
-
-window.openRankLobby = () => {
-    if (!currentUserUid) return alert("로그인이 필요한 서비스입니다.");
-    document.getElementById('ui-rank-rp').innerText = `${userRankData.rp} 점`;
-    document.getElementById('ui-rank-money').innerText = `${userRankData.rankMoney} 원`;
-    
-    document.getElementById('rank-overlay').style.display = 'flex';
-    document.getElementById('rank-lobby-modal').style.display = 'block';
-    document.getElementById('rank-shop-modal').style.display = 'none';
-    document.getElementById('rank-waiting-modal').style.display = 'none';
-};
-
-window.closeRankMenu = () => {
-    document.getElementById('rank-overlay').style.display = 'none';
-};
-
-window.openRankShop = () => {
-    document.getElementById('ui-shop-rank-money').innerText = userRankData.rankMoney;
-    document.getElementById('ui-shop-pieces').innerText = userRankData.monsterPieces;
-    document.getElementById('rank-lobby-modal').style.display = 'none';
-    document.getElementById('rank-shop-modal').style.display = 'block';
-};
-
-window.closeRankShop = () => {
-    document.getElementById('rank-shop-modal').style.display = 'none';
-    document.getElementById('rank-lobby-modal').style.display = 'block';
-    document.getElementById('ui-rank-rp').innerText = `${userRankData.rp} 점`;
-    document.getElementById('ui-rank-money').innerText = `${userRankData.rankMoney} 원`;
-};
-
-window.buyMonsterPiece = async () => {
-    if (userRankData.rankMoney >= 100) {
-        userRankData.rankMoney -= 100;
-        userRankData.monsterPieces += 1;
-        document.getElementById('ui-shop-rank-money').innerText = userRankData.rankMoney;
-        document.getElementById('ui-shop-pieces').innerText = userRankData.monsterPieces;
-        await window.syncToCloud();
-    } else { alert("랭크 머니가 부족합니다."); }
-};
-
-window.exchangeMonsterCoin = async () => {
-    if (userRankData.monsterPieces >= 5) {
-        userRankData.monsterPieces -= 5;
-        userRankData.bonusCoins += 1; 
-        document.getElementById('ui-shop-pieces').innerText = userRankData.monsterPieces;
-        await window.syncToCloud();
-        alert("몬스터 조각 5개를 코인 1개로 교환했습니다!\n(도감 상점에서 사용 가능)");
-    } else { alert("몬스터 조각이 부족합니다. (5개 필요)"); }
-};
-
 window.startRankMatchmaking = async () => {
     document.getElementById('rank-lobby-modal').style.display = 'none';
     document.getElementById('rank-waiting-modal').style.display = 'block';
@@ -1812,11 +1745,11 @@ function enterRankGame(roomId, oppUidKnown) {
     hitEffects = []; visualEffects = []; fumaList = []; damageTexts = [];
     waveTimer = 0; spawnTimer = 0; selectedUnitIdx = -1;
     
-    // ✨ 투명 유닛 버그 해결 지점
     renderGrid();
     window.switchScreen('game-container');
     
     document.getElementById('btn-speed').style.display = 'none';
+    // 🔥 랭크 게임 중에는 튀지 못하게 나가기 버튼 감춤
     document.getElementById('btn-exit').style.display = 'none';
     document.getElementById('rank-opp-ui').style.display = 'flex';
     document.getElementById('opp-wave').innerText = '1';
@@ -1891,6 +1824,7 @@ function handleRankGameOver(msg) {
     }, 2000);
 }
 
+// 🔥 지난번에 끊겼던 랭크 결과 처리 로직 완벽 복구 🔥
 async function processRankResult(result, desc) {
     if(!rankState.active) return;
     rankState.active = false;
