@@ -1331,6 +1331,127 @@ function drawOpp() {
     });
 }
 
+function draw() {
+    if (!ctx) return;
+    
+    // 1. 캔버스 초기화
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // 2. 맵 경로 (타일 라인) 그리기
+    ctx.strokeStyle = "rgba(188, 170, 164, 0.2)";
+    ctx.lineWidth = 35;
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    // 랭크 게임(2x5)과 모험 모드(5x5)의 캔버스 크기에 맞춰 경로 테두리 크기 조절
+    if (state.isRank) {
+        ctx.rect(25, 25, 450, 240);
+    } else {
+        ctx.rect(25, 25, 450, 450);
+    }
+    ctx.stroke();
+
+    // 3. 광역 스킬 (데스폴트, 썬더 브레이크) 이펙트 그리기
+    visualEffects.forEach(v => {
+        ctx.save();
+        if (v.type === 'death') {
+            let progress = Math.min(1, (1.2 - v.timer) / 0.2); 
+            ctx.strokeStyle = "#ffeb3b"; ctx.lineWidth = 8; ctx.lineCap = "round"; ctx.shadowColor = "#f57f17"; ctx.shadowBlur = 10;
+            let currentX = -50 + (600) * progress; let currentY = 450 + (-400) * progress;
+            ctx.beginPath(); ctx.moveTo(-50, 450); ctx.lineTo(currentX, currentY); ctx.stroke();
+        } else if (v.type === 'thunder') {
+            ctx.fillStyle = `rgba(0, 229, 255, ${v.timer})`; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = `rgba(255, 255, 255, ${v.timer * 2})`; ctx.lineWidth = 15;
+            ctx.beginPath(); ctx.moveTo(canvas.width / 2, 0); ctx.lineTo(canvas.width / 2 - 50, canvas.height / 2); ctx.lineTo(canvas.width / 2 + 50, canvas.height / 2); ctx.lineTo(canvas.width / 2, canvas.height); ctx.stroke();
+        }
+        ctx.restore();
+    });
+
+    // 4. 타격 이펙트 (6차 이상 유닛) 그리기
+    hitEffects.forEach(h => {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, h.timer / 0.2);
+        ctx.fillStyle = h.color || "#fff";
+        ctx.shadowColor = h.color || "#fff";
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(h.x, h.y, 15 - (h.timer * 30), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    });
+
+    // 5. 풍마 수리검 그리기
+    fumaList.forEach(f => {
+        ctx.save();
+        ctx.translate(f.x, f.y); ctx.rotate(f.angle);
+        ctx.fillStyle = "#4a148c"; ctx.shadowColor = "#ea80fc"; ctx.shadowBlur = 10;
+        ctx.beginPath(); ctx.moveTo(0, -30); ctx.lineTo(8, -8); ctx.lineTo(30, 0); ctx.lineTo(8, 8); ctx.lineTo(0, 30); ctx.lineTo(-8, 8); ctx.lineTo(-30, 0); ctx.lineTo(-8, -8); ctx.closePath(); ctx.fill();
+        ctx.restore();
+    });
+    
+    // 6. 몬스터 그리기
+    monsters.forEach(m => {
+        let size = m.isBoss ? 16 : 10; 
+        
+        if (m.isBoss && bossImages[m.name] && bossImages[m.name].complete) {
+            ctx.save(); ctx.translate(m.x, m.y); if (m.facingRight) ctx.scale(-1, 1);
+            if (m.freezeTimer > 0) { ctx.globalAlpha = 0.5; ctx.fillStyle = "#81d4fa"; ctx.fillRect(-size * 1.5, -size * 1.5, size * 3, size * 3); ctx.globalAlpha = 1.0; }
+            if (m.bindTimer > 0) { ctx.globalAlpha = 0.5; ctx.fillStyle = "#00e5ff"; ctx.fillRect(-size * 1.5, -size * 1.5, size * 3, size * 3); ctx.globalAlpha = 1.0; }
+            ctx.drawImage(bossImages[m.name], -size * 1.5, -size * 1.5, size * 3, size * 3); ctx.restore();
+        } else {
+            if (!m.isBoss) { 
+                ctx.fillStyle = m.freezeTimer > 0 ? "#81d4fa" : (m.bindTimer > 0 ? "#00e5ff" : "#81c784"); 
+                ctx.beginPath(); ctx.arc(m.x, m.y + 2, size, Math.PI, 0); ctx.fillRect(m.x - size, m.y + 2, size*2, size/2); ctx.fill(); 
+            } else { 
+                ctx.fillStyle = m.freezeTimer > 0 ? "#81d4fa" : (m.bindTimer > 0 ? "#00e5ff" : "#ff8a65"); 
+                ctx.beginPath(); ctx.arc(m.x, m.y - 2, size, Math.PI, 0); ctx.fill(); 
+                ctx.fillStyle = m.freezeTimer > 0 ? "#b3e5fc" : (m.bindTimer > 0 ? "#84ffff" : "#ffe0b2"); 
+                ctx.fillRect(m.x - size/2, m.y - 2, size, size - 2); 
+            }
+        }
+        
+        // 스턴/바인드 텍스트 표시
+        if (m.bindTimer > 0) { ctx.fillStyle = "#00e5ff"; ctx.font = "bold 12px sans-serif"; ctx.fillText("Bind!", m.x - 15, m.y - size - 15); }
+        else if (m.stunTimer > 0) { ctx.fillStyle = "#ffeb3b"; ctx.font = "bold 12px sans-serif"; ctx.fillText("Stun!", m.x - 15, m.y - size - 15); }
+
+        // 체력바 표시
+        ctx.fillStyle = "#000"; ctx.fillRect(m.x-10, m.y-size-8, 20, 3);
+        ctx.fillStyle = "#4caf50"; ctx.fillRect(m.x-10, m.y-size-8, 20 * (m.hp/m.maxHp), 3);
+    });
+    
+    // 7. 일반 투사체 그리기
+    projectiles.forEach(p => {
+        ctx.save(); ctx.translate(p.x, p.y);
+        let dir = Math.atan2(p.ty - p.y, p.tx - p.x);
+        let scale = p.gradeIdx >= 6 ? 1.5 : 1;
+        if (p.isFinal) { scale *= 1.3; ctx.globalAlpha = 1.0; } else ctx.globalAlpha = 0.8;
+        ctx.scale(scale, scale);
+        
+        if (p.type === '전사') { 
+            ctx.rotate(dir); ctx.fillStyle = p.isFinal ? "#b71c1c" : "rgba(229, 57, 53, 0.8)"; 
+            ctx.beginPath(); ctx.arc(0, 0, 15, -Math.PI/2, Math.PI/2); ctx.arc(6, 0, 15, Math.PI/2, -Math.PI/2, true); ctx.fill(); 
+        } else if (p.type === '법사') { 
+            ctx.rotate(dir); ctx.strokeStyle = "#00e5ff"; ctx.lineWidth = p.isFinal ? 5 : 3; 
+            ctx.beginPath(); ctx.moveTo(-12, 0); ctx.lineTo(-6, -6); ctx.lineTo(0, 6); ctx.lineTo(6, -6); ctx.lineTo(12, 0); ctx.stroke(); 
+        } else if (p.type === '도적') { 
+            ctx.rotate(p.angle); ctx.fillStyle = "#4a148c"; 
+            ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(3, -3); ctx.lineTo(10, 0); ctx.lineTo(3, 3); ctx.lineTo(0, 10); ctx.lineTo(-3, 3); ctx.lineTo(-10, 0); ctx.lineTo(-3, -3); ctx.closePath(); ctx.fill(); 
+        }
+        ctx.restore();
+    });
+
+    // 8. 데미지 텍스트 렌더링
+    damageTexts.forEach(d => {
+        ctx.save(); 
+        ctx.globalAlpha = Math.max(0, d.timer / 0.8); 
+        ctx.fillStyle = "#ffeb3b"; 
+        ctx.font = "bold 16px sans-serif"; 
+        ctx.shadowColor = "#c62828"; 
+        ctx.shadowBlur = 4; 
+        ctx.fillText(d.val, d.x - 10, d.y); 
+        ctx.restore();
+    });
+}
+
 function updateUI() {
     let skipWrapper = document.getElementById('boss-skip-wrapper');
     // 🔥 랭크 게임 중에는 보스 스킵 불가 처리 (동기화 이슈 방지)
@@ -1755,8 +1876,8 @@ function drawPk() {
             pkCtx.beginPath(); pkCtx.arc(0, 0, 15, -Math.PI/2, Math.PI/2);
             pkCtx.arc(6, 0, 15, Math.PI/2, -Math.PI/2, true); pkCtx.fill();
         } else if (p.type === '법사') {
-            pkCtx.rotate(dir); pkCtx.strokeStyle = "#00e5ff"; pkCtx.lineWidth = p.isFinal ? 5 : 3;
-            ctx.beginPath(); pkCtx.moveTo(-12, 0); pkCtx.lineTo(-6, -6);
+    pkCtx.rotate(dir); pkCtx.strokeStyle = "#00e5ff"; pkCtx.lineWidth = p.isFinal ? 5 : 3;
+    pkCtx.beginPath(); pkCtx.moveTo(-12, 0); pkCtx.lineTo(-6, -6);
             pkCtx.lineTo(0, 6); pkCtx.lineTo(6, -6); pkCtx.lineTo(12, 0); pkCtx.stroke();
         } else if (p.type === '도적') {
             pkCtx.rotate(p.angle); pkCtx.fillStyle = "#4a148c"; pkCtx.beginPath();
