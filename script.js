@@ -1,5 +1,5 @@
 // 🔥 버전은 여기서 수정해주시면 됩니다. (HTML 건드릴 필요 없음)
-const GAME_VERSION = "1.0.10"; 
+const GAME_VERSION = "1.0.11"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -22,7 +22,7 @@ const database = getDatabase(app);
 let currentUserName = "이름없는 용사";
 let currentUserUid = null;
 
-// UI에 현재 버전 표시 및 로딩 화면(가림막) 치우기! (핵심)
+// UI에 현재 버전 표시 및 로딩 화면(가림막) 치우기!
 document.getElementById('version-display').innerText = `Beta v${GAME_VERSION}`;
 let updateOverlay = document.getElementById('update-overlay');
 if(updateOverlay) updateOverlay.style.display = 'none';
@@ -60,7 +60,7 @@ window.switchScreen = (screenId) => {
     }
 };
 
-// 곧바로 로그인 및 데이터 로드 시작 (루프 없음)
+// 곧바로 로그인 및 데이터 로드 시작
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUserUid = user.uid;
@@ -173,7 +173,7 @@ husooabiImg.src = "image/husooabi.png";
 const GRADES = [
     { name: "초보자", prob: 50.0, sell: 3, mult: 1, rangeMul: 1 },
     { name: "1차", prob: 33.1, sell: 6, mult: 2, rangeMul: 1 },
-    { name: "2차", prob: 10.2, sell: 9, 가ult: 4, rangeMul: 1 },
+    { name: "2차", prob: 10.2, sell: 9, mult: 4, rangeMul: 1 },
     { name: "3차", prob: 5.1, sell: 16, mult: 8, rangeMul: 1.2, speedMul: 0.8 },
     { name: "4차", prob: 0.8, sell: 30, mult: 16, rangeMul: 1.2 },
     { name: "5차", prob: 0.5, sell: 0, mult: 32, rangeMul: 1.2, splash: true },
@@ -840,11 +840,17 @@ function loop() {
         t.lastAttack -= dt * 1000;
         if(t.lastAttack <= 0) {
             let range = t.cls.range * t.grade.rangeMul;
-            let target = null, minDist = range;
+            let target = null;
+            
+            // 🔥 디펜스 국룰 타겟팅: 범위 내 가장 먼저 스폰된(앞서가는) 적부터 점사!
             for(let m of monsters) {
                 let d = Math.hypot(m.x - t.x, m.y - t.y);
-                if(d <= minDist) { minDist = d; target = m; }
+                if(d <= range) { 
+                    target = m; 
+                    break; // 가장 오래된 놈을 찾으면 딴 데 안 보고 얘만 팸
+                }
             }
+
             if(target) {
                 let dmg = (t.cls.baseDmg + (state.upgrades[t.cls.type].val * 0.15)) * t.grade.mult * cardMulti * rageMulti;
                 
