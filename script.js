@@ -1,5 +1,5 @@
-// 🔥 1.0.14 버전 - 온라인 모드 폴더(선택창) 업데이트
-const GAME_VERSION = "1.0.14"; 
+// 🔥 1.0.15 버전 - 투명 유닛 렌더링 버그 수정
+const GAME_VERSION = "1.0.15"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -268,6 +268,7 @@ window.openRankLobbyFromOnline = () => {
     window.openRankLobby();
 };
 
+// 최초 1회만 DOM을 생성하도록 유지 (투명 유닛 버그 해결의 핵심)
 function initGrid() {
     gridContainer.innerHTML = '';
     for(let i=0; i<25; i++) {
@@ -333,7 +334,8 @@ window.startNewGame = () => {
     waveTimer = 0; spawnTimer = 0; selectedUnitIdx = -1;
     bestWave = parseInt(localStorage.getItem('mapleDefenseBestWave')) || 0;
     
-    initGrid();
+    // ✨ 투명 유닛 해결: DOM 파괴하는 initGrid() 삭제하고 renderGrid()로 교체
+    renderGrid();
     window.switchScreen('game-container');
     lastTime = performance.now(); 
     
@@ -740,7 +742,7 @@ window.useTicket = (choice) => {
 };
 
 window.toggleSpeed = () => {
-    if(state.isRank) return; // 랭크 게임은 배속 조절 불가
+    if(state.isRank) return; 
     if (state.speed === 1) state.speed = 10;
     else if (state.speed === 10) state.speed = 15;
     else state.speed = 1;
@@ -1616,7 +1618,7 @@ function drawPk() {
             pkCtx.arc(6, 0, 15, Math.PI/2, -Math.PI/2, true); pkCtx.fill();
         } else if (p.type === '법사') {
             pkCtx.rotate(dir); pkCtx.strokeStyle = "#00e5ff"; pkCtx.lineWidth = p.isFinal ? 5 : 3;
-            pkCtx.beginPath(); pkCtx.moveTo(-12, 0); pkCtx.lineTo(-6, -6);
+            ctx.beginPath(); pkCtx.moveTo(-12, 0); pkCtx.lineTo(-6, -6);
             pkCtx.lineTo(0, 6); pkCtx.lineTo(6, -6); pkCtx.lineTo(12, 0); pkCtx.stroke();
         } else if (p.type === '도적') {
             pkCtx.rotate(p.angle); pkCtx.fillStyle = "#4a148c"; pkCtx.beginPath();
@@ -1810,7 +1812,8 @@ function enterRankGame(roomId, oppUidKnown) {
     hitEffects = []; visualEffects = []; fumaList = []; damageTexts = [];
     waveTimer = 0; spawnTimer = 0; selectedUnitIdx = -1;
     
-    initGrid();
+    // ✨ 투명 유닛 버그 해결 지점
+    renderGrid();
     window.switchScreen('game-container');
     
     document.getElementById('btn-speed').style.display = 'none';
