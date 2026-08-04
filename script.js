@@ -1,5 +1,5 @@
-// 🔥 1.0.19 버전 - 2x5 랭크 맵, 매칭 인트로, UI 픽스
-const GAME_VERSION = "1.0.19"; 
+// 🔥 1.0.20 버전 - 상대방 미니보드 UI 레이아웃 완벽 수정
+const GAME_VERSION = "1.0.20"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -419,7 +419,7 @@ function getAvailableCoins() {
 
 window.openBookModal = () => {
     document.getElementById('overlay').style.display = 'block';
-    document.getElementById('book-modal').style.display = 'block'; // 🔥 망가짐 완벽 수정!
+    document.getElementById('book-modal').style.display = 'block';
     window.renderBook();
 };
 
@@ -474,7 +474,7 @@ window.upgradeCard = (bName) => {
 
 window.openShopModal = () => {
     document.getElementById('overlay').style.display = 'block';
-    document.getElementById('shop-modal').style.display = 'block'; // 🔥 망가짐 완벽 수정!
+    document.getElementById('shop-modal').style.display = 'block';
     window.renderShop('common');
 };
 
@@ -521,7 +521,7 @@ window.upgradeSkill = (key, category) => {
 
 window.openActiveSkillsModal = () => {
     document.getElementById('overlay').style.display = 'block';
-    document.getElementById('active-skills-modal').style.display = 'block'; // 🔥 망가짐 완벽 수정!
+    document.getElementById('active-skills-modal').style.display = 'block';
     let list = document.getElementById('active-skills-list');
     list.innerHTML = '';
     let hasSkill = false;
@@ -1274,7 +1274,8 @@ function drawOpp() {
     oppCtx.strokeStyle = "rgba(188, 170, 164, 0.2)";
     oppCtx.lineWidth = 35;
     oppCtx.lineJoin = "round";
-    oppCtx.beginPath(); oppCtx.rect(25, 25, 450, oppCanvas.height - 50); oppCtx.stroke();
+    // 🔥 캔버스와 상태바 분리로 인해 전체 화면을 활용해 패스 그리기
+    oppCtx.beginPath(); oppCtx.rect(25, 25, 450, 240); oppCtx.stroke();
     
     oppVisualEffects.forEach(v => {
         oppCtx.save();
@@ -1908,7 +1909,7 @@ function drawPk() {
             pkCtx.arc(6, 0, 15, Math.PI/2, -Math.PI/2, true); pkCtx.fill();
         } else if (p.type === '법사') {
             pkCtx.rotate(dir); pkCtx.strokeStyle = "#00e5ff"; pkCtx.lineWidth = p.isFinal ? 5 : 3;
-            pkCtx.beginPath(); pkCtx.moveTo(-12, 0); pkCtx.lineTo(-6, -6);
+            ctx.beginPath(); pkCtx.moveTo(-12, 0); pkCtx.lineTo(-6, -6);
             pkCtx.lineTo(0, 6); pkCtx.lineTo(6, -6); pkCtx.lineTo(12, 0); pkCtx.stroke();
         } else if (p.type === '도적') {
             pkCtx.rotate(p.angle); pkCtx.fillStyle = "#4a148c"; pkCtx.beginPath();
@@ -2091,7 +2092,7 @@ function enterRankGameAI(oppName, oppRp) {
     document.getElementById('btn-speed').style.display = 'none';
     document.getElementById('btn-exit').style.display = 'none'; 
     
-    document.getElementById('opp-board-wrapper').style.display = 'block';
+    document.getElementById('opp-board-wrapper').style.display = 'flex';
     document.getElementById('opp-name').innerText = oppName;
     document.getElementById('opp-wave').innerText = '1';
     document.getElementById('opp-mobs').innerText = '0';
