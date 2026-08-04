@@ -105,14 +105,6 @@
     </style>
 </head>
 <body>
-    <!-- 🔥 업데이트 확인 화면 -->
-    <div id="update-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; z-index:9999; background: linear-gradient(#0f172a, #020617); color:#fff; display:flex; flex-direction:column; justify-content:center; align-items:center;">
-        <img src="image/titlelogo.png" style="width:50%; max-width:200px; margin-bottom: 30px; filter: grayscale(30%) drop-shadow(2px 4px 6px rgba(0,0,0,0.8));">
-        <h3 id="update-title" style="color: #fbbf24; margin-bottom: 10px;">버전 확인 중...</h3>
-        <p id="update-desc" style="color: #9ca3af; font-size: 13px; text-align: center; line-height: 1.5;">서버에서 최신 데이터를 확인하고 있습니다.</p>
-        <div style="margin-top: 20px; width: 35px; height: 35px; border: 4px solid rgba(255,255,255,0.1); border-top-color: #fbbf24; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-    </div>
-
     <!-- 로그인 화면 -->
     <div id="login-screen" style="display:none; flex-direction:column; justify-content:center; align-items:center; position:fixed; top:0; left:0; width:100%; height:100%; z-index:950; background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.8)), url('image/wallpaper.png') no-repeat center center; background-size: cover;">
         <img src="image/titlelogo.png" alt="메이플 디펜스" style="width: 80%; max-width: 400px; margin-bottom: 40px; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.6));">
@@ -394,6 +386,13 @@
     </div>
 
     <div id="msg-overlay"></div>
-    <script type="module" src="script.js"></script>
+    
+    <!-- 🔥 핵심: 무조건 서버에서 최신 script.js 파일을 강제로 불러오는 캐시 파괴 마법 🔥 -->
+    <script>
+        const script = document.createElement('script');
+        script.type = 'module';
+        script.src = 'script.js?v=' + new Date().getTime();
+        document.body.appendChild(script);
+    </script>
 </body>
 </html>
