@@ -234,6 +234,10 @@ let lastTime = 0, waveTimer = 0, spawnTimer = 0;
 let selectedUnitIdx = -1; 
 let mainReqId; 
 
+let pkState;
+let pkReqId;
+let rankState = { active: false, roomId: null, opponentUid: null, myStatus: 'WAITING', oppStatus: 'WAITING', syncInterval: null, myBossDamage: 0 };
+
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const gridContainer = document.getElementById('grid-container');
@@ -342,13 +346,19 @@ window.startNewGame = () => {
 };
 
 // 🔥 로비로 나가기 로직 완벽 복구 🔥
+// 🛠️ 수정할 코드 (script.js의 goToLobby 함수 전체 덮어쓰기)
 window.goToLobby = () => { 
     if(!state.isRank) window.saveGameData(); 
     state.status = 'TITLE';
     cancelAnimationFrame(mainReqId);
     
-    document.getElementById('gameover-modal').style.display = 'none';
-    document.getElementById('overlay').style.display = 'none';
+    // null 체크 추가
+    let gameOverModal = document.getElementById('gameover-modal');
+    if(gameOverModal) gameOverModal.style.display = 'none';
+    
+    let overlay = document.getElementById('overlay');
+    if(overlay) overlay.style.display = 'none';
+    
     window.closeAllModals();
     
     document.getElementById('best-record').innerText = bestWave;
@@ -651,8 +661,8 @@ function renderGrid() {
         } else { cells[i].innerHTML = ''; }
     }
     
-    let pkBarContainer = document.getElementById('pk-global-bar-container');
-    if(pkBarContainer && pkState && pkState.active && pkState.unit) {
+let pkBarContainer = document.getElementById('pk-global-bar-container');
+    if(pkBarContainer && typeof pkState !== 'undefined' && pkState.active && pkState.unit) {
         let u = pkState.unit;
         if ((u.cls.type === '전사' && skillLevels.war_death > 0) || (u.cls.type === '법사' && skillLevels.mage_thunder > 0) || (u.cls.type === '도적' && skillLevels.thief_fuma > 0)) {
             pkBarContainer.style.display = 'block';
@@ -1676,6 +1686,54 @@ function drawPk() {
 // ==========================================
 // 🔥 실시간 1:1 PVP 랭크 게임 시스템 🔥
 // ==========================================
+window.openRankLobby = () => {
+    document.getElementById('rank-overlay').style.display = 'flex';
+    document.getElementById('rank-lobby-modal').style.display = 'block';
+    document.getElementById('ui-rank-rp').innerText = userRankData.rp + " 점";
+    document.getElementById('ui-rank-money').innerText = userRankData.rankMoney + " 원";
+};
+
+window.closeRankMenu = () => {
+    document.getElementById('rank-overlay').style.display = 'none';
+};
+
+window.openRankShop = () => {
+    document.getElementById('ui-shop-rank-money').innerText = userRankData.rankMoney;
+    document.getElementById('ui-shop-pieces').innerText = userRankData.monsterPieces;
+    document.getElementById('rank-lobby-modal').style.display = 'none';
+    document.getElementById('rank-shop-modal').style.display = 'block';
+};
+
+window.closeRankShop = () => {
+    document.getElementById('rank-shop-modal').style.display = 'none';
+    document.getElementById('rank-lobby-modal').style.display = 'block';
+};
+
+window.buyMonsterPiece = () => {
+    if (userRankData.rankMoney >= 100) {
+        userRankData.rankMoney -= 100;
+        userRankData.monsterPieces += 1;
+        document.getElementById('ui-shop-rank-money').innerText = userRankData.rankMoney;
+        document.getElementById('ui-shop-pieces').innerText = userRankData.monsterPieces;
+        document.getElementById('ui-rank-money').innerText = userRankData.rankMoney + " 원";
+        if (currentUserUid) window.syncToCloud();
+    } else {
+        alert("랭크 머니가 부족합니다.");
+    }
+};
+
+window.exchangeMonsterCoin = () => {
+    if (userRankData.monsterPieces >= 5) {
+        userRankData.monsterPieces -= 5;
+        userRankData.bonusCoins += 1;
+        document.getElementById('ui-shop-pieces').innerText = userRankData.monsterPieces;
+        alert("조각 5개를 코인 1개로 교환했습니다! (스킬 상점에서 사용 가능)");
+        if (currentUserUid) window.syncToCloud();
+    } else {
+        alert("몬스터 조각이 부족합니다. (5개 필요)");
+    }
+};
+
 window.startRankMatchmaking = async () => {
     document.getElementById('rank-lobby-modal').style.display = 'none';
     document.getElementById('rank-waiting-modal').style.display = 'block';
