@@ -1376,7 +1376,8 @@ function drawOpp() {
         } 
         else if (p.type === '도적') { 
             img = p.gradeIdx >= 5 ? projImages.rogue2 : projImages.rogue1; 
-            oppCtx.rotate(p.angle); 
+            if (p.gradeIdx >= 5) size = 25; // 🌟 도적 5차 이상 투사체 사이즈만 25로 축소
+            ctx.rotate(p.angle); 
         }
         
         if (img && img.complete) {
@@ -1490,7 +1491,8 @@ function draw() {
         } 
         else if (p.type === '도적') { 
             img = p.gradeIdx >= 5 ? projImages.rogue2 : projImages.rogue1; 
-            ctx.rotate(p.angle); 
+            if (p.gradeIdx >= 5) size = 25; // 🌟 도적 5차 이상 투사체 사이즈만 25로 축소
+            oppCtx.rotate(p.angle); 
         }
         
         if (img && img.complete) {
@@ -1971,6 +1973,7 @@ function drawPk() {
         } 
         else if (p.type === '도적') { 
             img = projImages.rogue2; 
+            psize = 25; // 🌟 펀치킹 도적 투사체 사이즈 25로 축소
             pkCtx.rotate(p.angle); 
         }
         
