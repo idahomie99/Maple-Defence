@@ -1511,6 +1511,34 @@ function draw() {
     });
 }
 
+damageTexts.forEach(d => {
+        ctx.save(); 
+        ctx.globalAlpha = Math.max(0, d.timer / 0.8); 
+        ctx.fillStyle = "#ffeb3b"; 
+        ctx.font = "bold 16px sans-serif"; 
+        ctx.shadowColor = "#c62828"; 
+        ctx.shadowBlur = 4; 
+        ctx.fillText(d.val, d.x - 10, d.y); 
+        ctx.restore();
+    });
+
+    // 🔥 여기서부터 공격 범위 표시 코드 추가 🔥
+    if (selectedUnitIdx !== -1 && grid[selectedUnitIdx]) {
+        let u = grid[selectedUnitIdx];
+        let currentRange = u.cls.range * u.grade.rangeMul;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(u.x, u.y, currentRange, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.15)"; // 반투명한 흰색 배경
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.6)"; // 흰색 테두리
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 5]); // 점선 스타일
+        ctx.stroke();
+        ctx.restore();
+    }
+}
+
 function updateUI() {
     let skipWrapper = document.getElementById('boss-skip-wrapper');
     if (state.isBoss && monsters.length === 0 && waveTimer > 0 && !state.isRank) skipWrapper.style.display = 'flex';
