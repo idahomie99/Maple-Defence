@@ -1298,6 +1298,7 @@ function loop() {
         }
     }
     
+    // 🔥 투사체 이미지 방향 수정 적용됨
     draw();
     if(state.isRank) drawOpp();
     document.getElementById('ui-mobs').innerText = `${monsters.length} / 50`;
@@ -1363,9 +1364,20 @@ function drawOpp() {
         let img = null;
         let size = p.gradeIdx >= 5 ? 35 : 20;
         
-        if (p.type === '전사') { img = p.gradeIdx >= 5 ? projImages.warrior2 : projImages.warrior1; oppCtx.rotate(dir); } 
-        else if (p.type === '법사') { img = p.gradeIdx >= 5 ? projImages.mage2 : projImages.mage1; oppCtx.rotate(dir); } 
-        else if (p.type === '도적') { img = p.gradeIdx >= 5 ? projImages.rogue2 : projImages.rogue1; oppCtx.rotate(p.angle); }
+        // 🔥 전사 투사체 반전 및 고랭크 법사 15도 추가 회전 (상대방 화면)
+        if (p.type === '전사') { 
+            img = p.gradeIdx >= 5 ? projImages.warrior2 : projImages.warrior1; 
+            oppCtx.rotate(dir + Math.PI); 
+        } 
+        else if (p.type === '법사') { 
+            img = p.gradeIdx >= 5 ? projImages.mage2 : projImages.mage1; 
+            let mageAngle = p.gradeIdx >= 5 ? dir + (15 * Math.PI / 180) : dir;
+            oppCtx.rotate(mageAngle); 
+        } 
+        else if (p.type === '도적') { 
+            img = p.gradeIdx >= 5 ? projImages.rogue2 : projImages.rogue1; 
+            oppCtx.rotate(p.angle); 
+        }
         
         if (img && img.complete) {
             oppCtx.drawImage(img, -size/2, -size/2, size, size);
@@ -1466,9 +1478,20 @@ function draw() {
         let img = null;
         let size = p.gradeIdx >= 5 ? 35 : 20; 
         
-        if (p.type === '전사') { img = p.gradeIdx >= 5 ? projImages.warrior2 : projImages.warrior1; ctx.rotate(dir); } 
-        else if (p.type === '법사') { img = p.gradeIdx >= 5 ? projImages.mage2 : projImages.mage1; ctx.rotate(dir); } 
-        else if (p.type === '도적') { img = p.gradeIdx >= 5 ? projImages.rogue2 : projImages.rogue1; ctx.rotate(p.angle); }
+        // 🔥 전사 투사체 180도 뒤집기 및 고랭크 법사 15도 각도 보정 (메인 화면)
+        if (p.type === '전사') { 
+            img = p.gradeIdx >= 5 ? projImages.warrior2 : projImages.warrior1; 
+            ctx.rotate(dir + Math.PI); // 180도 추가
+        } 
+        else if (p.type === '법사') { 
+            img = p.gradeIdx >= 5 ? projImages.mage2 : projImages.mage1; 
+            let mageAngle = p.gradeIdx >= 5 ? dir + (15 * Math.PI / 180) : dir; // 15도 추가
+            ctx.rotate(mageAngle); 
+        } 
+        else if (p.type === '도적') { 
+            img = p.gradeIdx >= 5 ? projImages.rogue2 : projImages.rogue1; 
+            ctx.rotate(p.angle); 
+        }
         
         if (img && img.complete) {
             ctx.drawImage(img, -size/2, -size/2, size, size);
@@ -1921,9 +1944,19 @@ function drawPk() {
         let img = null;
         let psize = 35; 
         
-        if (p.type === '전사') { img = projImages.warrior2; pkCtx.rotate(dir); } 
-        else if (p.type === '법사') { img = projImages.mage2; pkCtx.rotate(dir); } 
-        else if (p.type === '도적') { img = projImages.rogue2; pkCtx.rotate(p.angle); }
+        // 🔥 전사 투사체 반전 및 고랭크 법사 15도 추가 회전 (펀치킹 화면)
+        if (p.type === '전사') { 
+            img = projImages.warrior2; 
+            pkCtx.rotate(dir + Math.PI); 
+        } 
+        else if (p.type === '법사') { 
+            img = projImages.mage2; 
+            pkCtx.rotate(dir + (15 * Math.PI / 180)); 
+        } 
+        else if (p.type === '도적') { 
+            img = projImages.rogue2; 
+            pkCtx.rotate(p.angle); 
+        }
         
         if (img && img.complete) {
             pkCtx.drawImage(img, -psize/2, -psize/2, psize, psize);
