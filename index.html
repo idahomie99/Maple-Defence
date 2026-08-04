@@ -25,7 +25,7 @@
 
         @keyframes spin { 100% { transform: rotate(360deg); } }
 
-        /* 프리미엄 버튼 공통 스타일 (로비용 큰 버튼) */
+        /* 프리미엄 버튼 공통 스타일 */
         .premium-btn {
             box-sizing: border-box; 
             white-space: nowrap; 
@@ -65,7 +65,7 @@
             font-weight: bold;
         }
 
-        /* 인게임 버튼 공통 스타일 (일반 사이즈) */
+        /* 인게임 버튼 공통 스타일 */
         .ingame-btn {
             box-sizing: border-box;
             white-space: nowrap;
@@ -105,14 +105,6 @@
     </style>
 </head>
 <body>
-    <!-- 🔥 업데이트 확인 화면 -->
-    <div id="update-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; z-index:9999; background: linear-gradient(#0f172a, #020617); color:#fff; display:flex; flex-direction:column; justify-content:center; align-items:center;">
-        <img src="image/titlelogo.png" style="width:50%; max-width:200px; margin-bottom: 30px; filter: grayscale(30%) drop-shadow(2px 4px 6px rgba(0,0,0,0.8));">
-        <h3 id="update-title" style="color: #fbbf24; margin-bottom: 10px;">버전 확인 중...</h3>
-        <p id="update-desc" style="color: #9ca3af; font-size: 13px; text-align: center; line-height: 1.5;">서버에서 최신 데이터를 확인하고 있습니다.</p>
-        <div style="margin-top: 20px; width: 35px; height: 35px; border: 4px solid rgba(255,255,255,0.1); border-top-color: #fbbf24; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-    </div>
-
     <!-- 로그인 화면 -->
     <div id="login-screen" style="display:none; flex-direction:column; justify-content:center; align-items:center; position:fixed; top:0; left:0; width:100%; height:100%; z-index:950; background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.8)), url('image/wallpaper.png') no-repeat center center; background-size: cover;">
         <img src="image/titlelogo.png" alt="메이플 디펜스" style="width: 80%; max-width: 400px; margin-bottom: 40px; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.6));">
@@ -121,7 +113,7 @@
             <button class="ingame-btn premium-white" style="width:100%; padding: 12px 20px;" onclick="loginWithGoogle()">
                 <img src="https://developers.google.com/identity/images/g-logo.png" style="width: 20px;"> 구글 계정으로 로그인
             </button>
-            <p style="color:#aaa; font-size:12px; margin-top:15px; margin-bottom:0;">※ 월드 펀치킹 랭킹 등록을 위해 로그인이 필요합니다.</p>
+            <p style="color:#aaa; font-size:12px; margin-top:15px; margin-bottom:0;">※ 랭크 게임 및 데이터 연동을 위해 로그인이 필요합니다.</p>
         </div>
     </div>
 
@@ -129,7 +121,7 @@
     <div id="nickname-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:2150;"></div>
     <div id="nickname-modal" class="maple-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:2200; width:80%; max-width:300px;">
         <h3 style="color:#1565c0; margin-top:0;">닉네임 설정</h3>
-        <p style="font-size:12px; color:#555; margin-bottom:15px; font-weight:bold;">월드 펀치킹 랭킹에 등록될<br>멋진 닉네임을 정해주세요!</p>
+        <p style="font-size:12px; color:#555; margin-bottom:15px; font-weight:bold;">랭크 게임에 등록될<br>멋진 닉네임을 정해주세요!</p>
         <input type="text" id="nickname-input" style="width:90%; padding:10px; margin-bottom:15px; border:2px solid #8d6e63; border-radius:4px; font-weight:bold; text-align:center; font-size:16px;" maxlength="10" placeholder="최대 10자">
         <button class="ingame-btn premium-blue" style="width:100%;" onclick="submitNickname()">결정</button>
     </div>
@@ -137,7 +129,6 @@
     <!-- 로비 화면 -->
     <div id="start-screen" style="display:none; flex-direction:column; justify-content:center; align-items:center; position:fixed; top:0; left:0; width:100%; height:100%; z-index:900; background: linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.5)), url('image/wallpaper.png') no-repeat center center; background-size: cover;">
         
-        <!-- 🔥 우측 상단 바 위치 위로 올림 (top 속성 수정) 🔥 -->
         <div style="position:absolute; top: max(env(safe-area-inset-top, 15px), 15px); right: 15px; z-index: 100; background: rgba(15, 23, 42, 0.85); border: 1px solid #1e3a8a; border-radius: 20px; padding: 6px 15px; display: flex; align-items: center; gap: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.5); white-space: nowrap;">
             <span style="color:#e2e8f0; font-size: 14px; font-weight: bold; letter-spacing: -0.5px;">접속중: <span id="current-user-name" style="color:#fbbf24;">용사님</span></span>
             <button style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #e2e8f0; padding: 6px 10px; border-radius: 12px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: background 0.2s; white-space: nowrap;" onclick="logout()">
@@ -147,7 +138,6 @@
         
         <img src="image/titlelogo.png" alt="메이플 디펜스" style="width: 75%; max-width: 320px; margin-top: 50px; margin-bottom: 25px; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.6)); position: relative; z-index: 5;">
         
-        <!-- 👑 최고 기록 뱃지 -->
         <div style="background: linear-gradient(to bottom, #1e3a8a, #0f172a); border: 2px solid #3b82f6; border-radius: 12px; padding: 14px 0; margin-bottom: 25px; box-shadow: 0 4px 10px rgba(0,0,0,0.6); width: 85%; max-width: 300px; box-sizing: border-box; text-align: center; white-space: nowrap; overflow: hidden;">
             <span style="font-size: 20px; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.8)); vertical-align: middle; margin-right: 5px;">👑</span>
             <span style="font-size: 16px; font-weight: bold; color: #93c5fd; vertical-align: middle; margin-right: 5px;">최고 웨이브 :</span>
@@ -160,7 +150,7 @@
                 <span class="btn-arrow">〉</span>
             </button>
             <button class="premium-btn premium-green" onclick="startNewGame()">
-                <div class="btn-left"><span class="btn-icon">🚩</span> 새로하기</div>
+                <div class="btn-left"><span class="btn-icon">🚩</span> 모험 모드</div>
                 <span class="btn-arrow">〉</span>
             </button>
             <div style="display:flex; gap:10px;">
@@ -173,103 +163,109 @@
                     <span class="btn-arrow">〉</span>
                 </button>
             </div>
-            <button class="premium-btn premium-dark" onclick="openPkMenu()">
-                <div class="btn-left"><span class="btn-icon">🏆</span> 월드 펀치킹</div>
+            <!-- 🔥 랭크 게임 버튼 변경 -->
+            <button class="premium-btn premium-dark" onclick="openRankLobby()">
+                <div class="btn-left"><span class="btn-icon">🏆</span> 실시간 랭크 게임</div>
                 <span class="btn-arrow">〉</span>
             </button>
         </div>
 
-        <!-- 버전 표기 (JS 연동) -->
-        <div id="version-display" style="margin-top: 20px; color: rgba(255,255,255,0.4); font-size: 11px; font-weight: bold; pointer-events: none; letter-spacing: 0.5px;">
-            불러오는 중...
-        </div>
+        <div id="version-display" style="margin-top: 20px; color: rgba(255,255,255,0.4); font-size: 11px; font-weight: bold; pointer-events: none; letter-spacing: 0.5px;"></div>
     </div>
 
-    <!-- 월드 펀치킹 화면 -->
-    <div id="pk-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:2000; flex-direction:column; align-items:center;">
-        <div id="pk-menu" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 20vh;">
-            <h3>월드 펀치킹</h3>
-            <p style="font-size:12px; color:#555; margin-bottom:15px;">혼줌/보스추뎀 제외, 전 직업 기본공격 완전 동일!<br>순수 도감과 스킬 내실로 승부합니다. (1분)</p>
-            <button class="ingame-btn premium-blue" style="width:100%; height:55px; margin-bottom:10px;" onclick="showPkClassSelect()">시작하기</button>
-            <button class="ingame-btn premium-orange" style="width:100%; height:55px; margin-bottom:15px;" onclick="showPkRanking()">🏆 서버 랭킹 보드</button>
-            <button class="ingame-btn premium-dark" style="width:100%; padding: 8px; font-size: 14px;" onclick="closePk()">로비로 돌아가기</button>
-        </div>
-        
-        <div id="pk-class-select" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 20vh;">
-            <h3>직업 선택 (데스티니)</h3>
-            <div style="display:flex; gap:10px; margin-bottom:15px;">
-                <button class="ingame-btn premium-red" style="flex:1;" onclick="startPkGame('전사')">전사</button>
-                <button class="ingame-btn premium-blue" style="flex:1;" onclick="startPkGame('법사')">법사</button>
-                <button class="ingame-btn premium-purple" style="flex:1;" onclick="startPkGame('도적')">도적</button>
-            </div>
-            <button class="ingame-btn premium-dark" style="width:100%;" onclick="openPkMenu()">뒤로</button>
-        </div>
-
-        <div id="pk-ranking" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 10vh; width:90%; max-width:360px; max-height: 80vh; flex-direction:column;">
-            <h3>🏆 서버 펀치킹 랭킹 🏆</h3>
-            <div style="background: rgba(0,0,0,0.8); border-radius: 8px; padding: 10px; flex:1; display:flex; flex-direction:column; overflow:hidden; margin-bottom:15px;">
-                <div id="pk-ranking-list" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:8px; padding-right:5px;"></div>
-            </div>
-            <button class="ingame-btn premium-dark" style="width:100%;" onclick="openPkMenu()">뒤로</button>
-        </div>
-    </div>
-
-    <!-- 펀치킹 인게임 -->
-    <div id="pk-game" style="display:none; flex-direction:column; width:100%; max-width:500px; height:auto; min-height:100vh; background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('image/punchkingwallpaper.png') no-repeat center center; background-size: cover; padding-bottom: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.8);">
-        <div id="pk-header" class="maple-panel" style="margin: 10px 10px 0 10px; padding: 12px; font-size: 15px; font-weight: bold; background: rgba(253, 245, 230, 0.9);">
-            <div class="stat-row">
-                <div>점수: <span id="pk-score" class="highlight">0</span></div>
-                <div>타이머: <span id="pk-time" class="highlight" style="color:#ff5252;">60</span>초</div>
-                <div style="display:flex; gap:5px;">
-                    <button id="pk-btn-speed" class="ingame-btn premium-dark" style="padding: 5px 10px; font-size: 12px;" onclick="togglePkSpeed()">1배속</button>
+    <!-- 🏆 랭크 게임 로비 오버레이 -->
+    <div id="rank-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:2000; flex-direction:column; align-items:center;">
+        <div id="rank-lobby-modal" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 15vh; width: 85%; max-width: 320px;">
+            <h3 style="color:#ffd54f;">🏆 실시간 랭크 게임 🏆</h3>
+            <p style="font-size:12px; color:#ccc; margin-bottom:15px; line-height:1.4;">
+                서로 <b style="color:#ff5252">100메소</b>만 가지고 시작합니다.<br>
+                추가 재화 획득 불가, 배속은 <b style="color:#ff5252">15배속 고정!</b><br>
+                먼저 몹 50마리가 쌓이거나 죽는 사람이 패배합니다.
+            </p>
+            <div style="background:rgba(0,0,0,0.5); padding:15px; border-radius:8px; margin-bottom:15px; border: 1px solid #5a3c22;">
+                <div style="font-size:14px; font-weight:bold; color:#fff; display:flex; justify-content:space-between; margin-bottom:5px;">
+                    <span>내 랭크 점수 (RP)</span> <span id="ui-rank-rp" style="color:#4ade80;">1000 점</span>
+                </div>
+                <div style="font-size:14px; font-weight:bold; color:#fff; display:flex; justify-content:space-between;">
+                    <span>보유 랭크 머니</span> <span id="ui-rank-money" style="color:#f59e0b;">0 원</span>
                 </div>
             </div>
+            
+            <button class="ingame-btn premium-blue" style="width:100%; height:55px; margin-bottom:10px; font-size:18px;" onclick="startRankMatchmaking()">⚔️ 랭크 매칭 시작</button>
+            <button class="ingame-btn premium-purple" style="width:100%; height:50px; margin-bottom:15px;" onclick="openRankShop()">🛒 랭크 전용 상점</button>
+            <button class="ingame-btn premium-dark" style="width:100%; padding: 10px;" onclick="closeRankMenu()">로비로 돌아가기</button>
         </div>
-        
-        <div id="pk-board-area" style="position: relative; width: 100%; aspect-ratio: 1/1; background-color: rgba(55, 71, 79, 0.5); border-top: 4px solid rgba(38, 50, 56, 0.8); border-bottom: 4px solid rgba(38, 50, 56, 0.8); margin-top: 10px;">
-            <canvas id="pkCanvas" width="500" height="500" style="position:absolute; top:0; left:0; width:100%; height:100%; z-index:10; pointer-events:none;"></canvas>
-            <div style="position: absolute; top: 43%; left: 15%; width: 14%; height: 14%; background-color: rgba(220, 190, 170, 0.85); border: 2px solid rgba(120, 80, 60, 0.9); z-index: 5; border-radius: 4px; box-sizing: border-box;">
-                <div class="grid-cell glow-8" style="width: 100%; height: 100%; background: transparent; box-shadow: none; cursor:default; border:none; display:flex; flex-direction:column; justify-content:center; align-items:center;">
-                    <div id="pk-unit-icon" style="font-size: clamp(14px, 4vw, 20px); text-shadow:1px 1px 2px rgba(0,0,0,0.5);">🗡️</div>
-                    <div id="pk-unit-name" style="color:#ffd54f; font-size: clamp(8px, 2.5vw, 10px); margin-top:2px; font-weight:800;">데스티니</div>
-                    <div style="width: 80%; height: 3px; background: #333; margin-top: 2px; border-radius: 1.5px; overflow: hidden; border: 1px solid #111; display:none;" id="pk-global-bar-container"><div id="pk-global-bar" style="width: 0%; height: 100%; background: #ffeb3b;"></div></div>
+
+        <!-- 랭크 상점 모달 -->
+        <div id="rank-shop-modal" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 15vh; width: 85%; max-width: 320px;">
+            <h3 style="color:#a855f7;">🛒 랭크 전용 상점 🛒</h3>
+            <div style="text-align:right; font-size:13px; font-weight:bold; color:#f59e0b; margin-bottom:10px;">내 랭크 머니: <span id="ui-shop-rank-money">0</span> 원</div>
+            
+            <div style="background:#fff; border:2px solid #8d6e63; border-radius:6px; padding:10px; margin-bottom:10px; text-align:left;">
+                <div style="font-weight:900; color:#3e2723; font-size:14px;">🧩 몬스터 조각 구매</div>
+                <div style="font-size:11px; color:#666; margin-bottom:8px;">랭크 머니 100원으로 조각 1개를 구매합니다.</div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-weight:bold; font-size:13px; color:#1e3a8a;">보유 조각: <span id="ui-shop-pieces">0</span>개</span>
+                    <button class="maple-btn small primary" onclick="buyMonsterPiece()">구매 (100원)</button>
                 </div>
             </div>
-        </div>
-        
-        <div class="maple-panel" style="margin: 10px; padding: 12px; background: rgba(253, 245, 230, 0.9);">
-            <button class="ingame-btn premium-red" style="width: 100%; margin-bottom: 15px; padding: 15px;" onclick="endPkGame(true)">포기하고 로비로</button>
-            <div style="background: rgba(0,0,0,0.7); border-radius: 8px; padding: 10px;">
-                <h4 style="color: #ffeb3b; margin: 0 0 10px 0; text-align: center; font-size: 16px; font-weight:900;">🏆 펀치킹 실시간 TOP 10 🏆</h4>
-                <div id="pk-live-ranking-list" style="display:flex; flex-direction:column; gap:5px; font-size:13px; max-height: 200px; overflow-y: auto;">
-                    <div style="text-align:center; color:#ccc;">랭킹을 불러오는 중...</div>
+
+            <div style="background:#fff; border:2px solid #8d6e63; border-radius:6px; padding:10px; margin-bottom:15px; text-align:left;">
+                <div style="font-weight:900; color:#3e2723; font-size:14px;">🪙 몬스터 코인 교환</div>
+                <div style="font-size:11px; color:#666; margin-bottom:8px;">조각 5개를 스킬을 올릴 수 있는 '코인 1개'로 교환합니다.</div>
+                <div style="display:flex; justify-content:flex-end;">
+                    <button class="maple-btn small" style="background:#4ade80; color:#fff;" onclick="exchangeMonsterCoin()">교환하기</button>
                 </div>
             </div>
+            
+            <button class="ingame-btn premium-dark" style="width:100%; padding: 10px;" onclick="closeRankShop()">상점 닫기</button>
+        </div>
+
+        <!-- 매칭 대기 모달 -->
+        <div id="rank-waiting-modal" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 30vh; width: 85%; max-width: 320px; text-align:center;">
+            <div style="margin-bottom: 20px; width: 40px; height: 40px; border: 4px solid rgba(0,0,0,0.1); border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; display:inline-block;"></div>
+            <h3 style="color:#1e3a8a; border:none; padding:0;">상대방을 찾는 중...</h3>
+            <p style="font-size:13px; color:#555; margin-bottom:20px;">자신과 비슷한 실력의 용사님을<br>수색하고 있습니다.</p>
+            <button class="ingame-btn premium-red" style="width:100%; padding: 12px;" onclick="cancelRankMatchmaking()">매칭 취소</button>
         </div>
     </div>
 
-    <!-- 측정 종료 모달 -->
-    <div id="pk-result-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:2050;"></div>
-    <div id="pk-result-modal" class="maple-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:2100; width:80%; max-width:300px;">
-        <h3 style="color:#e65100;">측정 종료!</h3>
-        <div style="font-size:16px; margin-bottom:10px; color:#5a3c22; font-weight:bold;">나의 최종 DPS 점수</div>
-        <div id="pk-final-score" style="font-size:42px; font-weight:900; color:#c62828; text-shadow:1px 1px 0 #fff; margin-bottom:20px; display:flex; flex-direction:column; align-items:center;">0</div>
-        <button id="btn-submit-pk" class="ingame-btn premium-blue" style="width:100%; margin-bottom:10px; padding:15px;" onclick="submitPkScore()">랭킹 등록하고 로비로</button>
+    <!-- 랭크 결과 모달 -->
+    <div id="rank-result-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:3000;"></div>
+    <div id="rank-result-modal" class="maple-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:3100; width:80%; max-width:300px; text-align:center;">
+        <h2 id="rank-result-title" style="margin-top:0; font-size:28px;">승리!</h2>
+        <div style="background:rgba(0,0,0,0.05); border-radius:8px; padding:15px; margin-bottom:20px; text-align:left;">
+            <div style="font-size:14px; font-weight:bold; color:#333; margin-bottom:8px; display:flex; justify-content:space-between;">
+                <span>RP 변화</span>
+                <span id="rank-result-rp" style="color:#3b82f6;">+10</span>
+            </div>
+            <div style="font-size:14px; font-weight:bold; color:#333; display:flex; justify-content:space-between;">
+                <span>랭크 머니 획득</span>
+                <span id="rank-result-money" style="color:#f59e0b;">+100</span>
+            </div>
+        </div>
+        <button class="ingame-btn premium-blue" style="width:100%; padding:15px;" onclick="exitRankGame()">로비로 돌아가기</button>
     </div>
 
-    <!-- 토스트 알림 -->
-    <div id="summon-toast"></div>
-    <div id="boss-toast"></div>
-    
-    <!-- 메인 인게임 화면 -->
+    <!-- 메인 인게임 (공용) -->
     <div id="game-container" style="display:none;">
+        
+        <!-- 🔥 상대방 상태 표시바 (랭크 게임 전용) 🔥 -->
+        <div id="rank-opp-ui" class="maple-panel" style="display:none; margin: 10px 10px 0 10px; padding: 8px 12px; background: rgba(30, 58, 138, 0.9); border-color: #3b82f6; color: white;">
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size: 13px; font-weight: bold;">
+                <div>⚔️ 적군: <span id="opp-name" style="color:#fbbf24;">상대방</span> <span style="font-size:11px; color:#aaa;">(<span id="opp-rp">0</span> RP)</span></div>
+                <div>웨이브: <span id="opp-wave" style="color:#4ade80;">1</span></div>
+                <div>몹: <span id="opp-mobs" style="color:#ff5252;">0 / 50</span></div>
+            </div>
+        </div>
+
         <div id="header" class="maple-panel">
             <div class="stat-row" style="align-items: center;">
                 <div>웨이브: <span id="ui-wave" class="highlight">1</span></div>
                 <div>타이머: <span id="ui-timer" class="highlight">60</span>초</div>
                 <div style="display:flex; gap:5px;">
                     <button id="btn-speed" class="ingame-btn premium-dark" style="padding: 6px 10px; font-size: 11px;" onclick="toggleSpeed()">1배속</button>
-                    <button class="ingame-btn premium-orange" style="padding: 6px 10px; font-size: 11px;" onclick="goToLobby()">로비로</button>
+                    <button id="btn-exit" class="ingame-btn premium-orange" style="padding: 6px 10px; font-size: 11px;" onclick="goToLobby()">로비로</button>
                 </div>
             </div>
             <button class="ingame-btn premium-blue" style="width: 100%; margin: 8px 0; padding: 10px;" onclick="openActiveSkillsModal()">⭐ 적용중인 스킬 효과 보기</button>
@@ -395,7 +391,6 @@
 
     <div id="msg-overlay"></div>
     
-    <!-- 🔥 핵심: 무조건 서버에서 최신 script.js 파일을 강제로 불러오는 캐시 파괴 마법 🔥 -->
     <script>
         const script = document.createElement('script');
         script.type = 'module';
