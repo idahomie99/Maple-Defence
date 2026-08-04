@@ -1,5 +1,5 @@
 // 🔥 1.0.18 버전 - AI 랭크 게임 및 UI 개선 반영
-const GAME_VERSION = "1.0.18"; 
+const GAME_VERSION = "1.0.19"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
