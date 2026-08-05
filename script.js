@@ -1,5 +1,6 @@
-// 🔥 1.0.26 버전 - 조각/코인 통합 및 장비 버그 핫픽스
-const GAME_VERSION = "1.0.26"; 
+// 🔥 1.0.27 버전 - 월드 보스 레이드 15배속, 수동소환 및 캐시 갱신 확인용
+const GAME_VERSION = "1.0.27"; 
+console.log("🔥 레이드 V2 (15배속, 수동소환) 스크립트 정상 로드 완료!");
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
