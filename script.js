@@ -1,5 +1,5 @@
-// 🔥 1.0.28 버전 - 데이터 롤백 및 인벤토리 Firebase 동기화 버그 완벽 수정
-const GAME_VERSION = "1.0.28"; 
+// 🔥 1.0.29 버전 - 아이템 증발 버그 복구 및 최고 웨이브(NaN) 박스 출력 오류 완벽 해결
+const GAME_VERSION = "1.0.29"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -114,14 +114,20 @@ onAuthStateChanged(auth, async (user) => {
         const cloudSnap = await get(child(dbRef, `users/${currentUserUid}/cloudData`));
         if (cloudSnap.exists()) {
             let cloud = cloudSnap.val();
-            let localBest = parseInt(localStorage.getItem('mapleDefenseBestWave')) || 0;
-            let cloudBest = parseInt(cloud.bestWave) || 0;
             
-            userRankData.rp = cloud.rp !== undefined ? parseInt(cloud.rp) : 1000;
-            userRankData.rankMoney = cloud.rankMoney !== undefined ? parseInt(cloud.rankMoney) : 0;
-            userRankData.bonusCoins = cloud.bonusCoins !== undefined ? parseInt(cloud.bonusCoins) : 0;
+            // 🔥 최고 웨이브 NaN 방지
+            let localBestStr = localStorage.getItem('mapleDefenseBestWave');
+            let localBest = localBestStr ? parseInt(localBestStr) : 0;
+            if (isNaN(localBest)) localBest = 0;
+            
+            let cloudBestStr = cloud.bestWave;
+            let cloudBest = cloudBestStr ? parseInt(cloudBestStr) : 0;
+            if (isNaN(cloudBest)) cloudBest = 0;
+            
+            let parsedRp = parseInt(cloud.rp); userRankData.rp = isNaN(parsedRp) ? 1000 : parsedRp;
+            let parsedRankMoney = parseInt(cloud.rankMoney); userRankData.rankMoney = isNaN(parsedRankMoney) ? 0 : parsedRankMoney;
+            let parsedBonusCoins = parseInt(cloud.bonusCoins); userRankData.bonusCoins = isNaN(parsedBonusCoins) ? 0 : parsedBonusCoins;
 
-            // 🔥 강력한 데이터 방어: Firebase가 0을 누락시켜서 롤백되는 현상 방지
             userInventory = cloud.inventory || {};
             userInventory.coinPieces = userInventory.coinPieces || 0;
             userInventory.equipBoxes = userInventory.equipBoxes || 0;
@@ -134,21 +140,27 @@ onAuthStateChanged(auth, async (user) => {
                 userInventory.boxes['플래티넘'] = (userInventory.boxes['플래티넘'] || 0) + (userInventory.boxes.platinum || 0);
                 userInventory.boxes['다이아몬드'] = (userInventory.boxes['다이아몬드'] || 0) + (userInventory.boxes.diamond || 0);
                 userInventory.boxes['챌린저'] = (userInventory.boxes['챌린저'] || 0) + (userInventory.boxes.challenger || 0);
-                
                 delete userInventory.boxes.bronze; delete userInventory.boxes.silver; delete userInventory.boxes.gold; delete userInventory.boxes.platinum; delete userInventory.boxes.diamond; delete userInventory.boxes.challenger;
             }
             
-            // 🔥 코인 조각 롤백 버그 완전 해결
             if (cloud.monsterPieces && parseInt(cloud.monsterPieces) > 0) {
                 userInventory.coinPieces += parseInt(cloud.monsterPieces);
-                userRankData.monsterPieces = 0; // 마이그레이션 완료 후 클라우드 변수 초기화
             }
 
+            // 🔥 아이템 증발 복구 및 속성 고정 패치
             userEquipped = cloud.equipped || {};
             userEquipped['뱃지'] = userEquipped['뱃지'] || userEquipped.badge || null;
             userEquipped['엠블럼'] = userEquipped['엠블럼'] || userEquipped.emblem || null;
             userEquipped['링'] = userEquipped['링'] || userEquipped.ring || null;
             delete userEquipped.badge; delete userEquipped.emblem; delete userEquipped.ring;
+            
+            ['뱃지', '엠블럼', '링'].forEach(slot => {
+                if (userEquipped[slot] && userEquipped[slot].type) {
+                    if (userEquipped[slot].type === 'badge') userEquipped[slot].type = '뱃지';
+                    if (userEquipped[slot].type === 'emblem') userEquipped[slot].type = '엠블럼';
+                    if (userEquipped[slot].type === 'ring') userEquipped[slot].type = '링';
+                }
+            });
             
             if (cloud.equips) {
                 let equipsArr = Array.isArray(cloud.equips) ? cloud.equips : Object.values(cloud.equips);
@@ -168,8 +180,9 @@ onAuthStateChanged(auth, async (user) => {
                 if (cloud.cards) { localStorage.setItem('mapleDefenseCards', cloud.cards); cardData = JSON.parse(cloud.cards); }
                 if (cloud.skills) { localStorage.setItem('mapleDefenseSkills', cloud.skills); skillLevels = JSON.parse(cloud.skills); }
                 if (cloud.coins) { localStorage.setItem('mapleDefenseSpentCoins', cloud.coins); spentCoins = parseInt(cloud.coins); }
-                if (cloud.bestWave) { localStorage.setItem('mapleDefenseBestWave', cloud.bestWave); bestWave = parseInt(cloud.bestWave); }
                 
+                bestWave = cloudBest;
+                localStorage.setItem('mapleDefenseBestWave', bestWave);
                 document.getElementById('best-record').innerText = bestWave;
             } else {
                 window.syncToCloud();
@@ -208,7 +221,10 @@ window.loginWithGoogle = () => {
 
 window.logout = () => { signOut(auth).then(() => { location.reload(); }); };
 
-let bestWave = parseInt(localStorage.getItem('mapleDefenseBestWave')) || 0;
+// 🔥 로컬스토리지 NaN 방지
+let bestWaveStr = localStorage.getItem('mapleDefenseBestWave');
+let bestWave = bestWaveStr ? parseInt(bestWaveStr) : 0;
+if (isNaN(bestWave)) bestWave = 0;
 document.getElementById('best-record').innerText = bestWave;
 
 let cardData = JSON.parse(localStorage.getItem('mapleDefenseCards')) || {};
@@ -404,8 +420,6 @@ window.startNewGame = () => {
     monsters = []; projectiles = []; towers = []; hitEffects = []; visualEffects = []; fumaList = []; damageTexts = [];
     waveTimer = 0; spawnTimer = 0; selectedUnitIdx = -1; bestWave = parseInt(localStorage.getItem('mapleDefenseBestWave')) || 0;
     
-    if (currentUserUid) window.syncToCloud(); // 🔥 새 게임 시작 시 클라우드 찌꺼기 방지
-
     renderGrid(); window.switchScreen('game-container'); lastTime = performance.now(); 
     cancelAnimationFrame(mainReqId); updateUI(); mainReqId = requestAnimationFrame(loop);
 };
@@ -773,6 +787,7 @@ function loop() {
     if(monsters.length >= 50) { if(state.isRank) return handleRankGameOver("몹 50마리 초과!"); else return gameOver("몬스터 50마리 초과! 게임 오버"); }
     
     let cardMulti = 1 + (getTotalCardBonus() / 100);
+    // 장비 스탯 합산
     let rageMulti = 1 + (skillLevels.common_rage * 0.01) + (equipStats.atk * 0.01);
     let sharpChance = (skillLevels.common_sharp * 0.05) + (equipStats.crit * 0.01);
     let windReduc = 1 + (skillLevels.common_wind * 0.2) + (equipStats.spd * 0.01);
@@ -1134,10 +1149,11 @@ window.renderInventoryTab = (tab) => {
             let el = document.createElement('div'); el.className = `inv-item-box equip-${eq.grade.toLowerCase()}`;
             
             let statStr = "";
-            if (eq.atk > 0) statStr = `공격력+${eq.atk}%`;
+            if (eq.atk > 0 && eq.spd > 0 && eq.crit > 0) statStr = `공${eq.atk}/속${eq.spd}/크${eq.crit}`;
+            else if (eq.atk > 0) statStr = `공격력+${eq.atk}%`;
             else if (eq.spd > 0) statStr = `공속+${eq.spd}%`;
             else if (eq.crit > 0) statStr = `크확+${eq.crit}%`;
-            else statStr = `공${eq.atk}/속${eq.spd}/크${eq.crit}`;
+            else statStr = `옵션 없음`;
 
             el.innerHTML = `<div class="inv-item-icon">${getEquipIcon(eq.type)}</div><div style="font-size:10px; font-weight:bold; margin-top:4px; color:#37474f;">${statStr}</div>`;
             el.onclick = () => equipItem(idx);
