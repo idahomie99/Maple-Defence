@@ -1,5 +1,5 @@
-// 🔥 1.0.25 버전 - 월드 보스 레이드 15배속, 10초 대기, 골드상자 버그 수정 및 장비 시스템 개선
-const GAME_VERSION = "1.0.25"; 
+// 🔥 1.0.26 버전 - 조각/코인 통합 및 장비 버그 핫픽스
+const GAME_VERSION = "1.0.26"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -21,9 +21,8 @@ const database = getDatabase(app);
 
 let currentUserName = "이름없는 용사";
 let currentUserUid = null;
-let userRankData = { rp: 1000, rankMoney: 0, monsterPieces: 0, bonusCoins: 0 };
+let userRankData = { rp: 1000, rankMoney: 0, bonusCoins: 0 };
 
-// --- 신규 인벤토리 & 장비 & 레이드 상태 ---
 let userInventory = { 
     coinPieces: 0, equipBoxes: 0,
     boxes: { '브론즈': 0, '실버': 0, '골드': 0, '플래티넘': 0, '다이아몬드': 0, '챌린저': 0 }
@@ -50,9 +49,9 @@ function calculateEquipStats() {
     ['뱃지', '엠블럼', '링'].forEach(slot => {
         let item = userEquipped[slot];
         if (item) {
-            equipStats.atk += item.atk;
-            equipStats.spd += item.spd;
-            equipStats.crit += item.crit;
+            equipStats.atk += item.atk || 0;
+            equipStats.spd += item.spd || 0;
+            equipStats.crit += item.crit || 0;
         }
     });
 }
@@ -67,7 +66,6 @@ window.syncToCloud = async () => {
         bestWave: localStorage.getItem('mapleDefenseBestWave') || null,
         rp: userRankData.rp,
         rankMoney: userRankData.rankMoney,
-        monsterPieces: userRankData.monsterPieces,
         bonusCoins: userRankData.bonusCoins,
         raidDate: localStorage.getItem('mapleDefenseRaidDate') || null,
         inventory: userInventory,
@@ -121,11 +119,10 @@ onAuthStateChanged(auth, async (user) => {
             
             userRankData.rp = cloud.rp !== undefined ? parseInt(cloud.rp) : 1000;
             userRankData.rankMoney = cloud.rankMoney !== undefined ? parseInt(cloud.rankMoney) : 0;
-            userRankData.monsterPieces = cloud.monsterPieces !== undefined ? parseInt(cloud.monsterPieces) : 0;
             userRankData.bonusCoins = cloud.bonusCoins !== undefined ? parseInt(cloud.bonusCoins) : 0;
 
-            // 데이터 마이그레이션 (영문 키 -> 한글 키 변환)
             userInventory = cloud.inventory || { coinPieces: 0, equipBoxes: 0, boxes: { '브론즈': 0, '실버': 0, '골드': 0, '플래티넘': 0, '다이아몬드': 0, '챌린저': 0 } };
+            
             if(userInventory.boxes && userInventory.boxes.gold !== undefined) {
                 userInventory.boxes = {
                     '브론즈': userInventory.boxes.bronze || 0,
@@ -136,12 +133,19 @@ onAuthStateChanged(auth, async (user) => {
                     '챌린저': userInventory.boxes.challenger || 0
                 };
             }
+            
+            if (cloud.monsterPieces > 0) {
+                userInventory.coinPieces = (userInventory.coinPieces || 0) + cloud.monsterPieces;
+            }
+
             userEquipped = cloud.equipped || { '뱃지': null, '엠블럼': null, '링': null };
             if(userEquipped.ring !== undefined) {
                 userEquipped = { '뱃지': userEquipped.badge, '엠블럼': userEquipped.emblem, '링': userEquipped.ring };
             }
-            if(cloud.equips) {
-                userEquips = cloud.equips.map(eq => {
+            
+            if (cloud.equips) {
+                let equipsArr = Array.isArray(cloud.equips) ? cloud.equips : Object.values(cloud.equips);
+                userEquips = equipsArr.filter(eq => eq !== null && eq !== undefined).map(eq => {
                     if(eq.type === 'badge') eq.type = '뱃지';
                     if(eq.type === 'emblem') eq.type = '엠블럼';
                     if(eq.type === 'ring') eq.type = '링';
@@ -715,7 +719,7 @@ function processOpponentTick(dt) {
                         let splashDmg = p.dmg; if (p.type === '전사' && m.isBoss) splashDmg *= 1.5; m.hp -= splashDmg;
                         if (p.isCrit) oppDamageTexts.push({ val: Math.floor(splashDmg), x: m.x, y: m.y - 15, timer: 0.8 });
                         if (p.type === '전사' && Math.random() < 0.2) m.stunTimer = 1;
-                        if (p.type === '법사' && oppSkillLevels.mage_freeze > 0 && Math.random() < ((10 + oppSkillLevels.mage_freeze * 2) / 100)) { if (m.freezeTimer <= 0) { m.freezeTimer = 3; m.freezeTickTimer = 1; m.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][oppSkillLevels.mage_freeze - 1]; } }
+                        if (p.type === '법사' && oppSkillLevels.mage_freeze > 0 && Math.random() < ((10 + skillLevels.mage_freeze * 2) / 100)) { if (m.freezeTimer <= 0) { m.freezeTimer = 3; m.freezeTickTimer = 1; m.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][oppSkillLevels.mage_freeze - 1]; } }
                     }
                 });
             }
@@ -1028,10 +1032,21 @@ function drawPk() {
 // ==========================================
 window.openRankLobby = () => { let today = new Date().toLocaleDateString(); let lastDate = localStorage.getItem('mapleDefenseRankDate'); let playCount = parseInt(localStorage.getItem('mapleDefenseRankCount')) || 0; if (lastDate !== today) { playCount = 0; localStorage.setItem('mapleDefenseRankDate', today); localStorage.setItem('mapleDefenseRankCount', 0); } document.getElementById('ui-rank-remains').innerText = `${Math.max(0, 10 - playCount)} / 10`; document.getElementById('rank-overlay').style.display = 'flex'; document.getElementById('rank-lobby-modal').style.display = 'block'; document.getElementById('ui-rank-rp').innerText = userRankData.rp + " 점"; document.getElementById('ui-rank-money').innerText = userRankData.rankMoney + " 원"; };
 window.closeRankMenu = () => { document.getElementById('rank-overlay').style.display = 'none'; window.openOnlineMenu(); };
-window.openRankShop = () => { document.getElementById('ui-shop-rank-money').innerText = userRankData.rankMoney; document.getElementById('ui-shop-pieces').innerText = userRankData.monsterPieces; document.getElementById('rank-lobby-modal').style.display = 'none'; document.getElementById('rank-shop-modal').style.display = 'block'; };
+window.openRankShop = () => { document.getElementById('ui-shop-rank-money').innerText = userRankData.rankMoney; document.getElementById('ui-shop-pieces').innerText = userInventory.coinPieces; document.getElementById('rank-lobby-modal').style.display = 'none'; document.getElementById('rank-shop-modal').style.display = 'block'; };
 window.closeRankShop = () => { document.getElementById('rank-shop-modal').style.display = 'none'; document.getElementById('rank-lobby-modal').style.display = 'block'; };
-window.buyMonsterPiece = () => { if (userRankData.rankMoney >= 100) { userRankData.rankMoney -= 100; userRankData.monsterPieces += 1; document.getElementById('ui-shop-rank-money').innerText = userRankData.rankMoney; document.getElementById('ui-shop-pieces').innerText = userRankData.monsterPieces; document.getElementById('ui-rank-money').innerText = userRankData.rankMoney + " 원"; if (currentUserUid) window.syncToCloud(); } else { alert("랭크 머니가 부족합니다."); } };
-window.exchangeMonsterCoin = () => { if (userRankData.monsterPieces >= 10) { userRankData.monsterPieces -= 10; userRankData.bonusCoins += 1; document.getElementById('ui-shop-pieces').innerText = userRankData.monsterPieces; alert("조각 10개를 코인 1개로 교환했습니다! (스킬 상점에서 사용 가능)"); if (currentUserUid) window.syncToCloud(); } else { alert("몬스터 조각이 부족합니다. (10개 필요)"); } };
+
+window.buyMonsterPiece = () => {
+    if (userRankData.rankMoney >= 100) {
+        userRankData.rankMoney -= 100;
+        userInventory.coinPieces += 1;
+        document.getElementById('ui-shop-rank-money').innerText = userRankData.rankMoney;
+        document.getElementById('ui-shop-pieces').innerText = userInventory.coinPieces;
+        document.getElementById('ui-rank-money').innerText = userRankData.rankMoney + " 원";
+        if (currentUserUid) window.syncToCloud();
+    } else {
+        alert("랭크 머니가 부족합니다.");
+    }
+};
 
 function showMatchIntro(oppName, oppRp, callback) {
     let intro = document.getElementById('match-intro-overlay'); document.getElementById('intro-player').innerText = `${currentUserName} (${userRankData.rp} RP)`; document.getElementById('intro-opp').innerText = `${oppName} (${oppRp} RP)`;
@@ -1067,7 +1082,7 @@ async function processRankResult(result, desc) {
 window.exitRankGame = () => { document.getElementById('rank-result-overlay').style.display = 'none'; document.getElementById('rank-result-modal').style.display = 'none'; rankState = { active: false }; state.status = 'TITLE'; window.switchScreen('start-screen'); };
 
 // ==========================================
-// 인벤토리 & 장비 시스템 (마이그레이션 적용됨)
+// 인벤토리 & 장비 시스템
 // ==========================================
 window.openInventoryModal = () => { document.getElementById('inventory-modal').style.display = 'block'; document.getElementById('overlay').style.display = 'block'; calculateEquipStats(); renderEquippedSlots(); renderInventoryTab('consumable'); };
 window.closeInventoryModal = () => { document.getElementById('inventory-modal').style.display = 'none'; document.getElementById('overlay').style.display = 'none'; };
@@ -1083,10 +1098,24 @@ function renderEquippedSlots() {
 
 function getEquipIcon(type) { return type === '뱃지' ? '📛' : (type === '엠블럼' ? '🛡️' : '💍'); }
 
+window.combineCoinPieces = () => {
+    if (userInventory.coinPieces >= 10) {
+        if (confirm("코인 조각 10개를 스킬 코인 1개로 합치시겠습니까?")) {
+            userInventory.coinPieces -= 10;
+            userRankData.bonusCoins += 1;
+            window.syncToCloud();
+            renderInventoryTab('consumable');
+            alert("코인 1개를 획득했습니다!");
+        }
+    } else {
+        alert("코인 조각이 부족합니다. (10개 필요)");
+    }
+};
+
 window.renderInventoryTab = (tab) => {
     let list = document.getElementById('inventory-list'); list.innerHTML = '';
     if (tab === 'consumable') {
-        if(userInventory.coinPieces > 0) list.innerHTML += createInvBox('🧩', '코인 조각', userInventory.coinPieces, "alert('조각 10개를 모아 랭크상점에서 코인으로 교환하세요!')");
+        if(userInventory.coinPieces > 0) list.innerHTML += createInvBox('🧩', '코인 조각', userInventory.coinPieces, "combineCoinPieces()");
         if(userInventory.equipBoxes > 0) list.innerHTML += createInvBox('🎁', '장비 상자', userInventory.equipBoxes, "openBox('equipBoxes')");
         
         ['브론즈', '실버', '골드', '플래티넘', '다이아몬드', '챌린저'].forEach(tier => {
@@ -1100,6 +1129,7 @@ window.renderInventoryTab = (tab) => {
             if (eq.atk > 0) statStr = `공격력+${eq.atk}%`;
             else if (eq.spd > 0) statStr = `공속+${eq.spd}%`;
             else if (eq.crit > 0) statStr = `크확+${eq.crit}%`;
+            else statStr = `공${eq.atk}/속${eq.spd}/크${eq.crit}`;
 
             el.innerHTML = `<div class="inv-item-icon">${getEquipIcon(eq.type)}</div><div style="font-size:10px; font-weight:bold; margin-top:4px; color:#37474f;">${statStr}</div>`;
             el.onclick = () => equipItem(idx);
@@ -1161,9 +1191,9 @@ function generateEquipment() {
 }
 
 window.equipItem = (idx) => {
-    let item = userEquips[idx];
+    let item = userEquips.splice(idx, 1)[0];
     if(userEquipped[item.type]) { userEquips.push(userEquipped[item.type]); }
-    userEquipped[item.type] = item; userEquips.splice(idx, 1);
+    userEquipped[item.type] = item; 
     calculateEquipStats(); window.syncToCloud(); renderEquippedSlots(); renderInventoryTab('equip');
 };
 
@@ -1175,7 +1205,7 @@ window.unequipItem = (type) => {
 };
 
 // ==========================================
-// 월드 보스 레이드 시스템 (수동 소환 및 15배속 적용)
+// 월드 보스 레이드 시스템
 // ==========================================
 window.openRaidMenu = async () => {
     let today = new Date().toLocaleDateString(); let lastRaidDate = localStorage.getItem('mapleDefenseRaidDate');
@@ -1282,7 +1312,7 @@ function raidLoop() {
     if (!raidState.active) return;
     let now = performance.now();
     let dtReal = (now - raidState.lastTime) / 1000;
-    if (dtReal > 0.1) dtReal = 0.1; // 탭 이동시 폭주 방지 캡
+    if (dtReal > 0.1) dtReal = 0.1; 
     raidState.lastTime = now;
 
     if (raidState.status === 'PREP') {
@@ -1297,11 +1327,9 @@ function raidLoop() {
         return;
     }
 
-    // 🔥 15배속 연산 적용
     let dt = dtReal * 15;
     if (dt > 1.5) dt = 1.5;
 
-    // 전체 플레이 타이머는 실제 1배속 시간으로 감소
     raidState.time -= dtReal;
     document.getElementById('raid-time').innerText = Math.ceil(Math.max(0, raidState.time));
 
@@ -1337,7 +1365,7 @@ function raidLoop() {
     }
 
     for (let i = raidState.dmgTexts.length - 1; i >= 0; i--) {
-        raidState.dmgTexts[i].timer -= dtReal; // 데미지 텍스트는 실제 시간으로 이동
+        raidState.dmgTexts[i].timer -= dtReal; 
         raidState.dmgTexts[i].y -= dtReal * 60; 
         if (raidState.dmgTexts[i].timer <= 0) raidState.dmgTexts.splice(i, 1);
     }
