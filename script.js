@@ -1,5 +1,5 @@
-// 🔥 1.0.29 버전 - 아이템 증발 버그 복구 및 최고 웨이브(NaN) 박스 출력 오류 완벽 해결
-const GAME_VERSION = "1.0.29"; 
+// 🔥 1.0.30 버전 - 월드 보스 레이드 타이머 15배속 동기화 및 오버킬 피통 이월 수정
+const GAME_VERSION = "1.0.30"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -115,7 +115,6 @@ onAuthStateChanged(auth, async (user) => {
         if (cloudSnap.exists()) {
             let cloud = cloudSnap.val();
             
-            // 🔥 최고 웨이브 NaN 방지
             let localBestStr = localStorage.getItem('mapleDefenseBestWave');
             let localBest = localBestStr ? parseInt(localBestStr) : 0;
             if (isNaN(localBest)) localBest = 0;
@@ -147,7 +146,6 @@ onAuthStateChanged(auth, async (user) => {
                 userInventory.coinPieces += parseInt(cloud.monsterPieces);
             }
 
-            // 🔥 아이템 증발 복구 및 속성 고정 패치
             userEquipped = cloud.equipped || {};
             userEquipped['뱃지'] = userEquipped['뱃지'] || userEquipped.badge || null;
             userEquipped['엠블럼'] = userEquipped['엠블럼'] || userEquipped.emblem || null;
@@ -221,7 +219,6 @@ window.loginWithGoogle = () => {
 
 window.logout = () => { signOut(auth).then(() => { location.reload(); }); };
 
-// 🔥 로컬스토리지 NaN 방지
 let bestWaveStr = localStorage.getItem('mapleDefenseBestWave');
 let bestWave = bestWaveStr ? parseInt(bestWaveStr) : 0;
 if (isNaN(bestWave)) bestWave = 0;
@@ -420,6 +417,8 @@ window.startNewGame = () => {
     monsters = []; projectiles = []; towers = []; hitEffects = []; visualEffects = []; fumaList = []; damageTexts = [];
     waveTimer = 0; spawnTimer = 0; selectedUnitIdx = -1; bestWave = parseInt(localStorage.getItem('mapleDefenseBestWave')) || 0;
     
+    if (currentUserUid) window.syncToCloud();
+
     renderGrid(); window.switchScreen('game-container'); lastTime = performance.now(); 
     cancelAnimationFrame(mainReqId); updateUI(); mainReqId = requestAnimationFrame(loop);
 };
@@ -787,7 +786,6 @@ function loop() {
     if(monsters.length >= 50) { if(state.isRank) return handleRankGameOver("몹 50마리 초과!"); else return gameOver("몬스터 50마리 초과! 게임 오버"); }
     
     let cardMulti = 1 + (getTotalCardBonus() / 100);
-    // 장비 스탯 합산
     let rageMulti = 1 + (skillLevels.common_rage * 0.01) + (equipStats.atk * 0.01);
     let sharpChance = (skillLevels.common_sharp * 0.05) + (equipStats.crit * 0.01);
     let windReduc = 1 + (skillLevels.common_wind * 0.2) + (equipStats.spd * 0.01);
@@ -1332,7 +1330,7 @@ setInterval(() => {
             bossData.hp -= dmgToApply;
             if (!bossData.contributors) bossData.contributors = {};
             bossData.contributors[currentUserUid] = true;
-            if (bossData.hp <= 0) { bossData.hp = 7000000; bossData.killCount = (bossData.killCount || 0) + 1; bossData.contributors = {}; }
+            if (bossData.hp <= 0) { bossData.hp += 7000000; bossData.killCount = (bossData.killCount || 0) + 1; bossData.contributors = {}; }
             return bossData;
         });
     }
@@ -1360,7 +1358,7 @@ function raidLoop() {
     let dt = dtReal * 15;
     if (dt > 1.5) dt = 1.5;
 
-    raidState.time -= dtReal;
+    raidState.time -= dt;
     document.getElementById('raid-time').innerText = Math.ceil(Math.max(0, raidState.time));
 
     if (raidState.time <= 0) { endRaidGame(); return; }
@@ -1395,8 +1393,8 @@ function raidLoop() {
     }
 
     for (let i = raidState.dmgTexts.length - 1; i >= 0; i--) {
-        raidState.dmgTexts[i].timer -= dtReal; 
-        raidState.dmgTexts[i].y -= dtReal * 60; 
+        raidState.dmgTexts[i].timer -= dt; 
+        raidState.dmgTexts[i].y -= dt * 60; 
         if (raidState.dmgTexts[i].timer <= 0) raidState.dmgTexts.splice(i, 1);
     }
 
@@ -1415,6 +1413,20 @@ function drawRaid() {
 
 function endRaidGame() {
     raidState.active = false; cancelAnimationFrame(raidReqId);
+    
+    // 남은 데미지 즉시 전송
+    if (raidState.pendingDmg > 0) {
+        let dmgToApply = raidState.pendingDmg; raidState.pendingDmg = 0;
+        runTransaction(ref(database, 'worldBoss'), (bossData) => {
+            if (!bossData) bossData = { hp: 7000000, killCount: 0, contributors: {} };
+            bossData.hp -= dmgToApply;
+            if (!bossData.contributors) bossData.contributors = {};
+            bossData.contributors[currentUserUid] = true;
+            if (bossData.hp <= 0) { bossData.hp += 7000000; bossData.killCount = (bossData.killCount || 0) + 1; bossData.contributors = {}; }
+            return bossData;
+        });
+    }
+
     let percent = (raidState.totalDmg / 7000000) * 100; let rewardTier = '';
     
     if (percent <= 5) rewardTier = '브론즈'; else if (percent <= 10) rewardTier = '실버'; else if (percent <= 20) rewardTier = '골드'; else if (percent <= 30) rewardTier = '플래티넘'; else if (percent <= 50) rewardTier = '다이아몬드'; else rewardTier = '챌린저';
