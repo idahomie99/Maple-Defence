@@ -1493,7 +1493,7 @@ function draw() {
         else if (p.type === '도적') { 
             img = p.gradeIdx >= 5 ? projImages.rogue2 : projImages.rogue1; 
             if (p.gradeIdx >= 5) size = 25; // 🌟 도적 5차 이상 투사체 사이즈만 25로 축소
-            Ctx.rotate(p.angle); 
+            ctx.rotate(p.angle); 
         }
         
         if (img && img.complete) {
