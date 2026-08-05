@@ -1,6 +1,5 @@
-// 🔥 1.0.27 버전 - 월드 보스 레이드 15배속, 수동소환 및 캐시 갱신 확인용
-const GAME_VERSION = "1.0.27"; 
-console.log("🔥 레이드 V2 (15배속, 수동소환) 스크립트 정상 로드 완료!");
+// 🔥 1.0.28 버전 - 데이터 롤백 및 인벤토리 Firebase 동기화 버그 완벽 수정
+const GAME_VERSION = "1.0.28"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -122,27 +121,34 @@ onAuthStateChanged(auth, async (user) => {
             userRankData.rankMoney = cloud.rankMoney !== undefined ? parseInt(cloud.rankMoney) : 0;
             userRankData.bonusCoins = cloud.bonusCoins !== undefined ? parseInt(cloud.bonusCoins) : 0;
 
-            userInventory = cloud.inventory || { coinPieces: 0, equipBoxes: 0, boxes: { '브론즈': 0, '실버': 0, '골드': 0, '플래티넘': 0, '다이아몬드': 0, '챌린저': 0 } };
+            // 🔥 강력한 데이터 방어: Firebase가 0을 누락시켜서 롤백되는 현상 방지
+            userInventory = cloud.inventory || {};
+            userInventory.coinPieces = userInventory.coinPieces || 0;
+            userInventory.equipBoxes = userInventory.equipBoxes || 0;
+            userInventory.boxes = userInventory.boxes || { '브론즈': 0, '실버': 0, '골드': 0, '플래티넘': 0, '다이아몬드': 0, '챌린저': 0 };
             
-            if(userInventory.boxes && userInventory.boxes.gold !== undefined) {
-                userInventory.boxes = {
-                    '브론즈': userInventory.boxes.bronze || 0,
-                    '실버': userInventory.boxes.silver || 0,
-                    '골드': userInventory.boxes.gold || 0,
-                    '플래티넘': userInventory.boxes.platinum || 0,
-                    '다이아몬드': userInventory.boxes.diamond || 0,
-                    '챌린저': userInventory.boxes.challenger || 0
-                };
+            if(userInventory.boxes.gold !== undefined || userInventory.boxes.bronze !== undefined) {
+                userInventory.boxes['브론즈'] = (userInventory.boxes['브론즈'] || 0) + (userInventory.boxes.bronze || 0);
+                userInventory.boxes['실버'] = (userInventory.boxes['실버'] || 0) + (userInventory.boxes.silver || 0);
+                userInventory.boxes['골드'] = (userInventory.boxes['골드'] || 0) + (userInventory.boxes.gold || 0);
+                userInventory.boxes['플래티넘'] = (userInventory.boxes['플래티넘'] || 0) + (userInventory.boxes.platinum || 0);
+                userInventory.boxes['다이아몬드'] = (userInventory.boxes['다이아몬드'] || 0) + (userInventory.boxes.diamond || 0);
+                userInventory.boxes['챌린저'] = (userInventory.boxes['챌린저'] || 0) + (userInventory.boxes.challenger || 0);
+                
+                delete userInventory.boxes.bronze; delete userInventory.boxes.silver; delete userInventory.boxes.gold; delete userInventory.boxes.platinum; delete userInventory.boxes.diamond; delete userInventory.boxes.challenger;
             }
             
-            if (cloud.monsterPieces > 0) {
-                userInventory.coinPieces = (userInventory.coinPieces || 0) + cloud.monsterPieces;
+            // 🔥 코인 조각 롤백 버그 완전 해결
+            if (cloud.monsterPieces && parseInt(cloud.monsterPieces) > 0) {
+                userInventory.coinPieces += parseInt(cloud.monsterPieces);
+                userRankData.monsterPieces = 0; // 마이그레이션 완료 후 클라우드 변수 초기화
             }
 
-            userEquipped = cloud.equipped || { '뱃지': null, '엠블럼': null, '링': null };
-            if(userEquipped.ring !== undefined) {
-                userEquipped = { '뱃지': userEquipped.badge, '엠블럼': userEquipped.emblem, '링': userEquipped.ring };
-            }
+            userEquipped = cloud.equipped || {};
+            userEquipped['뱃지'] = userEquipped['뱃지'] || userEquipped.badge || null;
+            userEquipped['엠블럼'] = userEquipped['엠블럼'] || userEquipped.emblem || null;
+            userEquipped['링'] = userEquipped['링'] || userEquipped.ring || null;
+            delete userEquipped.badge; delete userEquipped.emblem; delete userEquipped.ring;
             
             if (cloud.equips) {
                 let equipsArr = Array.isArray(cloud.equips) ? cloud.equips : Object.values(cloud.equips);
@@ -398,6 +404,8 @@ window.startNewGame = () => {
     monsters = []; projectiles = []; towers = []; hitEffects = []; visualEffects = []; fumaList = []; damageTexts = [];
     waveTimer = 0; spawnTimer = 0; selectedUnitIdx = -1; bestWave = parseInt(localStorage.getItem('mapleDefenseBestWave')) || 0;
     
+    if (currentUserUid) window.syncToCloud(); // 🔥 새 게임 시작 시 클라우드 찌꺼기 방지
+
     renderGrid(); window.switchScreen('game-container'); lastTime = performance.now(); 
     cancelAnimationFrame(mainReqId); updateUI(); mainReqId = requestAnimationFrame(loop);
 };
@@ -679,7 +687,7 @@ function processOpponentTick(dt) {
                 if (t.globalCooldown <= 0 && oppMonsters.length > 0) {
                     let baseDmg = t.cls.baseDmg * t.grade.mult * cardMulti * rageMulti;
                     if (t.cls.type === '전사' && oppSkillLevels.war_death > 0) { let gdmg = baseDmg * (1 + oppSkillLevels.war_death * 0.1); oppVisualEffects.push({ type: 'death', timer: 1.2, dmg: gdmg }); t.globalCooldown = 60000; }
-                    else if (t.cls.type === '법사' && oppSkillLevels.mage_thunder > 0) { let gdmg = baseDmg * (1 + oppSkillLevels.mage_thunder * 0.1); oppVisualEffects.push({ type: 'thunder', timer: 0.5, dmg: gdmg }); t.globalCooldown = 60000; }
+                    else if (t.cls.type === '법사' && oppSkillLevels.mage_thunder > 0) { let gdmg = baseDmg * (1 + skillLevels.mage_thunder * 0.1); oppVisualEffects.push({ type: 'thunder', timer: 0.5, dmg: gdmg }); t.globalCooldown = 60000; }
                     else if (t.cls.type === '도적' && oppSkillLevels.thief_fuma > 0) { let gdmg = baseDmg * (1 + oppSkillLevels.thief_fuma * 0.1); oppFumaList.push({ x: t.x, y: t.y, targetNode: 0, nodesVisited: 0, dmg: gdmg, hitSet: new Set(), angle: 0 }); t.globalCooldown = 60000; }
                 }
             }
@@ -765,7 +773,6 @@ function loop() {
     if(monsters.length >= 50) { if(state.isRank) return handleRankGameOver("몹 50마리 초과!"); else return gameOver("몬스터 50마리 초과! 게임 오버"); }
     
     let cardMulti = 1 + (getTotalCardBonus() / 100);
-    // 장비 스탯 합산
     let rageMulti = 1 + (skillLevels.common_rage * 0.01) + (equipStats.atk * 0.01);
     let sharpChance = (skillLevels.common_sharp * 0.05) + (equipStats.crit * 0.01);
     let windReduc = 1 + (skillLevels.common_wind * 0.2) + (equipStats.spd * 0.01);
@@ -1158,8 +1165,10 @@ window.openBox = (boxType) => {
     };
 
     if (boxType === 'equipBoxes') {
+        if (userInventory.equipBoxes <= 0) return;
         userInventory.equipBoxes--; generateEquipment();
     } else {
+        if (!userInventory.boxes[boxType] || userInventory.boxes[boxType] <= 0) return;
         userInventory.boxes[boxType]--; let data = tierProb[boxType];
         let r = Math.random(); let acc = 0; let getFrag = 0;
         for(let f of data.frag) { acc += f[1]; if(r <= acc) { getFrag = f[0]; break; } }
@@ -1193,6 +1202,7 @@ function generateEquipment() {
 
 window.equipItem = (idx) => {
     let item = userEquips.splice(idx, 1)[0];
+    if (!item) return;
     if(userEquipped[item.type]) { userEquips.push(userEquipped[item.type]); }
     userEquipped[item.type] = item; 
     calculateEquipStats(); window.syncToCloud(); renderEquippedSlots(); renderInventoryTab('equip');
