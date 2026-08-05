@@ -1308,7 +1308,8 @@ function loop() {
 function drawOpp() {
     if(!oppCtx) return;
     oppCtx.clearRect(0, 0, oppCanvas.width, oppCanvas.height);
-    
+    oppCtx.setLineDash([]);
+
     oppCtx.strokeStyle = "rgba(188, 170, 164, 0.2)";
     oppCtx.lineWidth = 35;
     oppCtx.lineJoin = "round";
@@ -1525,6 +1526,7 @@ function draw() {
         ctx.lineWidth = 1.5;
         ctx.setLineDash([5, 5]);
         ctx.stroke();
+        ctx.setLineDash([]);
         ctx.restore();
     }
 }
@@ -1905,7 +1907,8 @@ function drawPk() {
     let pkCanvas = document.getElementById('pkCanvas');
     let pkCtx = pkCanvas.getContext('2d');
     pkCtx.clearRect(0, 0, pkCanvas.width, pkCanvas.height);
-    
+    pkCtx.setLineDash([]);
+
     pkCtx.strokeStyle = "rgba(188, 170, 164, 0.2)";
     pkCtx.lineWidth = 35;
     pkCtx.lineJoin = "round";
@@ -2047,14 +2050,14 @@ window.buyMonsterPiece = () => {
 };
 
 window.exchangeMonsterCoin = () => {
-    if (userRankData.monsterPieces >= 5) {
-        userRankData.monsterPieces -= 5;
+    if (userRankData.monsterPieces >= 10) {
+        userRankData.monsterPieces -= 10;
         userRankData.bonusCoins += 1;
         document.getElementById('ui-shop-pieces').innerText = userRankData.monsterPieces;
-        alert("조각 5개를 코인 1개로 교환했습니다! (스킬 상점에서 사용 가능)");
+        alert("조각 10개를 코인 1개로 교환했습니다! (스킬 상점에서 사용 가능)");
         if (currentUserUid) window.syncToCloud();
     } else {
-        alert("몬스터 조각이 부족합니다. (5개 필요)");
+        alert("몬스터 조각이 부족합니다. (10개 필요)");
     }
 };
 
