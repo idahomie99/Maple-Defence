@@ -1113,13 +1113,16 @@ window.closeInventoryModal = () => { document.getElementById('inventory-modal').
 function renderEquippedSlots() {
     ['뱃지', '엠블럼', '링'].forEach(slot => {
         let el = document.getElementById(`slot-${slot}`); let item = userEquipped[slot];
-        if (item) { el.className = `equip-slot equip-${item.grade.toLowerCase()}`; el.querySelector('.slot-item').innerText = getEquipIcon(slot); } 
-        else { el.className = `equip-slot`; el.querySelector('.slot-item').innerText = ''; }
+        if (item) { el.className = `equip-slot equip-${item.grade.toLowerCase()}`; el.querySelector('.slot-item').innerHTML = getEquipIcon(slot); } 
+        else { el.className = `equip-slot`; el.querySelector('.slot-item').innerHTML = ''; }
     });
     document.getElementById('equip-total-stats').innerText = `적용 능력치: 공 +${equipStats.atk}% / 공속 +${equipStats.spd}% / 크확 +${equipStats.crit}%`;
 }
 
-function getEquipIcon(type) { return type === '뱃지' ? '📛' : (type === '엠블럼' ? '🛡️' : '💍'); }
+function getEquipIcon(type) { 
+    let fileName = type === '뱃지' ? 'badge.png' : (type === '엠블럼' ? 'emblem.png' : 'ring.png');
+    return `<img src="image/${fileName}" style="width: 36px; height: 36px; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.4));">`; 
+}
 
 window.combineCoinPieces = () => {
     if (userInventory.coinPieces >= 10) {
