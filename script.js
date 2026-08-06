@@ -262,7 +262,7 @@ window.startNewGame = () => {
     document.getElementById('best-wave-container').style.display = 'block'; document.getElementById('btn-speed').innerText = "1배속"; document.getElementById('btn-speed').style.display = 'block'; document.getElementById('btn-exit').style.display = 'block'; let surrenderBtn = document.getElementById('btn-rank-surrender'); if (surrenderBtn) surrenderBtn.style.display = 'none'; document.getElementById('opp-board-wrapper').style.display = 'none';
     monsters = []; projectiles = []; towers = []; hitEffects = []; visualEffects = []; fumaList = []; damageTexts = []; waveTimer = 0; spawnTimer = 0; selectedUnitIdx = -1; bestWave = parseInt(localStorage.getItem('mapleDefenseBestWave')) || 0;
     if (currentUserUid) window.syncToCloud();
-    renderGrid(); window.switchScreen('game-container'); lastTime = performance.now(); cancelAnimationFrame(mainReqId); updateUI(); mainReqId = requestAnimationFrame(loop);
+    renderGrid(); window.switchScreen('game-container'); lastTime = performance.now(); cancelAnimationFrame(mainReqId); updateUI(); mainReqId = requestAnimationFrame(window.loop);
 };
 
 window.loadAndStartGame = () => {
@@ -271,7 +271,7 @@ window.loadAndStartGame = () => {
     document.getElementById('best-wave-container').style.display = 'block'; document.getElementById('btn-speed').innerText = "1배속"; document.getElementById('btn-speed').style.display = 'block'; document.getElementById('btn-exit').style.display = 'block'; let surrenderBtn = document.getElementById('btn-rank-surrender'); if (surrenderBtn) surrenderBtn.style.display = 'none'; document.getElementById('opp-board-wrapper').style.display = 'none';
     towers = []; if(saved.gridData && Array.isArray(saved.gridData)) { saved.gridData.forEach((u) => { if(u) window.addUnit(u.idx, u.gradeIdx, u.clsName, true); }); }
     window.switchScreen('game-container'); state.status = 'PREP'; state.time = 5; lastTime = performance.now(); state.isBoss = !!getBossInfo(state.wave);
-    cancelAnimationFrame(mainReqId); updateUI(); mainReqId = requestAnimationFrame(loop);
+    cancelAnimationFrame(mainReqId); updateUI(); mainReqId = requestAnimationFrame(window.loop);
 };
 
 window.goToLobby = () => { if(!state.isRank) window.saveGameData(); state.status = 'TITLE'; cancelAnimationFrame(mainReqId); let gameOverModal = document.getElementById('gameover-modal'); if(gameOverModal) gameOverModal.style.display = 'none'; window.closeAllModals(); document.getElementById('ui-best-wave').innerText = bestWave; window.switchScreen('start-screen'); if (currentUserUid) window.syncToCloud(); };
@@ -407,7 +407,20 @@ window.isCombiningCoin = false;
 window.combineCoinPieces = () => {
     if (window.isCombiningCoin) return;
     if (userInventory.coinPieces >= 10) {
-        if (confirm("코인 조각 10개를 스킬 코인 1개로 합치시겠습니까?")) { window.isCombiningCoin = true; userInventory.coinPieces -= 10; userRankData.bonusCoins += 1; window.syncToCloud().then(() => { window.isCombiningCoin = false; renderInventoryTab('consumable'); showMessage("코인 1개를 획득했습니다!"); }); }
+        if (confirm("코인 조각 10개를 스킬 코인 1개로 합치시겠습니까?")) { 
+            window.isCombiningCoin = true; 
+            userInventory.coinPieces -= 10; 
+            userRankData.bonusCoins += 1; 
+            window.syncToCloud().then(() => { 
+                window.isCombiningCoin = false; 
+                renderInventoryTab('consumable'); 
+                showMessage("코인 1개를 획득했습니다!"); 
+            }).catch((e) => {
+                // 🔥 통신 실패 시 잠금 해제하도록 수정됨
+                window.isCombiningCoin = false;
+                showMessage("서버 통신 중 오류가 발생했습니다.");
+            }); 
+        }
     } else { showMessage("코인 조각이 부족합니다. (10개 필요)"); }
 };
 window.renderInventoryTab = (tab) => {
@@ -607,7 +620,7 @@ function enterRankGameAI(oppName, oppRp) {
     monsters = []; projectiles = []; towers = []; hitEffects = []; visualEffects = []; fumaList = []; damageTexts = []; waveTimer = 0; spawnTimer = 0; selectedUnitIdx = -1;
     oppState = { wave: 1, meso: 100, isDead: false, isBoss: false }; oppMonsters = []; oppProjectiles = []; oppTowers = []; oppVisualEffects = []; oppFumaList = []; oppDamageTexts = []; oppWaveTimer = 0; oppSpawnTimer = 0;
     renderGrid(); window.switchScreen('game-container'); document.getElementById('btn-speed').style.display = 'none'; document.getElementById('btn-exit').style.display = 'none'; let surrenderBtn = document.getElementById('btn-rank-surrender'); if (surrenderBtn) surrenderBtn.style.display = 'block'; document.getElementById('opp-board-wrapper').style.display = 'flex'; document.getElementById('opp-name').innerText = oppName; document.getElementById('opp-wave').innerText = '1'; document.getElementById('opp-mobs').innerText = '0'; document.getElementById('best-wave-container').style.display = 'none';
-    lastTime = performance.now(); cancelAnimationFrame(mainReqId); updateUI(); mainReqId = requestAnimationFrame(loop);
+    lastTime = performance.now(); cancelAnimationFrame(mainReqId); updateUI(); mainReqId = requestAnimationFrame(window.loop);
 }
 
 window.surrenderRankGame = () => { if (confirm("정말로 항복하시겠습니까? (즉시 패배 처리됩니다)")) { handleRankGameOver("항복했습니다."); } };
@@ -637,12 +650,13 @@ function processOpponentTick(dt) {
     let cardMulti = 1 + (oppCardBonus / 100); let rageMulti = 1 + ((oppSkillLevels.common_rage || 0) * 0.01); let sharpChance = (oppSkillLevels.common_sharp || 0) * 0.05; let windReduc = 1 + ((oppSkillLevels.common_wind || 0) * 0.2);
     oppTowers.forEach(t => {
         if (t.gradeIdx >= 5) {
+            // 🔥 AI의 스킬 참조가 skillLevels(플레이어)로 되어있던 것을 oppSkillLevels로 수정됨
             if ((t.cls.type === '전사' && oppSkillLevels.war_death > 0) || (t.cls.type === '법사' && oppSkillLevels.mage_thunder > 0) || (t.cls.type === '도적' && oppSkillLevels.thief_fuma > 0)) {
                 t.globalCooldown -= dt * 1000;
                 if (t.globalCooldown <= 0 && oppMonsters.length > 0) {
                     let baseDmg = t.cls.baseDmg * t.grade.mult * cardMulti * rageMulti;
                     if (t.cls.type === '전사' && oppSkillLevels.war_death > 0) { let gdmg = baseDmg * (1 + oppSkillLevels.war_death * 0.1); oppVisualEffects.push({ type: 'death', timer: 1.2, dmg: gdmg }); t.globalCooldown = 60000; }
-                    else if (t.cls.type === '법사' && oppSkillLevels.mage_thunder > 0) { let gdmg = baseDmg * (1 + skillLevels.mage_thunder * 0.1); oppVisualEffects.push({ type: 'thunder', timer: 0.5, dmg: gdmg }); t.globalCooldown = 60000; }
+                    else if (t.cls.type === '법사' && oppSkillLevels.mage_thunder > 0) { let gdmg = baseDmg * (1 + oppSkillLevels.mage_thunder * 0.1); oppVisualEffects.push({ type: 'thunder', timer: 0.5, dmg: gdmg }); t.globalCooldown = 60000; }
                     else if (t.cls.type === '도적' && oppSkillLevels.thief_fuma > 0) { let gdmg = baseDmg * (1 + oppSkillLevels.thief_fuma * 0.1); oppFumaList.push({ x: t.x, y: t.y, targetNode: 0, nodesVisited: 0, dmg: gdmg, hitSet: new Set(), angle: 0 }); t.globalCooldown = 60000; }
                 }
             }
@@ -671,6 +685,7 @@ function processOpponentTick(dt) {
                 let hitDmg = p.dmg; if (p.type === '전사' && p.target.isBoss) hitDmg *= 1.5; p.target.hp -= hitDmg;
                 if (p.isCrit) oppDamageTexts.push({ val: Math.floor(hitDmg), x: p.target.x, y: p.target.y - 15, timer: 0.8 });
                 if (p.type === '전사' && Math.random() < 0.2) p.target.stunTimer = 1;
+                // 🔥 AI의 스킬 참조가 skillLevels(플레이어)로 되어있던 것을 oppSkillLevels로 수정됨
                 if (p.type === '법사' && oppSkillLevels.mage_freeze > 0 && Math.random() < ((10 + oppSkillLevels.mage_freeze * 2) / 100)) { if (p.target.freezeTimer <= 0) { p.target.freezeTimer = 3; p.target.freezeTickTimer = 1; p.target.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][oppSkillLevels.mage_freeze - 1]; } }
             }
             if(p.splash > 0) {
@@ -679,7 +694,8 @@ function processOpponentTick(dt) {
                         let splashDmg = p.dmg; if (p.type === '전사' && m.isBoss) splashDmg *= 1.5; m.hp -= splashDmg;
                         if (p.isCrit) oppDamageTexts.push({ val: Math.floor(splashDmg), x: m.x, y: m.y - 15, timer: 0.8 });
                         if (p.type === '전사' && Math.random() < 0.2) m.stunTimer = 1;
-                        if (p.type === '법사' && oppSkillLevels.mage_freeze > 0 && Math.random() < ((10 + skillLevels.mage_freeze * 2) / 100)) { if (m.freezeTimer <= 0) { m.freezeTimer = 3; m.freezeTickTimer = 1; m.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][skillLevels.mage_freeze - 1]; } }
+                        // 🔥 AI의 스킬 참조가 skillLevels(플레이어)로 되어있던 것을 oppSkillLevels로 수정됨
+                        if (p.type === '법사' && oppSkillLevels.mage_freeze > 0 && Math.random() < ((10 + oppSkillLevels.mage_freeze * 2) / 100)) { if (m.freezeTimer <= 0) { m.freezeTimer = 3; m.freezeTickTimer = 1; m.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][oppSkillLevels.mage_freeze - 1]; } }
                     }
                 });
             }
@@ -832,3 +848,65 @@ function drawPk() {
     });
     pkState.dmgTexts.forEach(d => { pkCtx.save(); pkCtx.globalAlpha = Math.max(0, d.timer / 0.6); pkCtx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; pkCtx.font = d.isCrit ? "900 24px NanumSquare" : "bold 18px NanumSquare"; pkCtx.shadowColor = d.isCrit ? "#c62828" : "#000"; pkCtx.shadowBlur = 4; pkCtx.fillText(d.val, d.x, d.y); pkCtx.restore(); });
 }
+
+// ==========================================
+// 10. 누락된 핵심 게임 루프 및 UI 업데이트 함수 (추가됨)
+// ==========================================
+window.updateUI = () => {
+    let elMeso = document.getElementById('ui-meso'); if(elMeso) elMeso.innerText = state.meso;
+    let elMp = document.getElementById('ui-mp'); if(elMp) elMp.innerText = state.mp;
+    let elWave = document.getElementById('ui-wave'); if(elWave) elWave.innerText = state.wave;
+    let elKills = document.getElementById('ui-kills'); if(elKills) elKills.innerText = state.kills;
+    let elMobs = document.getElementById('ui-mobs'); if(elMobs) elMobs.innerText = `${monsters ? monsters.length : 0} / 50`;
+    let elTickets = document.getElementById('ui-tickets'); if(elTickets) elTickets.innerText = state.tickets ? state.tickets.length : 0;
+    
+    let upgWVal = document.getElementById('upg-w-val'); if(upgWVal) upgWVal.innerText = state.upgrades['전사'].val;
+    let upgWCost = document.getElementById('upg-w-cost'); if(upgWCost) upgWCost.innerText = state.upgrades['전사'].cost;
+    let upgMVal = document.getElementById('upg-m-val'); if(upgMVal) upgMVal.innerText = state.upgrades['법사'].val;
+    let upgMCost = document.getElementById('upg-m-cost'); if(upgMCost) upgMCost.innerText = state.upgrades['법사'].cost;
+    let upgTVal = document.getElementById('upg-t-val'); if(upgTVal) upgTVal.innerText = state.upgrades['도적'].val;
+    let upgTCost = document.getElementById('upg-t-cost'); if(upgTCost) upgTCost.innerText = state.upgrades['도적'].cost;
+};
+
+window.loop = window.loop || (() => {
+    if (state.status === 'GAMEOVER' || state.status === 'TITLE') return;
+    
+    let now = performance.now();
+    if (!lastTime) lastTime = now;
+    let dtReal = (now - lastTime) / 1000;
+    if (dtReal > 0.1) dtReal = 0.1;
+    lastTime = now;
+    
+    let dt = dtReal * state.speed;
+
+    // 1. 준비 시간 처리
+    if (state.status === 'PREP') {
+        state.time -= dtReal;
+        let uiTimer = document.getElementById('ui-timer');
+        if(uiTimer) uiTimer.innerText = Math.ceil(Math.max(0, state.time));
+        
+        if (state.time <= 0) {
+            state.status = 'PLAY';
+            let skipBtn = document.getElementById('boss-skip-wrapper');
+            if(skipBtn) skipBtn.style.display = 'none';
+        }
+    } 
+    // 2. 본 게임 처리 (웨이브 및 몹 업데이트)
+    else if (state.status === 'PLAY') {
+        updateWave(dt);
+        
+        // TODO: 플레이어 타워의 몹 공격 및 몹 이동 로직
+        // (이전에 작성하셨던 본게임 전투 로직, 즉 투사체 발사 및 몹 이동 코드가 있다면 이 부분에 붙여넣어 주세요)
+    }
+
+    // 3. 랭크 게임일 경우 상대방 AI 로직 실행
+    if (state.isRank && rankState.active) {
+        processOpponentTick(dt);
+    }
+
+    // 4. 화면 그리기 (추가된 본게임 전용 draw 함수가 있다면)
+    if (typeof window.draw === 'function') window.draw();
+    if (state.isRank && typeof window.drawOpponent === 'function') window.drawOpponent();
+
+    mainReqId = requestAnimationFrame(window.loop);
+});
