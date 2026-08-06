@@ -491,7 +491,8 @@ window.summonRaidUnit = () => {
     raidState.meso -= 10; document.getElementById('raid-meso').innerText = raidState.meso;
     let r = Math.random() * 100; let gradeIdx = r < 60 ? 5 : (r < 90 ? 6 : (r < 99 ? 7 : 8)); 
     let clsNames = Object.keys(CLASSES); let clsName = clsNames[Math.floor(Math.random() * clsNames.length)]; let cls = CLASSES[clsName]; let grade = GRADES[gradeIdx];
-    raidState.units[emptyIdx] = { cls: cls, grade: grade, gradeIdx: gradeIdx, x: 100 + (emptyIdx * 150), y: 400, lastAttack: 0, globalCooldown: 0 }; renderRaidGrid();
+    // x좌표와 y좌표가 실제 하단 그리드 박스의 중앙에 오도록 조정되었습니다.
+raidState.units[emptyIdx] = { cls: cls, grade: grade, gradeIdx: gradeIdx, x: 150 + (emptyIdx * 100), y: 360, lastAttack: 0, globalCooldown: 0 };
 };
 
 function renderRaidGrid() {
@@ -607,8 +608,37 @@ function raidLoop() {
 
 function drawRaid() {
     let canvas = document.getElementById('raidCanvas'); let ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height);
-    raidState.projectiles.forEach(p => { ctx.save(); ctx.translate(p.x, p.y); ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(0, 0, p.gradeIdx >= 6 ? 8 : 5, 0, Math.PI*2); ctx.fill(); ctx.restore(); });
-    raidState.dmgTexts.forEach(d => { ctx.save(); ctx.globalAlpha = Math.max(0, d.timer / 0.6); ctx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; ctx.font = d.isCrit ? "900 24px NanumSquare" : "bold 18px NanumSquare"; ctx.shadowColor = d.isCrit ? "#c62828" : "#000"; ctx.shadowBlur = 4; ctx.fillText(d.val, d.x - 20, d.y); ctx.restore(); });
+    
+    // 투사체 이미지 렌더링
+    raidState.projectiles.forEach(p => { 
+        ctx.save(); ctx.translate(p.x, p.y); 
+        
+        let dir = Math.atan2(p.ty - p.y, p.tx - p.x);
+        let scale = 1.0; if (p.isFinal) scale *= 1.3; ctx.scale(scale, scale);
+        if (p.isShadow) ctx.globalAlpha = 0.5;
+
+        let img = null; let psize = 20;
+        if (p.type === '전사') { img = p.gradeIdx >= 6 ? projImages.warrior2 : projImages.warrior1; ctx.rotate(dir + Math.PI); psize = p.gradeIdx >= 6 ? 30 : 20; }
+        else if (p.type === '법사') { img = p.gradeIdx >= 6 ? projImages.mage2 : projImages.mage1; ctx.rotate(dir + (15 * Math.PI / 180)); psize = p.gradeIdx >= 6 ? 30 : 20; }
+        else if (p.type === '도적') { img = p.gradeIdx >= 6 ? projImages.rogue2 : projImages.rogue1; ctx.rotate(p.angle); }
+
+        if (img && img.complete) { 
+            ctx.drawImage(img, -psize/2, -psize/2, psize, psize); 
+        } else { 
+            // 이미지 로드 전 예비용 렌더링
+            ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(0, 0, p.gradeIdx >= 6 ? 8 : 5, 0, Math.PI*2); ctx.fill(); 
+        }
+        ctx.restore(); 
+    });
+    
+    // 데미지 텍스트 렌더링
+    raidState.dmgTexts.forEach(d => { 
+        ctx.save(); ctx.globalAlpha = Math.max(0, d.timer / 0.6); 
+        ctx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; 
+        ctx.font = d.isCrit ? "900 24px NanumSquare" : "bold 18px NanumSquare"; 
+        ctx.shadowColor = d.isCrit ? "#c62828" : "#000"; ctx.shadowBlur = 4; 
+        ctx.fillText(d.val, d.x - 20, d.y); ctx.restore(); 
+    });
 }
 
 function endRaidGame() {
