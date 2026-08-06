@@ -1,5 +1,5 @@
-// 🔥 1.0.37 버전 - 타이머 프리즈 해결, 랭크 게임 15배속 & 25마리 제한 적용
-const GAME_VERSION = "1.0.37"; 
+// 🔥 1.0.38 버전 - 펀치킹 타이머 배속 수정, 랭겜 대기시간 25마리 표기, 월드보스 알림창 UI로 교체
+const GAME_VERSION = "1.0.38"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -440,7 +440,7 @@ function setGridMode(mode) {
 }
 
 window.openOnlineMenu = () => {
-    if (!currentUserUid) return alert("로그인이 필요한 서비스입니다.");
+    if (!currentUserUid) { showMessage("로그인이 필요한 서비스입니다."); return; }
     document.getElementById('online-overlay').style.display = 'flex';
     document.getElementById('online-menu-modal').style.display = 'block';
 };
@@ -757,7 +757,7 @@ function processOpponentTick(dt) {
         if(dist <= move) { m.x = t.x; m.y = t.y; m.targetNode = (m.targetNode + 1) % currentPath.length; } else { m.x += (dx/dist)*move; m.y += (dy/dist)*move; }
     }
     
-    // 🔥 상대방 필드 몹 제한 25마리로 하향 조정
+    // 🔥 랭겜 상대방 몹 제한 25마리
     if(oppMonsters.length >= 25) { oppState.isDead = true; state.status = 'GAMEOVER'; processRankResult('WIN', '상대방의 몹이 25마리 쌓여 패배했습니다!'); return; }
 
     let oppCardBonus = 0; for(let k in oppCardData) { if(oppCardData[k].grade > 0) oppCardBonus += 1 + (oppCardData[k].grade - 1) * 0.5; }
@@ -825,13 +825,12 @@ function loop() {
     if(state.status === 'GAMEOVER' || state.status === 'TITLE') return;
     let now = performance.now(); 
     
-    // 🔥 게임루프 현실 시간/게임 시간 완전 분리로 프리즈 현상 완벽 방지
     if (!lastTime) lastTime = now;
     let dtReal = (now - lastTime) / 1000;
-    if (dtReal > 0.1) dtReal = 0.1; // 최대 100ms 지연만 허용
+    if (dtReal > 0.1) dtReal = 0.1; 
     if (dtReal < 0) dtReal = 0.016; 
     
-    let dt = dtReal * (state.speed || 1); // 15배속 온전하게 적용
+    let dt = dtReal * (state.speed || 1); 
     lastTime = now;
     
     for (let i = hitEffects.length - 1; i >= 0; i--) { hitEffects[i].timer -= dt; if (hitEffects[i].timer <= 0) hitEffects.splice(i, 1); }
@@ -846,7 +845,7 @@ function loop() {
     for (let i = damageTexts.length - 1; i >= 0; i--) { damageTexts[i].timer -= dt; damageTexts[i].y -= dt * 30; if (damageTexts[i].timer <= 0) damageTexts.splice(i, 1); }
     
     if (state.status === 'PREP') {
-        state.time -= dtReal; // 대기 시간은 현실 시간으로 계산
+        state.time -= dtReal; 
         document.getElementById('ui-timer').innerText = Math.ceil(Math.max(0, state.time));
         if (state.time <= 0) { state.status = 'PLAY'; state.wave = state.wave || 1; waveTimer = 0; spawnTimer = 0; showMessage(state.wave + "웨이브 시작!"); updateUI(); }
         draw(); if(state.isRank) drawOpp(); mainReqId = requestAnimationFrame(loop); return;
@@ -863,7 +862,7 @@ function loop() {
         if(dist <= move) { m.x = t.x; m.y = t.y; m.targetNode = (m.targetNode + 1) % currentPath.length; } else { m.x += (dx/dist)*move; m.y += (dy/dist)*move; }
     }
     
-    // 🔥 랭크 게임 몹 25마리 제한 적용
+    // 🔥 내 필드 몹 제한 25마리 적용
     if(state.isRank && monsters.length >= 25) return handleRankGameOver("몹 25마리 초과!");
     if(!state.isRank && monsters.length >= 50) return gameOver("몬스터 50마리 초과! 게임 오버");
     
@@ -948,70 +947,16 @@ function loop() {
     }
     
     draw(); if(state.isRank) drawOpp(); 
-    
-    // 🔥 UI 몹 표시 실시간 동기화
-    document.getElementById('ui-mobs').innerText = `${monsters.length} / ${state.isRank ? 25 : 50}`; 
     mainReqId = requestAnimationFrame(loop);
-}
-
-function drawOpp() {
-    if(!oppCtx) return; oppCtx.clearRect(0, 0, oppCanvas.width, oppCanvas.height); oppCtx.setLineDash([]); oppCtx.strokeStyle = "rgba(188, 170, 164, 0.2)"; oppCtx.lineWidth = 35; oppCtx.lineJoin = "round"; oppCtx.beginPath(); oppCtx.rect(25, 25, 450, 240); oppCtx.stroke();
-    oppVisualEffects.forEach(v => {
-        oppCtx.save();
-        if (v.type === 'death') { let progress = Math.min(1, (1.2 - v.timer) / 0.2); oppCtx.strokeStyle = "#ffeb3b"; oppCtx.lineWidth = 8; oppCtx.lineCap = "round"; oppCtx.shadowColor = "#f57f17"; oppCtx.shadowBlur = 10; let currentX = -50 + (600) * progress; let currentY = 450 + (-400) * progress; oppCtx.beginPath(); oppCtx.moveTo(-50, 450); oppCtx.lineTo(currentX, currentY); oppCtx.stroke(); } 
-        else if (v.type === 'thunder') { oppCtx.fillStyle = `rgba(0, 229, 255, ${v.timer})`; oppCtx.fillRect(0,0,500,500); oppCtx.strokeStyle = `rgba(255, 255, 255, ${v.timer * 2})`; oppCtx.lineWidth = 15; oppCtx.beginPath(); oppCtx.moveTo(250,0); oppCtx.lineTo(200,250); oppCtx.lineTo(300,250); oppCtx.lineTo(250,500); oppCtx.stroke(); }
-        oppCtx.restore();
-    });
-    oppFumaList.forEach(f => { oppCtx.save(); oppCtx.translate(f.x, f.y); oppCtx.rotate(f.angle); if (fumaImg && fumaImg.complete) { let size = 60; oppCtx.drawImage(fumaImg, -size/2, -size/2, size, size); } oppCtx.restore(); });
-    oppMonsters.forEach(m => {
-        let size = m.isBoss ? 16 : 10; 
-        if (m.isBoss && bossImages[m.name] && bossImages[m.name].complete) { oppCtx.save(); oppCtx.translate(m.x, m.y); if (m.facingRight) oppCtx.scale(-1, 1); if (m.freezeTimer > 0) { oppCtx.globalAlpha = 0.5; oppCtx.fillStyle = "#81d4fa"; oppCtx.fillRect(-size * 1.5, -size * 1.5, size * 3, size * 3); oppCtx.globalAlpha = 1.0; } oppCtx.drawImage(bossImages[m.name], -size * 1.5, -size * 1.5, size * 3, size * 3); oppCtx.restore(); } 
-        else { if (!m.isBoss) { oppCtx.fillStyle = m.freezeTimer > 0 ? "#81d4fa" : "#81c784"; oppCtx.beginPath(); oppCtx.arc(m.x, m.y + 2, size, Math.PI, 0); oppCtx.fillRect(m.x - size, m.y + 2, size*2, size/2); oppCtx.fill(); } else { oppCtx.fillStyle = m.freezeTimer > 0 ? "#81d4fa" : "#ff8a65"; oppCtx.beginPath(); oppCtx.arc(m.x, m.y - 2, size, Math.PI, 0); oppCtx.fill(); oppCtx.fillStyle = m.freezeTimer > 0 ? "#b3e5fc" : "#ffe0b2"; oppCtx.fillRect(m.x - size/2, m.y - 2, size, size - 2); } }
-        oppCtx.fillStyle = "#000"; oppCtx.fillRect(m.x-10, m.y-size-8, 20, 3); oppCtx.fillStyle = "#4caf50"; oppCtx.fillRect(m.x-10, m.y-size-8, 20 * (m.hp/m.maxHp), 3);
-    });
-    oppProjectiles.forEach(p => {
-        oppCtx.save(); oppCtx.translate(p.x, p.y); let dir = Math.atan2(p.ty - p.y, p.tx - p.x); let scale = p.gradeIdx >= 6 ? 1.5 : 1; if (p.isFinal) scale *= 1.3; oppCtx.scale(scale, scale); if (p.isShadow) oppCtx.globalAlpha = 0.5;
-        let img = null; let size = p.gradeIdx >= 5 ? 35 : 20;
-        if (p.type === '전사') { img = p.gradeIdx >= 5 ? projImages.warrior2 : projImages.warrior1; oppCtx.rotate(dir + Math.PI); } 
-        else if (p.type === '법사') { img = p.gradeIdx >= 5 ? projImages.mage2 : projImages.mage1; let mageAngle = p.gradeIdx >= 5 ? dir + (15 * Math.PI / 180) : dir; oppCtx.rotate(mageAngle); } 
-        else if (p.type === '도적') { img = p.gradeIdx >= 5 ? projImages.rogue2 : projImages.rogue1; if (p.gradeIdx >= 5) size = 25; oppCtx.rotate(p.angle); }
-        if (img && img.complete) { oppCtx.drawImage(img, -size/2, -size/2, size, size); } oppCtx.restore();
-    });
-    oppDamageTexts.forEach(d => { oppCtx.save(); oppCtx.globalAlpha = d.timer / 0.8; oppCtx.fillStyle = "#ffeb3b"; oppCtx.font = "bold 16px NanumSquare"; oppCtx.shadowColor = "#c62828"; oppCtx.shadowBlur = 4; oppCtx.fillText(d.val, d.x - 10, d.y); oppCtx.restore(); });
-}
-
-function draw() {
-    if (!ctx) return; ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.strokeStyle = "rgba(188, 170, 164, 0.2)"; ctx.lineWidth = 35; ctx.lineJoin = "round"; ctx.beginPath(); if (state.isRank) { ctx.rect(25, 25, 450, 240); } else { ctx.rect(25, 25, 450, 450); } ctx.stroke();
-    visualEffects.forEach(v => {
-        ctx.save();
-        if (v.type === 'death') { let progress = Math.min(1, (1.2 - v.timer) / 0.2); ctx.strokeStyle = "#ffeb3b"; ctx.lineWidth = 8; ctx.lineCap = "round"; ctx.shadowColor = "#f57f17"; ctx.shadowBlur = 10; let currentX = -50 + (600) * progress; let currentY = 450 + (-400) * progress; ctx.beginPath(); ctx.moveTo(-50, 450); ctx.lineTo(currentX, currentY); ctx.stroke(); } 
-        else if (v.type === 'thunder') { ctx.fillStyle = `rgba(0, 229, 255, ${v.timer})`; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.strokeStyle = `rgba(255, 255, 255, ${v.timer * 2})`; ctx.lineWidth = 15; ctx.beginPath(); ctx.moveTo(canvas.width / 2, 0); ctx.lineTo(canvas.width / 2 - 50, canvas.height / 2); ctx.lineTo(canvas.width / 2 + 50, canvas.height / 2); ctx.lineTo(canvas.width / 2, canvas.height); ctx.stroke(); }
-        ctx.restore();
-    });
-    hitEffects.forEach(h => { ctx.save(); ctx.globalAlpha = Math.max(0, h.timer / 0.2); ctx.fillStyle = h.color || "#fff"; ctx.shadowColor = h.color || "#fff"; ctx.shadowBlur = 10; ctx.beginPath(); ctx.arc(h.x, h.y, 15 - (h.timer * 30), 0, Math.PI * 2); ctx.fill(); ctx.restore(); });
-    fumaList.forEach(f => { ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.angle); if (fumaImg && fumaImg.complete) { let size = 60; ctx.drawImage(fumaImg, -size/2, -size/2, size, size); } ctx.restore(); });
-    monsters.forEach(m => {
-        let size = m.isBoss ? 16 : 10; 
-        if (m.isBoss && bossImages[m.name] && bossImages[m.name].complete) { ctx.save(); ctx.translate(m.x, m.y); if (m.facingRight) ctx.scale(-1, 1); if (m.freezeTimer > 0) { ctx.globalAlpha = 0.5; ctx.fillStyle = "#81d4fa"; ctx.fillRect(-size * 1.5, -size * 1.5, size * 3, size * 3); ctx.globalAlpha = 1.0; } if (m.bindTimer > 0) { ctx.globalAlpha = 0.5; ctx.fillStyle = "#00e5ff"; ctx.fillRect(-size * 1.5, -size * 1.5, size * 3, size * 3); ctx.globalAlpha = 1.0; } ctx.drawImage(bossImages[m.name], -size * 1.5, -size * 1.5, size * 3, size * 3); ctx.restore(); } 
-        else { if (!m.isBoss) { ctx.fillStyle = m.freezeTimer > 0 ? "#81d4fa" : (m.bindTimer > 0 ? "#00e5ff" : "#81c784"); ctx.beginPath(); ctx.arc(m.x, m.y + 2, size, Math.PI, 0); ctx.fillRect(m.x - size, m.y + 2, size*2, size/2); ctx.fill(); } else { ctx.fillStyle = m.freezeTimer > 0 ? "#81d4fa" : (m.bindTimer > 0 ? "#00e5ff" : "#ff8a65"); ctx.beginPath(); ctx.arc(m.x, m.y - 2, size, Math.PI, 0); ctx.fill(); ctx.fillStyle = m.freezeTimer > 0 ? "#b3e5fc" : (m.bindTimer > 0 ? "#84ffff" : "#ffe0b2"); ctx.fillRect(m.x - size/2, m.y - 2, size, size - 2); } }
-        if (m.bindTimer > 0) { ctx.fillStyle = "#00e5ff"; ctx.font = "bold 12px sans-serif"; ctx.fillText("Bind!", m.x - 15, m.y - size - 15); } else if (m.stunTimer > 0) { ctx.fillStyle = "#ffeb3b"; ctx.font = "bold 12px sans-serif"; ctx.fillText("Stun!", m.x - 15, m.y - size - 15); }
-        ctx.fillStyle = "#000"; ctx.fillRect(m.x-10, m.y-size-8, 20, 3); ctx.fillStyle = "#4caf50"; ctx.fillRect(m.x-10, m.y-size-8, 20 * (m.hp/m.maxHp), 3);
-    });
-    projectiles.forEach(p => {
-        ctx.save(); ctx.translate(p.x, p.y); let dir = Math.atan2(p.ty - p.y, p.tx - p.x); let scale = p.gradeIdx >= 6 ? 1.5 : 1; if (p.isFinal) scale *= 1.3; ctx.scale(scale, scale); if (p.isShadow) ctx.globalAlpha = 0.5;
-        let img = null; let size = p.gradeIdx >= 5 ? 35 : 20; 
-        if (p.type === '전사') { img = p.gradeIdx >= 5 ? projImages.warrior2 : projImages.warrior1; ctx.rotate(dir + Math.PI); } 
-        else if (p.type === '법사') { img = p.gradeIdx >= 5 ? projImages.mage2 : projImages.mage1; let mageAngle = p.gradeIdx >= 5 ? dir + (15 * Math.PI / 180) : dir; ctx.rotate(mageAngle); } 
-        else if (p.type === '도적') { img = p.gradeIdx >= 5 ? projImages.rogue2 : projImages.rogue1; if (p.gradeIdx >= 5) size = 25; ctx.rotate(p.angle); }
-        if (img && img.complete) { ctx.drawImage(img, -size/2, -size/2, size, size); } ctx.restore();
-    });
-    damageTexts.forEach(d => { ctx.save(); ctx.globalAlpha = Math.max(0, d.timer / 0.8); ctx.fillStyle = "#ffeb3b"; ctx.font = "bold 16px sans-serif"; ctx.shadowColor = "#c62828"; ctx.shadowBlur = 4; ctx.fillText(d.val, d.x - 10, d.y); ctx.restore(); });
-    if (selectedUnitIdx !== -1 && grid[selectedUnitIdx]) { let u = grid[selectedUnitIdx]; let currentRange = u.cls.range * u.grade.rangeMul; ctx.save(); ctx.beginPath(); ctx.arc(u.x, u.y, currentRange, 0, Math.PI * 2); ctx.fillStyle = "rgba(255, 255, 255, 0.15)"; ctx.fill(); ctx.strokeStyle = "rgba(255, 255, 255, 0.6)"; ctx.lineWidth = 1.5; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]); ctx.restore(); }
 }
 
 function updateUI() {
     let skipWrapper = document.getElementById('boss-skip-wrapper'); if (state.isBoss && monsters.length === 0 && waveTimer > 0 && !state.isRank) skipWrapper.style.display = 'flex'; else skipWrapper.style.display = 'none';
     document.getElementById('ui-meso').innerText = state.meso; document.getElementById('ui-mp').innerText = state.mp; document.getElementById('ui-wave').innerText = state.wave; document.getElementById('ui-kills').innerText = state.kills.toLocaleString(); document.getElementById('ui-tickets').innerText = state.tickets.length; document.getElementById('btn-summon').disabled = (state.meso < 10);
+    
+    // 🔥 UI 몹 표시를 여기서 업데이트 (준비 시간에도 즉시 반영되도록)
+    document.getElementById('ui-mobs').innerText = `${monsters.length} / ${state.isRank ? 25 : 50}`; 
+    
     if (state.isRank) { document.getElementById('opp-wave').innerText = oppState.wave; document.getElementById('opp-mobs').innerText = oppMonsters.length; }
     let sellBtn = document.getElementById('btn-sell-single'); if (selectedUnitIdx !== -1 && grid[selectedUnitIdx] && grid[selectedUnitIdx].grade.sell > 0) { sellBtn.disabled = false; } else { sellBtn.disabled = true; }
     if (state.upgrades) { document.getElementById('upg-w-val').innerText = state.upgrades['전사'].val; document.getElementById('upg-w-cost').innerText = state.upgrades['전사'].cost; document.getElementById('upg-m-val').innerText = state.upgrades['법사'].val; document.getElementById('upg-m-cost').innerText = state.upgrades['법사'].cost; document.getElementById('upg-t-val').innerText = state.upgrades['도적'].val; document.getElementById('upg-t-cost').innerText = state.upgrades['도적'].cost; }
@@ -1036,7 +981,7 @@ window.loadPkLiveRanking = async () => {
 };
 window.openPkMenu = () => { document.getElementById('pk-overlay').style.display = 'flex'; document.getElementById('pk-menu').style.display = 'block'; document.getElementById('pk-class-select').style.display = 'none'; document.getElementById('pk-ranking').style.display = 'none'; document.getElementById('pk-result-modal').style.display = 'none'; document.getElementById('pk-result-overlay').style.display = 'none'; };
 window.closePk = () => { document.getElementById('pk-overlay').style.display = 'none'; pkState.active = false; cancelAnimationFrame(pkReqId); window.openOnlineMenu(); };
-window.showPkClassSelect = () => { if (!currentUserUid) return alert("로그인이 필요한 서비스입니다."); document.getElementById('pk-menu').style.display = 'none'; document.getElementById('pk-class-select').style.display = 'block'; };
+window.showPkClassSelect = () => { if (!currentUserUid) { showMessage("로그인이 필요한 서비스입니다."); return; } document.getElementById('pk-menu').style.display = 'none'; document.getElementById('pk-class-select').style.display = 'block'; };
 window.showPkRanking = async () => {
     document.getElementById('pk-menu').style.display = 'none'; document.getElementById('pk-class-select').style.display = 'none'; document.getElementById('pk-overlay').style.display = 'flex'; document.getElementById('pk-ranking').style.display = 'flex';
     let list = document.getElementById('pk-ranking-list'); list.innerHTML = '<div style="text-align:center; padding:20px; color:#fff;">서버에서 랭킹을 불러오는 중...</div>';
@@ -1067,10 +1012,13 @@ function pkLoop() {
     let dtReal = (now - pkState.lastTime) / 1000;
     if (dtReal > 0.1) dtReal = 0.1;
     if (dtReal < 0) dtReal = 0.016;
+    
+    // 🔥 배속이 적용된 진짜 시간(dt) 계산
     let dt = dtReal * (pkState.speed || 1); 
     pkState.lastTime = now;
 
-    pkState.time -= dtReal; 
+    // 🔥 dtReal이 아닌 dt를 빼주어 타이머도 초고속으로 줄어들게 수정
+    pkState.time -= dt; 
     document.getElementById('pk-time').innerText = Math.ceil(Math.max(0, pkState.time));
     if (pkState.time <= 0) {
         pkState.active = false; cancelAnimationFrame(pkReqId);
@@ -1141,58 +1089,3 @@ function drawPk() {
     });
     pkState.dmgTexts.forEach(d => { pkCtx.save(); pkCtx.globalAlpha = Math.max(0, d.timer / 0.6); pkCtx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; pkCtx.font = d.isCrit ? "900 24px NanumSquare" : "bold 18px NanumSquare"; pkCtx.shadowColor = d.isCrit ? "#c62828" : "#000"; pkCtx.shadowBlur = 4; pkCtx.fillText(d.val, d.x, d.y); pkCtx.restore(); });
 }
-
-// ==========================================
-// AI 랭크 게임 시스템
-// ==========================================
-window.openRankLobby = () => { let today = new Date().toLocaleDateString(); let lastDate = localStorage.getItem('mapleDefenseRankDate'); let playCount = parseInt(localStorage.getItem('mapleDefenseRankCount')) || 0; if (lastDate !== today) { playCount = 0; localStorage.setItem('mapleDefenseRankDate', today); localStorage.setItem('mapleDefenseRankCount', 0); } document.getElementById('ui-rank-remains').innerText = `${Math.max(0, 10 - playCount)} / 10`; document.getElementById('rank-overlay').style.display = 'flex'; document.getElementById('rank-lobby-modal').style.display = 'block'; document.getElementById('ui-rank-rp').innerText = userRankData.rp + " 점"; document.getElementById('ui-rank-money').innerText = userRankData.rankMoney + " 원"; };
-window.closeRankMenu = () => { document.getElementById('rank-overlay').style.display = 'none'; window.openOnlineMenu(); };
-window.openRankShop = () => { document.getElementById('ui-shop-rank-money').innerText = userRankData.rankMoney; document.getElementById('ui-shop-pieces').innerText = userInventory.coinPieces; document.getElementById('rank-lobby-modal').style.display = 'none'; document.getElementById('rank-shop-modal').style.display = 'block'; };
-window.closeRankShop = () => { document.getElementById('rank-shop-modal').style.display = 'none'; document.getElementById('rank-lobby-modal').style.display = 'block'; };
-
-window.buyMonsterPiece = () => {
-    if (userRankData.rankMoney >= 100) {
-        userRankData.rankMoney -= 100;
-        userInventory.coinPieces += 1;
-        document.getElementById('ui-shop-rank-money').innerText = userRankData.rankMoney;
-        document.getElementById('ui-shop-pieces').innerText = userInventory.coinPieces;
-        document.getElementById('ui-rank-money').innerText = userRankData.rankMoney + " 원";
-        if (currentUserUid) window.syncToCloud();
-    } else {
-        alert("랭크 머니가 부족합니다.");
-    }
-};
-
-function showMatchIntro(oppName, oppRp, callback) {
-    let intro = document.getElementById('match-intro-overlay'); document.getElementById('intro-player').innerText = `${currentUserName} (${userRankData.rp} RP)`; document.getElementById('intro-opp').innerText = `${oppName} (${oppRp} RP)`;
-    intro.style.display = 'flex'; void intro.offsetWidth; intro.style.opacity = '1';
-    setTimeout(() => { intro.style.opacity = '0'; setTimeout(() => { intro.style.display = 'none'; callback(); }, 500); }, 2000); 
-}
-window.startRankMatchmaking = async () => {
-    let today = new Date().toLocaleDateString(); let playCount = parseInt(localStorage.getItem('mapleDefenseRankCount')) || 0;
-    if (playCount >= 10) { alert("오늘의 랭크 게임 제한 횟수(10회)를 모두 소진했습니다. 내일 다시 도전해주세요!"); return; }
-    document.getElementById('rank-lobby-modal').style.display = 'none'; document.getElementById('rank-waiting-modal').style.display = 'block';
-    let oppName = "의문의 용사 (AI)"; let oppRp = userRankData.rp + Math.floor(Math.random() * 40 - 20); oppCardData = {}; oppSkillLevels = { ...skillLevels };
-    try { const snap = await get(child(ref(database), `users`)); if (snap.exists()) { let users = []; snap.forEach(c => { let v = c.val(); if (v.cloudData && v.nickname && c.key !== currentUserUid) { let diff = Math.abs((parseInt(v.cloudData.rp)||1000) - userRankData.rp); users.push({ ...v, diff: diff }); } }); users.sort((a,b) => a.diff - b.diff); if(users.length > 0) { let aiUser = users[Math.floor(Math.random() * Math.min(3, users.length))]; oppName = aiUser.nickname + " (AI)"; oppRp = parseInt(aiUser.cloudData.rp) || 1000; if(aiUser.cloudData.cards) oppCardData = JSON.parse(aiUser.cloudData.cards); if(aiUser.cloudData.skills) oppSkillLevels = JSON.parse(aiUser.cloudData.skills); } } } catch(e) { console.log("AI 데이터 로드 실패, 기본값 사용"); }
-    setTimeout(() => { document.getElementById('rank-waiting-modal').style.display = 'none'; playCount++; localStorage.setItem('mapleDefenseRankCount', playCount); showMatchIntro(oppName, oppRp, () => { enterRankGameAI(oppName, oppRp); }); }, 1500);
-};
-
-function enterRankGameAI(oppName, oppRp) {
-    document.getElementById('rank-overlay').style.display = 'none'; rankState.active = true; setGridMode('RANK'); 
-    state = { status: 'PREP', meso: 100, mp: 0, mpTotal: 0, kills: 0, wave: 1, time: 5, speed: 15, isBoss: false, upgrades: { '전사': {val: 0, cost: 10}, '법사': {val: 0, cost: 10}, '도적': {val: 0, cost: 10} }, tickets: [], isRank: true };
-    monsters = []; projectiles = []; towers = []; hitEffects = []; visualEffects = []; fumaList = []; damageTexts = []; waveTimer = 0; spawnTimer = 0; selectedUnitIdx = -1;
-    oppState = { wave: 1, meso: 100, isDead: false, isBoss: false }; oppMonsters = []; oppProjectiles = []; oppTowers = []; oppVisualEffects = []; oppFumaList = []; oppDamageTexts = []; oppWaveTimer = 0; oppSpawnTimer = 0;
-    renderGrid(); window.switchScreen('game-container'); document.getElementById('btn-speed').style.display = 'none'; document.getElementById('btn-exit').style.display = 'none'; let surrenderBtn = document.getElementById('btn-rank-surrender'); if (surrenderBtn) surrenderBtn.style.display = 'block';
-    document.getElementById('opp-board-wrapper').style.display = 'flex'; document.getElementById('opp-name').innerText = oppName; document.getElementById('opp-wave').innerText = '1'; document.getElementById('opp-mobs').innerText = '0';
-    document.getElementById('best-wave-container').style.display = 'none';
-    lastTime = performance.now(); cancelAnimationFrame(mainReqId); updateUI(); mainReqId = requestAnimationFrame(loop);
-}
-function handleRankGameOver(msg) { state.status = 'GAMEOVER'; processRankResult('LOSE', msg); }
-async function processRankResult(result, desc) {
-    if(!rankState.active) return; rankState.active = false;
-    document.getElementById('rank-result-title').innerText = result === 'WIN' ? "🏆 승리! 🏆" : "💀 패배... 💀"; document.getElementById('rank-result-title').style.color = result === 'WIN' ? "#3b82f6" : "#ef4444";
-    let rpChange = result === 'WIN' ? 10 : -10; let moneyChange = result === 'WIN' ? 100 : 20; userRankData.rp = Math.max(0, userRankData.rp + rpChange); userRankData.rankMoney += moneyChange;
-    document.getElementById('rank-result-rp').innerText = (rpChange > 0 ? "+" : "") + rpChange; document.getElementById('rank-result-rp').style.color = rpChange > 0 ? "#3b82f6" : "#ef4444"; document.getElementById('rank-result-money').innerText = "+" + moneyChange;
-    await window.syncToCloud(); document.getElementById('rank-result-overlay').style.display = 'block'; document.getElementById('rank-result-modal').style.display = 'block';
-}
-window.exitRankGame = () => { document.getElementById('rank-result-overlay').style.display = 'none'; document.getElementById('rank-result-modal').style.display = 'none'; rankState = { active: false }; state.status = 'TITLE'; window.switchScreen('start-screen'); };
