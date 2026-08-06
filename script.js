@@ -1,5 +1,5 @@
-// 🔥 1.0.38 버전 - 펀치킹 타이머 배속 수정, 랭겜 대기시간 25마리 표기, 월드보스 알림창 UI로 교체
-const GAME_VERSION = "1.0.38"; 
+// 🔥 1.0.39 버전 - 펀치킹 랭킹 등록 불가(undefined 비교) 버그 완벽 수정
+const GAME_VERSION = "1.0.39"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -757,7 +757,6 @@ function processOpponentTick(dt) {
         if(dist <= move) { m.x = t.x; m.y = t.y; m.targetNode = (m.targetNode + 1) % currentPath.length; } else { m.x += (dx/dist)*move; m.y += (dy/dist)*move; }
     }
     
-    // 🔥 랭겜 상대방 몹 제한 25마리
     if(oppMonsters.length >= 25) { oppState.isDead = true; state.status = 'GAMEOVER'; processRankResult('WIN', '상대방의 몹이 25마리 쌓여 패배했습니다!'); return; }
 
     let oppCardBonus = 0; for(let k in oppCardData) { if(oppCardData[k].grade > 0) oppCardBonus += 1 + (oppCardData[k].grade - 1) * 0.5; }
@@ -862,7 +861,6 @@ function loop() {
         if(dist <= move) { m.x = t.x; m.y = t.y; m.targetNode = (m.targetNode + 1) % currentPath.length; } else { m.x += (dx/dist)*move; m.y += (dy/dist)*move; }
     }
     
-    // 🔥 내 필드 몹 제한 25마리 적용
     if(state.isRank && monsters.length >= 25) return handleRankGameOver("몹 25마리 초과!");
     if(!state.isRank && monsters.length >= 50) return gameOver("몬스터 50마리 초과! 게임 오버");
     
@@ -947,16 +945,69 @@ function loop() {
     }
     
     draw(); if(state.isRank) drawOpp(); 
+    document.getElementById('ui-mobs').innerText = `${monsters.length} / ${state.isRank ? 25 : 50}`; 
     mainReqId = requestAnimationFrame(loop);
+}
+
+function drawOpp() {
+    if(!oppCtx) return; oppCtx.clearRect(0, 0, oppCanvas.width, oppCanvas.height); oppCtx.setLineDash([]); oppCtx.strokeStyle = "rgba(188, 170, 164, 0.2)"; oppCtx.lineWidth = 35; oppCtx.lineJoin = "round"; oppCtx.beginPath(); oppCtx.rect(25, 25, 450, 240); oppCtx.stroke();
+    oppVisualEffects.forEach(v => {
+        oppCtx.save();
+        if (v.type === 'death') { let progress = Math.min(1, (1.2 - v.timer) / 0.2); oppCtx.strokeStyle = "#ffeb3b"; oppCtx.lineWidth = 8; oppCtx.lineCap = "round"; oppCtx.shadowColor = "#f57f17"; oppCtx.shadowBlur = 10; let currentX = -50 + (600) * progress; let currentY = 450 + (-400) * progress; oppCtx.beginPath(); oppCtx.moveTo(-50, 450); oppCtx.lineTo(currentX, currentY); oppCtx.stroke(); } 
+        else if (v.type === 'thunder') { oppCtx.fillStyle = `rgba(0, 229, 255, ${v.timer})`; oppCtx.fillRect(0,0,500,500); oppCtx.strokeStyle = `rgba(255, 255, 255, ${v.timer * 2})`; oppCtx.lineWidth = 15; oppCtx.beginPath(); oppCtx.moveTo(250,0); oppCtx.lineTo(200,250); oppCtx.lineTo(300,250); oppCtx.lineTo(250,500); oppCtx.stroke(); }
+        oppCtx.restore();
+    });
+    oppFumaList.forEach(f => { oppCtx.save(); oppCtx.translate(f.x, f.y); oppCtx.rotate(f.angle); if (fumaImg && fumaImg.complete) { let size = 60; oppCtx.drawImage(fumaImg, -size/2, -size/2, size, size); } oppCtx.restore(); });
+    oppMonsters.forEach(m => {
+        let size = m.isBoss ? 16 : 10; 
+        if (m.isBoss && bossImages[m.name] && bossImages[m.name].complete) { oppCtx.save(); oppCtx.translate(m.x, m.y); if (m.facingRight) oppCtx.scale(-1, 1); if (m.freezeTimer > 0) { oppCtx.globalAlpha = 0.5; oppCtx.fillStyle = "#81d4fa"; oppCtx.fillRect(-size * 1.5, -size * 1.5, size * 3, size * 3); oppCtx.globalAlpha = 1.0; } oppCtx.drawImage(bossImages[m.name], -size * 1.5, -size * 1.5, size * 3, size * 3); oppCtx.restore(); } 
+        else { if (!m.isBoss) { oppCtx.fillStyle = m.freezeTimer > 0 ? "#81d4fa" : "#81c784"; oppCtx.beginPath(); oppCtx.arc(m.x, m.y + 2, size, Math.PI, 0); oppCtx.fillRect(m.x - size, m.y + 2, size*2, size/2); oppCtx.fill(); } else { oppCtx.fillStyle = m.freezeTimer > 0 ? "#81d4fa" : "#ff8a65"; oppCtx.beginPath(); oppCtx.arc(m.x, m.y - 2, size, Math.PI, 0); oppCtx.fill(); oppCtx.fillStyle = m.freezeTimer > 0 ? "#b3e5fc" : "#ffe0b2"; oppCtx.fillRect(m.x - size/2, m.y - 2, size, size - 2); } }
+        oppCtx.fillStyle = "#000"; oppCtx.fillRect(m.x-10, m.y-size-8, 20, 3); oppCtx.fillStyle = "#4caf50"; oppCtx.fillRect(m.x-10, m.y-size-8, 20 * (m.hp/m.maxHp), 3);
+    });
+    oppProjectiles.forEach(p => {
+        oppCtx.save(); oppCtx.translate(p.x, p.y); let dir = Math.atan2(p.ty - p.y, p.tx - p.x); let scale = p.gradeIdx >= 6 ? 1.5 : 1; if (p.isFinal) scale *= 1.3; oppCtx.scale(scale, scale); if (p.isShadow) oppCtx.globalAlpha = 0.5;
+        let img = null; let size = p.gradeIdx >= 5 ? 35 : 20;
+        if (p.type === '전사') { img = p.gradeIdx >= 5 ? projImages.warrior2 : projImages.warrior1; oppCtx.rotate(dir + Math.PI); } 
+        else if (p.type === '법사') { img = p.gradeIdx >= 5 ? projImages.mage2 : projImages.mage1; let mageAngle = p.gradeIdx >= 5 ? dir + (15 * Math.PI / 180) : dir; oppCtx.rotate(mageAngle); } 
+        else if (p.type === '도적') { img = p.gradeIdx >= 5 ? projImages.rogue2 : projImages.rogue1; if (p.gradeIdx >= 5) size = 25; oppCtx.rotate(p.angle); }
+        if (img && img.complete) { oppCtx.drawImage(img, -size/2, -size/2, size, size); } oppCtx.restore();
+    });
+    oppDamageTexts.forEach(d => { oppCtx.save(); oppCtx.globalAlpha = d.timer / 0.8; oppCtx.fillStyle = "#ffeb3b"; oppCtx.font = "bold 16px NanumSquare"; oppCtx.shadowColor = "#c62828"; oppCtx.shadowBlur = 4; oppCtx.fillText(d.val, d.x - 10, d.y); oppCtx.restore(); });
+}
+
+function draw() {
+    if (!ctx) return; ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.strokeStyle = "rgba(188, 170, 164, 0.2)"; ctx.lineWidth = 35; ctx.lineJoin = "round"; ctx.beginPath(); if (state.isRank) { ctx.rect(25, 25, 450, 240); } else { ctx.rect(25, 25, 450, 450); } ctx.stroke();
+    visualEffects.forEach(v => {
+        ctx.save();
+        if (v.type === 'death') { let progress = Math.min(1, (1.2 - v.timer) / 0.2); ctx.strokeStyle = "#ffeb3b"; ctx.lineWidth = 8; ctx.lineCap = "round"; ctx.shadowColor = "#f57f17"; ctx.shadowBlur = 10; let currentX = -50 + (600) * progress; let currentY = 450 + (-400) * progress; ctx.beginPath(); ctx.moveTo(-50, 450); ctx.lineTo(currentX, currentY); ctx.stroke(); } 
+        else if (v.type === 'thunder') { ctx.fillStyle = `rgba(0, 229, 255, ${v.timer})`; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.strokeStyle = `rgba(255, 255, 255, ${v.timer * 2})`; ctx.lineWidth = 15; ctx.beginPath(); ctx.moveTo(canvas.width / 2, 0); ctx.lineTo(canvas.width / 2 - 50, canvas.height / 2); ctx.lineTo(canvas.width / 2 + 50, canvas.height / 2); ctx.lineTo(canvas.width / 2, canvas.height); ctx.stroke(); }
+        ctx.restore();
+    });
+    hitEffects.forEach(h => { ctx.save(); ctx.globalAlpha = Math.max(0, h.timer / 0.2); ctx.fillStyle = h.color || "#fff"; ctx.shadowColor = h.color || "#fff"; ctx.shadowBlur = 10; ctx.beginPath(); ctx.arc(h.x, h.y, 15 - (h.timer * 30), 0, Math.PI * 2); ctx.fill(); ctx.restore(); });
+    fumaList.forEach(f => { ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.angle); if (fumaImg && fumaImg.complete) { let size = 60; ctx.drawImage(fumaImg, -size/2, -size/2, size, size); } ctx.restore(); });
+    monsters.forEach(m => {
+        let size = m.isBoss ? 16 : 10; 
+        if (m.isBoss && bossImages[m.name] && bossImages[m.name].complete) { ctx.save(); ctx.translate(m.x, m.y); if (m.facingRight) ctx.scale(-1, 1); if (m.freezeTimer > 0) { ctx.globalAlpha = 0.5; ctx.fillStyle = "#81d4fa"; ctx.fillRect(-size * 1.5, -size * 1.5, size * 3, size * 3); ctx.globalAlpha = 1.0; } if (m.bindTimer > 0) { ctx.globalAlpha = 0.5; ctx.fillStyle = "#00e5ff"; ctx.fillRect(-size * 1.5, -size * 1.5, size * 3, size * 3); ctx.globalAlpha = 1.0; } ctx.drawImage(bossImages[m.name], -size * 1.5, -size * 1.5, size * 3, size * 3); ctx.restore(); } 
+        else { if (!m.isBoss) { ctx.fillStyle = m.freezeTimer > 0 ? "#81d4fa" : (m.bindTimer > 0 ? "#00e5ff" : "#81c784"); ctx.beginPath(); ctx.arc(m.x, m.y + 2, size, Math.PI, 0); ctx.fillRect(m.x - size, m.y + 2, size*2, size/2); ctx.fill(); } else { ctx.fillStyle = m.freezeTimer > 0 ? "#81d4fa" : (m.bindTimer > 0 ? "#00e5ff" : "#ff8a65"); ctx.beginPath(); ctx.arc(m.x, m.y - 2, size, Math.PI, 0); ctx.fill(); ctx.fillStyle = m.freezeTimer > 0 ? "#b3e5fc" : (m.bindTimer > 0 ? "#84ffff" : "#ffe0b2"); ctx.fillRect(m.x - size/2, m.y - 2, size, size - 2); } }
+        if (m.bindTimer > 0) { ctx.fillStyle = "#00e5ff"; ctx.font = "bold 12px sans-serif"; ctx.fillText("Bind!", m.x - 15, m.y - size - 15); } else if (m.stunTimer > 0) { ctx.fillStyle = "#ffeb3b"; ctx.font = "bold 12px sans-serif"; ctx.fillText("Stun!", m.x - 15, m.y - size - 15); }
+        ctx.fillStyle = "#000"; ctx.fillRect(m.x-10, m.y-size-8, 20, 3); ctx.fillStyle = "#4caf50"; ctx.fillRect(m.x-10, m.y-size-8, 20 * (m.hp/m.maxHp), 3);
+    });
+    projectiles.forEach(p => {
+        ctx.save(); ctx.translate(p.x, p.y); let dir = Math.atan2(p.ty - p.y, p.tx - p.x); let scale = p.gradeIdx >= 6 ? 1.5 : 1; if (p.isFinal) scale *= 1.3; ctx.scale(scale, scale); if (p.isShadow) ctx.globalAlpha = 0.5;
+        let img = null; let size = p.gradeIdx >= 5 ? 35 : 20; 
+        if (p.type === '전사') { img = p.gradeIdx >= 5 ? projImages.warrior2 : projImages.warrior1; ctx.rotate(dir + Math.PI); } 
+        else if (p.type === '법사') { img = p.gradeIdx >= 5 ? projImages.mage2 : projImages.mage1; let mageAngle = p.gradeIdx >= 5 ? dir + (15 * Math.PI / 180) : dir; ctx.rotate(mageAngle); } 
+        else if (p.type === '도적') { img = p.gradeIdx >= 5 ? projImages.rogue2 : projImages.rogue1; if (p.gradeIdx >= 5) size = 25; ctx.rotate(p.angle); }
+        if (img && img.complete) { ctx.drawImage(img, -size/2, -size/2, size, size); } ctx.restore();
+    });
+    damageTexts.forEach(d => { ctx.save(); ctx.globalAlpha = Math.max(0, d.timer / 0.8); ctx.fillStyle = "#ffeb3b"; ctx.font = "bold 16px sans-serif"; ctx.shadowColor = "#c62828"; ctx.shadowBlur = 4; ctx.fillText(d.val, d.x - 10, d.y); ctx.restore(); });
+    if (selectedUnitIdx !== -1 && grid[selectedUnitIdx]) { let u = grid[selectedUnitIdx]; let currentRange = u.cls.range * u.grade.rangeMul; ctx.save(); ctx.beginPath(); ctx.arc(u.x, u.y, currentRange, 0, Math.PI * 2); ctx.fillStyle = "rgba(255, 255, 255, 0.15)"; ctx.fill(); ctx.strokeStyle = "rgba(255, 255, 255, 0.6)"; ctx.lineWidth = 1.5; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]); ctx.restore(); }
 }
 
 function updateUI() {
     let skipWrapper = document.getElementById('boss-skip-wrapper'); if (state.isBoss && monsters.length === 0 && waveTimer > 0 && !state.isRank) skipWrapper.style.display = 'flex'; else skipWrapper.style.display = 'none';
     document.getElementById('ui-meso').innerText = state.meso; document.getElementById('ui-mp').innerText = state.mp; document.getElementById('ui-wave').innerText = state.wave; document.getElementById('ui-kills').innerText = state.kills.toLocaleString(); document.getElementById('ui-tickets').innerText = state.tickets.length; document.getElementById('btn-summon').disabled = (state.meso < 10);
-    
-    // 🔥 UI 몹 표시를 여기서 업데이트 (준비 시간에도 즉시 반영되도록)
     document.getElementById('ui-mobs').innerText = `${monsters.length} / ${state.isRank ? 25 : 50}`; 
-    
     if (state.isRank) { document.getElementById('opp-wave').innerText = oppState.wave; document.getElementById('opp-mobs').innerText = oppMonsters.length; }
     let sellBtn = document.getElementById('btn-sell-single'); if (selectedUnitIdx !== -1 && grid[selectedUnitIdx] && grid[selectedUnitIdx].grade.sell > 0) { sellBtn.disabled = false; } else { sellBtn.disabled = true; }
     if (state.upgrades) { document.getElementById('upg-w-val').innerText = state.upgrades['전사'].val; document.getElementById('upg-w-cost').innerText = state.upgrades['전사'].cost; document.getElementById('upg-m-val').innerText = state.upgrades['법사'].val; document.getElementById('upg-m-cost').innerText = state.upgrades['법사'].cost; document.getElementById('upg-t-val').innerText = state.upgrades['도적'].val; document.getElementById('upg-t-cost').innerText = state.upgrades['도적'].cost; }
@@ -967,14 +1018,15 @@ function showMessage(msg) { let ov = document.getElementById('msg-overlay'); ov.
 function gameOver(msg) { state.status = 'GAMEOVER'; localStorage.removeItem('mapleDefenseSave'); document.getElementById('gameover-msg').innerText = msg; document.getElementById('overlay').style.display = 'block'; document.getElementById('gameover-modal').style.display = 'block'; if (currentUserUid) window.syncToCloud(); }
 
 // ==========================================
-// 펀치킹 시스템
+// 펀킹 시스템
 // ==========================================
 window.loadPkLiveRanking = async () => {
     let list = document.getElementById('pk-live-ranking-list'); if(!list) return;
     try {
         const snap = await get(child(ref(database), `pk_rankings`));
         if (snap.exists()) {
-            let ranks = []; snap.forEach(c => ranks.push(c.val())); ranks.sort((a, b) => b.score - a.score); ranks = ranks.slice(0, 10); list.innerHTML = '';
+            let ranks = []; snap.forEach(c => { let v = c.val(); if(typeof v.score === 'number') ranks.push(v); }); 
+            ranks.sort((a, b) => b.score - a.score); ranks = ranks.slice(0, 10); list.innerHTML = '';
             ranks.forEach((entry, idx) => { let color = idx === 0 ? '#ffd700' : (idx === 1 ? '#e0e0e0' : (idx === 2 ? '#cd7f32' : '#fff')); list.innerHTML += `<div style="display:flex; justify-content:space-between; background:rgba(255,255,255,0.1); padding:6px 10px; border-radius:4px; color:${color}; font-weight:bold;"><span>${idx + 1}. ${entry.nickname} <span style="font-size:10px; color:#aaa;">(${entry.class})</span></span><span>${entry.score.toLocaleString()}점</span></div>`; });
         } else { list.innerHTML = '<div style="text-align:center; color:#ccc;">아직 등록된 랭킹이 없습니다.</div>'; }
     } catch(e) { list.innerHTML = '<div style="text-align:center; color:#ff5252;">랭킹 서버 연결 실패.</div>'; }
@@ -988,7 +1040,8 @@ window.showPkRanking = async () => {
     try {
         const snap = await get(child(ref(database), `pk_rankings`));
         if (snap.exists()) {
-            let ranks = []; snap.forEach(c => ranks.push(c.val())); ranks.sort((a, b) => b.score - a.score); ranks = ranks.slice(0, 10); list.innerHTML = '';
+            let ranks = []; snap.forEach(c => { let v = c.val(); if(typeof v.score === 'number') ranks.push(v); }); 
+            ranks.sort((a, b) => b.score - a.score); ranks = ranks.slice(0, 10); list.innerHTML = '';
             ranks.forEach((entry, idx) => { let color = idx === 0 ? '#ffd700' : (idx === 1 ? '#e0e0e0' : (idx === 2 ? '#cd7f32' : '#fff')); list.innerHTML += `<div style="display:flex; justify-content:space-between; background:rgba(255,255,255,0.1); padding:10px; border-radius:6px; color:${color}; font-weight:bold;"><span>${idx + 1}위 - ${entry.nickname} (${entry.class})</span><span>${entry.score.toLocaleString()}점 <span style="font-size:10px; color:#aaa;">(${entry.date})</span></span></div>`; });
         } else list.innerHTML = '<div style="text-align:center; padding:20px; color:#fff;">아직 등록된 랭킹이 없습니다.</div>';
     } catch(e) { list.innerHTML = '<div style="text-align:center; color:#ff5252;">랭킹 서버 연결 실패.</div>'; }
@@ -997,7 +1050,16 @@ window.togglePkSpeed = () => { if (pkState.speed === 1) pkState.speed = 10; else
 window.startPkGame = async (clsName) => {
     document.getElementById('pk-overlay').style.display = 'none'; window.switchScreen('pk-game'); window.loadPkLiveRanking();
     let grade = GRADES[8]; let cls = CLASSES[clsName]; document.getElementById('pk-unit-icon').innerText = cls.icon; document.getElementById('pk-unit-name').style.color = cls.color;
-    let bestScore = 0; if (currentUserUid) { try { let snap = await get(child(ref(database), `pk_rankings/${currentUserUid}`)); if(snap.exists()) bestScore = snap.val().score; } catch(e) {} }
+    let bestScore = 0; 
+    if (currentUserUid) { 
+        try { 
+            let snap = await get(child(ref(database), `pk_rankings/${currentUserUid}`)); 
+            if(snap.exists()) {
+                let s = snap.val().score;
+                if(typeof s === 'number') bestScore = s;
+            }
+        } catch(e) {} 
+    }
     let pkBarContainer = document.getElementById('pk-global-bar-container');
     if (pkBarContainer) {
         if ((cls.type === '전사' && skillLevels.war_death > 0) || (cls.type === '법사' && skillLevels.mage_thunder > 0) || (cls.type === '도적' && skillLevels.thief_fuma > 0)) { pkBarContainer.style.display = 'block'; document.getElementById('pk-global-bar').style.background = cls.type === '전사' ? '#ffeb3b' : (cls.type === '법사' ? '#00e5ff' : '#ab47bc'); document.getElementById('pk-global-bar').style.width = '0%'; } else pkBarContainer.style.display = 'none';
@@ -1012,12 +1074,9 @@ function pkLoop() {
     let dtReal = (now - pkState.lastTime) / 1000;
     if (dtReal > 0.1) dtReal = 0.1;
     if (dtReal < 0) dtReal = 0.016;
-    
-    // 🔥 배속이 적용된 진짜 시간(dt) 계산
     let dt = dtReal * (pkState.speed || 1); 
     pkState.lastTime = now;
 
-    // 🔥 dtReal이 아닌 dt를 빼주어 타이머도 초고속으로 줄어들게 수정
     pkState.time -= dt; 
     document.getElementById('pk-time').innerText = Math.ceil(Math.max(0, pkState.time));
     if (pkState.time <= 0) {
@@ -1067,8 +1126,18 @@ window.submitPkScore = async () => {
     const btnSubmit = document.getElementById('btn-submit-pk'); if(btnSubmit) { btnSubmit.disabled = true; btnSubmit.innerText = "서버에 저장 중..."; }
     try {
         const snap = await get(child(ref(database), `pk_rankings/${currentUserUid}`));
-        if (snap.exists()) { const data = snap.val(); if (finalScore > data.score) { await set(ref(database, `pk_rankings/${currentUserUid}`), { nickname: currentUserName, class: className, score: finalScore, date: new Date().toLocaleDateString() }); } } 
-        else { await set(ref(database, `pk_rankings/${currentUserUid}`), { nickname: currentUserName, class: className, score: finalScore, date: new Date().toLocaleDateString() }); }
+        let shouldUpdate = false;
+        if (snap.exists()) { 
+            const data = snap.val(); 
+            if (typeof data.score === 'undefined' || finalScore > data.score) { 
+                shouldUpdate = true;
+            } 
+        } else { 
+            shouldUpdate = true; 
+        }
+        if (shouldUpdate) {
+            await set(ref(database, `pk_rankings/${currentUserUid}`), { nickname: currentUserName, class: className, score: finalScore, date: new Date().toLocaleDateString() }); 
+        }
     } catch(e) { alert("서버 통신 중 오류가 발생했습니다."); }
     if(btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerText = "랭킹 등록하고 로비로"; }
     document.getElementById('pk-result-overlay').style.display = 'none'; document.getElementById('pk-result-modal').style.display = 'none'; window.switchScreen('start-screen'); window.loadPkLiveRanking(); 
