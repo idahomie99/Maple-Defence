@@ -359,15 +359,15 @@
         <p style="color: #fff; font-size: 14px; margin: 0;">남은 시간: <span id="raid-prep-time" style="color:#ff5252; font-weight:bold; font-size:20px;">10</span>초</p>
     </div>
 
-    <!-- 하단: 소환 버튼 -->
     <div style="background: rgba(0,0,0,0.8); padding: 15px 20px; border-radius: 12px; border: 1px solid #777; text-align: center; margin-bottom: 10px;">
-        <div style="color: #eee; font-size: 14px; margin-bottom: 10px;">보유 메소: <span id="raid-meso" style="color: #ffeb3b; font-weight:bold; font-size: 18px;">30</span></div>
-        <button class="ingame-btn premium-green" style="padding: 12px 24px; font-size: 16px;" onclick="summonRaidUnit()">유닛 소환 (10 메소)</button>
-        <p style="color:#aaa; font-size:11px; margin-top: 10px; margin-bottom: 0;">※ 10초 뒤 <span style="color:#ffeb3b;">15배속</span>으로 자동 시작됩니다.</p>
-    </div>
+            <div style="color: #eee; font-size: 14px; margin-bottom: 10px;">보유 메소: <span id="raid-meso" style="color: #ffeb3b; font-weight:bold; font-size: 18px;">30</span></div>
+            <button class="ingame-btn premium-green" style="padding: 12px 24px; font-size: 16px;" onclick="summonRaidUnit()">유닛 소환 (10 메소)</button>
+            <p style="color:#aaa; font-size:11px; margin-top: 10px; margin-bottom: 0;">※ 10초 뒤 <span style="color:#ffeb3b;">15배속</span>으로 자동 시작됩니다.</p>
+        </div>
 
-</div>
-    </div>
+    </div> <!-- raid-prep-ui 닫기 -->
+    </div> <!-- raid-board-area 닫기 -->
+</div> <!-- raid-game 닫기 -->
 
     <!-- 인벤토리 모달 -->
     <div id="inventory-modal" class="maple-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:3500; width:90%; max-width:340px; background: #eceff1; border-color: #546e7a;">

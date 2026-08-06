@@ -1,5 +1,5 @@
-// 🔥 1.0.45 버전 - 누락된 메인 화면 렌더링(draw, drawOpp) 복구, 모든 오류 수정 통합 완료
-const GAME_VERSION = "1.0.45"; 
+// 🔥 1.0.46 버전 - 레이드 중복 코드 제거 및 모달창 먹통 버그 해결
+const GAME_VERSION = "1.0.46"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
