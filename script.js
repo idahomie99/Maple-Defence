@@ -1,5 +1,5 @@
-// 🔥 1.0.46 버전 - 레이드 중복 코드 제거 및 모달창 먹통 버그 해결
-const GAME_VERSION = "1.0.46"; 
+// 🔥 1.0.47 버전 - 100층 이후 보스 HP 밸런스 패치, 몬스터 좌우 반전 교정, 사거리 표시 기능 추가
+const GAME_VERSION = "1.0.47"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -123,7 +123,8 @@ const CLASSES = {
     '도적': { type: '도적', icon: '✦', color: '#6a1b9a', baseDmg: 18, range: 200, cd: 800, splash: 0 }
 };
 
-const BOSS_WAVES = { 24: { hp: 10000, meso: 50, ticket: 3, name: "킹 슬라임" }, 37: { hp: 30000, meso: 50, ticket: 4, name: "알리샤르" }, 58: { hp: 100000, meso: 50, ticket: 4, name: "파풀라투스" }, 79: { hp: 300000, meso: 70, ticket: 5, name: "피아누스" }, 90: { hp: 1000000, meso: 100, ticket: 5, name: "자쿰" }, 100: { name: "혼테일", meso: 100, ticket: 5 }, 110: { name: "시그너스", meso: 150, ticket: 5 }, 120: { name: "반반", meso: 150, ticket: 5 }, 130: { name: "피에르", meso: 150, ticket: 5 }, 140: { name: "블러드퀸", meso: 150, ticket: 5 }, 150: { name: "벨룸", meso: 150, ticket: 5 } };
+// 🔥 자쿰 HP 하향 (100만 -> 80만)
+const BOSS_WAVES = { 24: { hp: 10000, meso: 50, ticket: 3, name: "킹 슬라임" }, 37: { hp: 30000, meso: 50, ticket: 4, name: "알리샤르" }, 58: { hp: 100000, meso: 50, ticket: 4, name: "파풀라투스" }, 79: { hp: 300000, meso: 70, ticket: 5, name: "피아누스" }, 90: { hp: 800000, meso: 100, ticket: 5, name: "자쿰" }, 100: { name: "혼테일", meso: 100, ticket: 5 }, 110: { name: "시그너스", meso: 150, ticket: 5 }, 120: { name: "반반", meso: 150, ticket: 5 }, 130: { name: "피에르", meso: 150, ticket: 5 }, 140: { name: "블러드퀸", meso: 150, ticket: 5 }, 150: { name: "벨룸", meso: 150, ticket: 5 } };
 
 // ==========================================
 // 4. 유틸리티 및 인증 함수
@@ -232,7 +233,16 @@ window.logout = () => { signOut(auth).then(() => { location.reload(); }); };
 // ==========================================
 function getBossInfo(w) {
     if (w < 100 && BOSS_WAVES[w]) return BOSS_WAVES[w];
-    if (w >= 100 && w % 5 === 0) { let n = (w - 100) / 5; let calculatedHp = 2000000 + (n * 1000000) + (Math.pow(n, 2) * 150000); let bName = BOSS_WAVES[w] ? BOSS_WAVES[w].name : (w % 10 === 5 ? "어둠의 늑대" : `심연의 보스 (${w}층)`); let bMeso = BOSS_WAVES[w] ? BOSS_WAVES[w].meso : 150; let bTicket = BOSS_WAVES[w] ? BOSS_WAVES[w].ticket : 5; return { hp: Math.floor(calculatedHp), meso: bMeso, ticket: bTicket, name: bName }; } return null;
+    if (w >= 100 && w % 5 === 0) { 
+        let n = (w - 100) / 5; 
+        // 🔥 100층 이후 HP 밸런스 하향 조정 적용
+        let calculatedHp = 1200000 + (n * 300000) + (Math.pow(n, 2) * 50000); 
+        let bName = BOSS_WAVES[w] ? BOSS_WAVES[w].name : (w % 10 === 5 ? "어둠의 늑대" : `심연의 보스 (${w}층)`); 
+        let bMeso = BOSS_WAVES[w] ? BOSS_WAVES[w].meso : 150; 
+        let bTicket = BOSS_WAVES[w] ? BOSS_WAVES[w].ticket : 5; 
+        return { hp: Math.floor(calculatedHp), meso: bMeso, ticket: bTicket, name: bName }; 
+    } 
+    return null;
 }
 
 function setGridMode(mode) {
@@ -453,7 +463,7 @@ function generateEquipment() {
     let types = ['뱃지', '엠블럼', '링']; let type = types[Math.floor(Math.random() * 3)]; let r = Math.random(); let grade, min, max;
     if (r < 0.65) { grade = 'Rare'; min = 1; max = 3; } else if (r < 0.90) { grade = 'Epic'; min = 4; max = 8; } else if (r < 0.99) { grade = 'Unique'; min = 9; max = 15; } else { grade = 'Legendary'; min = 16; max = 25; }
     let atk = 0, spd = 0, crit = 0; let statType = Math.floor(Math.random() * 3); let val = Math.floor(Math.random() * (max - min + 1)) + min; let alertMsg = "";
-    if (statType === 0) { atk = val; alertMsg = `공격력: +${val}%`; } else if (statType === 1) { spd = val; alertMsg = `공속: +${val}%`; } else { crit = val; alertMsg = `크확: +${val}%`; }
+    if (statType === 0) { atk = val; alertMsg = `공격력: +${val}%`; } else if (statType === 1) { spd = val; alertMsg = `공속: +${val}%`; } else { crit = val; alertMsg = `크확: +val}%`; }
     userEquips.push({ type, grade, atk, spd, crit, id: Date.now() }); showMessage(`[${grade}] ${type} 획득!\n${alertMsg}`);
 }
 window.equipItem = (idx) => { let item = userEquips.splice(idx, 1)[0]; if (!item) return; if(userEquipped[item.type]) { userEquips.push(userEquipped[item.type]); } userEquipped[item.type] = item; calculateEquipStats(); window.syncToCloud(); renderEquippedSlots(); renderInventoryTab('equip'); };
@@ -491,7 +501,7 @@ window.summonRaidUnit = () => {
     raidState.meso -= 10; document.getElementById('raid-meso').innerText = raidState.meso;
     let r = Math.random() * 100; let gradeIdx = r < 60 ? 5 : (r < 90 ? 6 : (r < 99 ? 7 : 8)); 
     let clsNames = Object.keys(CLASSES); let clsName = clsNames[Math.floor(Math.random() * clsNames.length)]; let cls = CLASSES[clsName]; let grade = GRADES[gradeIdx];
-    // x좌표와 y좌표가 실제 하단 그리드 박스의 중앙에 오도록 조정되었습니다.
+    
 raidState.units[emptyIdx] = { cls: cls, grade: grade, gradeIdx: gradeIdx, x: 150 + (emptyIdx * 100), y: 360, lastAttack: 0, globalCooldown: 0 };
 };
 
@@ -523,7 +533,6 @@ setInterval(() => {
                 }
             }
         }).catch(e => {
-            // 🔥 통신 실패 시 데미지 복구 (다음 1초에 재전송)
             raidState.pendingDmg += dmgToApply; 
             console.warn("데미지 전송 지연, 다음 틱에 재전송합니다.");
         });
@@ -548,7 +557,6 @@ function raidLoop() {
     raidState.units.forEach(u => {
         if(!u) return; 
 
-        // 🔥 1. 5차 스킬 글로벌 쿨타임 및 광역 데미지 적용
         if (u.gradeIdx >= 5 && ((u.cls.type === '전사' && skillLevels.war_death > 0) || (u.cls.type === '법사' && skillLevels.mage_thunder > 0) || (u.cls.type === '도적' && skillLevels.thief_fuma > 0))) {
             u.globalCooldown -= dt * 1000;
             if (u.globalCooldown <= 0) {
@@ -573,7 +581,6 @@ function raidLoop() {
             let dmg = 20 * u.grade.mult * cardMulti * rageMulti; 
             let isCrit = Math.random() < sharpChance; if (isCrit) dmg *= 1.2;
             
-            // 🔥 2. 파이널 어택 적용
             let isFinal = false; 
             if (u.cls.type === '전사' && skillLevels.war_final > 0 && Math.random() < (skillLevels.war_final * 0.03)) { 
                 isFinal = true; dmg *= 2; 
@@ -581,7 +588,6 @@ function raidLoop() {
 
             raidState.projectiles.push({ type: u.cls.type, x: u.x, y: u.y, tx: bx, ty: by, dmg: dmg, color: u.cls.color, angle: 0, isCrit: isCrit, gradeIdx: u.gradeIdx, isFinal: isFinal }); 
             
-            // 🔥 3. 섀도우 파트너 적용
             if (u.cls.type === '도적' && skillLevels.thief_shadow > 0 && Math.random() < (skillLevels.thief_shadow * 0.03)) { 
                 raidState.projectiles.push({ type: u.cls.type, x: u.x, y: u.y, tx: bx, ty: by, dmg: dmg, color: u.cls.color, angle: 0, isCrit: isCrit, gradeIdx: u.gradeIdx, isShadow: true }); 
             }
@@ -597,7 +603,6 @@ function raidLoop() {
             let ox = (Math.random() - 0.5) * 50; let oy = (Math.random() - 0.5) * 50; raidState.dmgTexts.push({ val: Math.floor(p.dmg), x: bx + ox, y: by + oy, timer: 0.6, isCrit: p.isCrit });
             raidState.projectiles.splice(i, 1);
         } else { 
-            // 섀도우 파트너 투사체는 조금 더 느리게 이동하는 시각적 효과
             let moveAmt = speed; if (p.isShadow) moveAmt *= 0.85; 
             p.x += (dx/dist)*moveAmt; p.y += (dy/dist)*moveAmt; 
         }
@@ -609,7 +614,6 @@ function raidLoop() {
 function drawRaid() {
     let canvas = document.getElementById('raidCanvas'); let ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // 투사체 이미지 렌더링
     raidState.projectiles.forEach(p => { 
         ctx.save(); ctx.translate(p.x, p.y); 
         
@@ -625,13 +629,11 @@ function drawRaid() {
         if (img && img.complete) { 
             ctx.drawImage(img, -psize/2, -psize/2, psize, psize); 
         } else { 
-            // 이미지 로드 전 예비용 렌더링
             ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(0, 0, p.gradeIdx >= 6 ? 8 : 5, 0, Math.PI*2); ctx.fill(); 
         }
         ctx.restore(); 
     });
     
-    // 데미지 텍스트 렌더링
     raidState.dmgTexts.forEach(d => { 
         ctx.save(); ctx.globalAlpha = Math.max(0, d.timer / 0.6); 
         ctx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; 
@@ -648,7 +650,6 @@ function endRaidGame() {
         if (percent <= 5) rewardTier = '브론즈'; else if (percent <= 10) rewardTier = '실버'; else if (percent <= 20) rewardTier = '골드'; else if (percent <= 30) rewardTier = '플래티넘'; else if (percent <= 50) rewardTier = '다이아몬드'; else rewardTier = '챌린저';
         let rewardMsg = "";
         
-        // 🔥 추가된 안전장치: 상자 객체가 비어있을 경우 발생하는 오류 방지
         if (!userInventory.boxes) userInventory.boxes = {};
         
         if (raidState.gotLastHit) { 
@@ -674,7 +675,6 @@ function endRaidGame() {
             if(committed && snapshot.exists()) { let data = snapshot.val(); if (data.lastKillerUid === currentUserUid && !raidState.rewardClaimedForKills.includes(data.killCount)) { raidState.rewardClaimedForKills.push(data.killCount); raidState.gotLastHit = true; } }
             finishProcess();
         }).catch(e => {
-            // 🔥 핵심 수정: 서버 통신 실패 시 멈추지 않고 강제로 결과창 띄우기
             console.warn("보스 데이터 통신 에러 발생:", e);
             finishProcess();
         });
@@ -959,11 +959,28 @@ window.draw = () => {
     for(let i=1; i<currentPath.length; i++) ctx.lineTo(currentPath[i].x, currentPath[i].y);
     ctx.closePath(); ctx.stroke();
 
+    // 🔥 선택된 유닛 사거리 표시
+    if (selectedUnitIdx !== -1 && grid[selectedUnitIdx]) {
+        let u = grid[selectedUnitIdx];
+        let attackRange = u.cls.range * u.grade.rangeMul;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(u.x, u.y, attackRange, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = "rgba(255, 235, 59, 0.6)";
+        ctx.stroke();
+        ctx.restore();
+    }
+
     // 몬스터
     monsters.forEach(m => {
         let size = m.isBoss ? 25 : 12;
         ctx.save(); ctx.translate(m.x, m.y);
-        if (!m.facingRight) ctx.scale(-1, 1);
+        
+        // 🔥 기본 이미지가 왼쪽을 바라보므로, 오른쪽으로 이동할 때 이미지를 좌우 반전
+        if (m.facingRight) ctx.scale(-1, 1);
         
         if (m.isBoss && bossImages[m.name] && bossImages[m.name].complete) {
             ctx.drawImage(bossImages[m.name], -size*1.5, -size*1.5, size*3, size*3);
@@ -1040,7 +1057,9 @@ window.drawOpp = () => {
     oppMonsters.forEach(m => {
         let size = m.isBoss ? 15 : 8;
         oppCtx.save(); oppCtx.translate(m.x, m.y);
-        if (!m.facingRight) oppCtx.scale(-1, 1);
+        
+        // 🔥 기본 이미지가 왼쪽을 바라보므로, 오른쪽으로 이동할 때 이미지를 좌우 반전
+        if (m.facingRight) oppCtx.scale(-1, 1);
         
         if (m.isBoss && bossImages[m.name] && bossImages[m.name].complete) {
             oppCtx.drawImage(bossImages[m.name], -size*1.5, -size*1.5, size*3, size*3);
