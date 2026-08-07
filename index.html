@@ -170,20 +170,26 @@
         </div>
 
         <div id="rank-shop-modal" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 15vh; width: 85%; max-width: 320px;">
-            <h3 style="color:#6b21a8;">🛒 랭크 전용 상점</h3>
-            <div style="background:rgba(0,0,0,0.7); padding:15px; border-radius:8px; margin-bottom:15px; border: 1px solid #6d4c41;">
-                <div style="font-size:14px; font-weight:bold; display:flex; justify-content:space-between; margin-bottom:10px;">
-                    <span style="color:#ddd;">보유 랭크 머니</span> <span id="ui-shop-rank-money" style="color:#ffe082;">0</span>
-                </div>
-                <div style="font-size:14px; font-weight:bold; display:flex; justify-content:space-between;">
-                    <span style="color:#ddd;">보유 코인 조각</span> <span id="ui-shop-pieces" style="color:#81c784;">0</span>
-                </div>
-            </div>
-            <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;">
-                <button class="ingame-btn premium-orange" style="width:100%;" onclick="buyMonsterPiece()">조각 1개 구매 (100 머니)</button>
-            </div>
-            <button class="ingame-btn premium-dark" style="width:100%; padding: 10px;" onclick="closeRankShop()">랭크 로비로 돌아가기</button>
+    <h3 style="color:#6b21a8;">🛒 랭크 전용 상점</h3>
+    <div style="background:rgba(0,0,0,0.7); padding:15px; border-radius:8px; margin-bottom:15px; border: 1px solid #6d4c41;">
+        <div style="font-size:14px; font-weight:bold; display:flex; justify-content:space-between; margin-bottom:10px;">
+            <span style="color:#ddd;">보유 랭크 머니</span> <span id="ui-shop-rank-money" style="color:#ffe082;">0</span>
         </div>
+        <div style="font-size:14px; font-weight:bold; display:flex; justify-content:space-between; margin-bottom:10px;">
+            <span style="color:#ddd;">보유 코인 조각</span> <span id="ui-shop-pieces" style="color:#81c784;">0</span>
+        </div>
+        <!-- 🔥 새로 추가된 별의 기운 표기 -->
+        <div style="font-size:14px; font-weight:bold; display:flex; justify-content:space-between;">
+            <span style="color:#ddd;">보유 별의 기운</span> <span id="ui-shop-star-pieces" style="color:#ffeb3b;">0</span>
+        </div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;">
+        <button class="ingame-btn premium-orange" style="width:100%;" onclick="buyMonsterPiece()">조각 1개 구매 (100 머니)</button>
+        <!-- 🔥 새로 추가된 별의 기운 구매 버튼 -->
+        <button class="ingame-btn premium-blue" style="width:100%;" onclick="buyStarPiece()">별의 기운 1개 구매 (50 머니)</button>
+    </div>
+    <button class="ingame-btn premium-dark" style="width:100%; padding: 10px;" onclick="closeRankShop()">랭크 로비로 돌아가기</button>
+</div>
 
         <div id="match-intro-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:4000; flex-direction:column; justify-content:center; align-items:center; opacity:0; transition: opacity 0.5s ease-in-out;">
             <h2 style="color:#ffeb3b; font-size:36px; margin-bottom: 30px; text-shadow: 2px 2px 5px #000;">⚔️ 매칭 성사! ⚔️</h2>
