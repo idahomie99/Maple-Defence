@@ -1,5 +1,5 @@
-// 🔥 1.0.58 버전 - A to Z 전면 검증 및 인벤토리 장비 텍스트 겹침 완벽 해결
-const GAME_VERSION = "1.0.58"; 
+// 🔥 1.0.59 버전 - 인벤토리 & 장착 슬롯 레이아웃 붕괴 완벽 교정 (Flexbox 적용)
+const GAME_VERSION = "1.0.59"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -504,21 +504,25 @@ function renderEquippedSlots() {
     ['뱃지', '엠블럼', '링'].forEach(slot => { 
         let el = document.getElementById(`slot-${slot}`); 
         
-        // 🔥 텍스트(slot-name)가 이미지와 겹치지 않게 하단으로 살짝 내리기
+        // 🔥 Flexbox로 강제 정렬하여 이미지는 무조건 위로, 텍스트는 무조건 아래로 배치
+        el.style.display = 'flex';
+        el.style.flexDirection = 'column-reverse'; // 이미지를 위로
+        el.style.alignItems = 'center';
+        el.style.justifyContent = 'center';
+
         let nameEl = el.querySelector('.slot-name');
         if(nameEl) {
-            nameEl.style.position = 'relative';
-            nameEl.style.top = '4px'; 
-            nameEl.style.zIndex = '5';
+            nameEl.style.position = 'static'; // 억지로 내리던 설정 초기화
+            nameEl.style.marginTop = '6px'; // 이미지와 글씨 간격 확보
+            nameEl.style.lineHeight = '1';
         }
 
         let item = userEquipped[slot]; 
         if (item) { 
             el.className = `equip-slot equip-${item.grade.toLowerCase()}`; 
-            // 🔥 스타포스 위치를 좀 더 우측 상단 밖으로 배치
-            let starStr = item.star > 0 ? `<div style="position:absolute; top:-10px; right:-10px; font-size:11px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${item.star}</div>` : '';
-            // 🔥 이미지 자체도 글씨 공간을 위해 살짝 위로 올림
-            el.querySelector('.slot-item').innerHTML = `<div style="position:relative; display:inline-block; line-height:1; transform: translateY(-4px);">${starStr}${getEquipIcon(slot)}</div>`;
+            // 🔥 스타포스 위치를 이미지 박스 밖으로 넉넉히 빼서 화려한 이펙트와 겹치지 않게 고정
+            let starStr = item.star > 0 ? `<div style="position:absolute; top:-10px; right:-10px; font-size:12px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${item.star}</div>` : '';
+            el.querySelector('.slot-item').innerHTML = `<div style="position:relative; display:flex; justify-content:center; align-items:center;">${starStr}${getEquipIcon(slot)}</div>`;
             el.onclick = () => openEquipDetailModal(item, slot, true); 
         } else { 
             el.className = `equip-slot`; 
@@ -530,7 +534,8 @@ function renderEquippedSlots() {
 }
 
 function getEquipIcon(type) { 
-    let fileName = type === '뱃지' ? 'emblem.png' : (type === '엠블럼' ? 'badge.png' : 'ring.png'); 
+    // 🔥 뱃지와 엠블럼 이미지 이름 반전 교정 (엠블럼=emblem.png, 뱃지=badge.png)
+    let fileName = type === '뱃지' ? 'badge.png' : (type === '엠블럼' ? 'emblem.png' : 'ring.png'); 
     let size = type === '링' ? '30px' : '36px'; 
     return `<img src="image/${fileName}" style="width: ${size}; height: ${size}; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.4));">`; 
 }
@@ -566,9 +571,9 @@ window.renderInventoryTab = (tab) => {
         userEquips.forEach((eq, idx) => {
             let el = document.createElement('div'); el.className = `inv-item-box equip-${eq.grade.toLowerCase()}`; let statStr = "";
             if (eq.atk > 0) statStr = `공+${eq.atk}%`; else if (eq.spd > 0) statStr = `속+${eq.spd}%`; else if (eq.crit > 0) statStr = `크+${eq.crit}%`;
-            let starStr = eq.star > 0 ? `<div style="position:absolute; top:-10px; right:-10px; font-size:11px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${eq.star}</div>` : '';
-            // 🔥 이미지 박스 여백 수정 및 이미지 살짝 위로 이동
-            el.innerHTML = `<div style="position:relative; display:inline-block; margin-top:5px; line-height:1; transform: translateY(-2px);">${starStr}${getEquipIcon(eq.type)}</div><div style="font-size:10px; font-weight:bold; margin-top:6px; color:#37474f; text-align:center;">${statStr}</div>`; 
+            let starStr = eq.star > 0 ? `<div style="position:absolute; top:-6px; right:-10px; font-size:12px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${eq.star}</div>` : '';
+            // 🔥 인벤토리 내부 장비도 Flex로 강제 정렬
+            el.innerHTML = `<div style="position:relative; display:flex; justify-content:center; align-items:center; height:36px; margin-top:4px;">${starStr}${getEquipIcon(eq.type)}</div><div style="font-size:10px; font-weight:bold; margin-top:2px; color:#37474f; text-align:center;">${statStr}</div>`; 
             el.onclick = () => openEquipDetailModal(eq, idx, false); 
             list.appendChild(el);
         });
@@ -704,7 +709,7 @@ window.modalActionDisassemble = () => {
 };
 
 // ==========================================
-// 🌟 스타포스 강화 팝업 및 로직
+// 🌟 스타포스 강화 팝업 및 로직 
 // ==========================================
 window.openStarForceModal = () => {
     let eqModal = document.getElementById('equip-detail-modal');
@@ -838,7 +843,7 @@ window.openRaidMenu = () => {
 
 window.summonRaidUnit = () => {
     if(raidState.status !== 'PREP') return; if(raidState.meso < 10) { window.showMessage("메소가 부족합니다."); return; }
-    let emptyIdx = raidState.units.findIndex(v => v === null); if(emptyIdx === -1) { window.showMessage("더 이상 배치할 수ীকার"); return; }
+    let emptyIdx = raidState.units.findIndex(v => v === null); if(emptyIdx === -1) { window.showMessage("더 이상 배치할 수 없습니다."); return; }
     raidState.meso -= 10; document.getElementById('raid-meso').innerText = raidState.meso;
     let r = Math.random() * 100; let gradeIdx = r < 60 ? 5 : (r < 90 ? 6 : (r < 99 ? 7 : 8)); 
     let clsNames = Object.keys(CLASSES); let clsName = clsNames[Math.floor(Math.random() * clsNames.length)]; let cls = CLASSES[clsName]; let grade = GRADES[gradeIdx];
@@ -1213,7 +1218,7 @@ function processOpponentTick(dt) {
                         let splashDmg = p.dmg; if (p.type === '전사' && m.isBoss) splashDmg *= 1.5; m.hp -= splashDmg;
                         if (p.isCrit) oppDamageTexts.push({ val: Math.floor(splashDmg), x: m.x, y: m.y - 15, timer: 0.8 });
                         if (p.type === '전사' && Math.random() < 0.2) m.stunTimer = 1;
-                        if (p.type === '법사' && oppSkillLevels.mage_freeze > 0 && Math.random() < ((10 + skillLevels.mage_freeze * 2) / 100)) { if (m.freezeTimer <= 0) { m.freezeTimer = 3; m.freezeTickTimer = 1; m.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][oppSkillLevels.mage_freeze - 1]; } }
+                        if (p.type === '법사' && oppSkillLevels.mage_freeze > 0 && Math.random() < ((10 + skillLevels.mage_freeze * 2) / 100)) { if (m.freezeTimer <= 0) { m.freezeTimer = 3; m.freezeTickTimer = 1; m.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][skillLevels.mage_freeze - 1]; } }
                     }
                 });
             }
