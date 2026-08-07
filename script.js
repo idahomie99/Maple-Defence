@@ -1,5 +1,5 @@
-// 🔥 1.0.59 버전 - 인벤토리 & 장착 슬롯 레이아웃 붕괴 완벽 교정 (Flexbox 적용)
-const GAME_VERSION = "1.0.59"; 
+// 🔥 1.0.60 버전 - 일반 몬스터 이미지(mob.png) 적용 완료
+const GAME_VERSION = "1.0.60"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -109,6 +109,7 @@ const husooabiImg = new Image(); husooabiImg.src = "image/husooabi.png";
 const projImages = { warrior1: new Image(), warrior2: new Image(), mage1: new Image(), mage2: new Image(), rogue1: new Image(), rogue2: new Image() };
 projImages.warrior1.src = "image/warrior1.png"; projImages.warrior2.src = "image/warrior2.png"; projImages.mage1.src = "image/magician1.png"; projImages.mage2.src = "image/magician2.png"; projImages.rogue1.src = "image/rogue1.png"; projImages.rogue2.src = "image/rogue2.png";
 const fumaImg = new Image(); fumaImg.src = "image/fumashurikenimage.png";
+const mobImg = new Image(); mobImg.src = "image/mob.png"; // 🔥 일반 잡몹 이미지 추가
 
 const GRADES = [
     { name: "초보자", prob: 50.0, sell: 3, mult: 1, rangeMul: 1 }, { name: "1차", prob: 33.1, sell: 6, mult: 2, rangeMul: 1 },
@@ -503,26 +504,16 @@ window.closeInventoryModal = () => { document.getElementById('inventory-modal').
 function renderEquippedSlots() { 
     ['뱃지', '엠블럼', '링'].forEach(slot => { 
         let el = document.getElementById(`slot-${slot}`); 
-        
-        // 🔥 Flexbox로 강제 정렬하여 이미지는 무조건 위로, 텍스트는 무조건 아래로 배치
-        el.style.display = 'flex';
-        el.style.flexDirection = 'column-reverse'; // 이미지를 위로
-        el.style.alignItems = 'center';
-        el.style.justifyContent = 'center';
-
-        let nameEl = el.querySelector('.slot-name');
-        if(nameEl) {
-            nameEl.style.position = 'static'; // 억지로 내리던 설정 초기화
-            nameEl.style.marginTop = '6px'; // 이미지와 글씨 간격 확보
-            nameEl.style.lineHeight = '1';
-        }
-
         let item = userEquipped[slot]; 
         if (item) { 
             el.className = `equip-slot equip-${item.grade.toLowerCase()}`; 
-            // 🔥 스타포스 위치를 이미지 박스 밖으로 넉넉히 빼서 화려한 이펙트와 겹치지 않게 고정
-            let starStr = item.star > 0 ? `<div style="position:absolute; top:-10px; right:-10px; font-size:12px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${item.star}</div>` : '';
-            el.querySelector('.slot-item').innerHTML = `<div style="position:relative; display:flex; justify-content:center; align-items:center;">${starStr}${getEquipIcon(slot)}</div>`;
+            let starStr = item.star > 0 ? `<div style="position:absolute; top:-10px; right:-10px; font-size:11px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${item.star}</div>` : '';
+            // 🔥 이미지 반전 적용 완료: 뱃지 <-> 엠블럼
+            let fileName = slot === '뱃지' ? 'emblem.png' : (slot === '엠블럼' ? 'badge.png' : 'ring.png'); 
+            let size = slot === '링' ? '30px' : '36px'; 
+            let imgSrc = `<img src="image/${fileName}" style="width: ${size}; height: ${size}; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.4));">`;
+            // 🔥 Flexbox를 사용하지 않고 기존의 깔끔한 위치 지정 방식으로 원상 복구 및 이미지 살짝 위로 띄우기
+            el.querySelector('.slot-item').innerHTML = `<div style="position:relative; display:inline-block; margin-bottom: 5px;">${starStr}${imgSrc}</div>`;
             el.onclick = () => openEquipDetailModal(item, slot, true); 
         } else { 
             el.className = `equip-slot`; 
@@ -531,13 +522,6 @@ function renderEquippedSlots() {
         } 
     }); 
     document.getElementById('equip-total-stats').innerText = `적용 능력치: 공 +${equipStats.atk}% (추가 공격력 +${equipStats.flatAtk}) / 공속 +${equipStats.spd}% / 크확 +${equipStats.crit}%`; 
-}
-
-function getEquipIcon(type) { 
-    // 🔥 뱃지와 엠블럼 이미지 이름 반전 교정 (엠블럼=emblem.png, 뱃지=badge.png)
-    let fileName = type === '뱃지' ? 'badge.png' : (type === '엠블럼' ? 'emblem.png' : 'ring.png'); 
-    let size = type === '링' ? '30px' : '36px'; 
-    return `<img src="image/${fileName}" style="width: ${size}; height: ${size}; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.4));">`; 
 }
 
 window.isCombiningCoin = false;
@@ -571,9 +555,12 @@ window.renderInventoryTab = (tab) => {
         userEquips.forEach((eq, idx) => {
             let el = document.createElement('div'); el.className = `inv-item-box equip-${eq.grade.toLowerCase()}`; let statStr = "";
             if (eq.atk > 0) statStr = `공+${eq.atk}%`; else if (eq.spd > 0) statStr = `속+${eq.spd}%`; else if (eq.crit > 0) statStr = `크+${eq.crit}%`;
-            let starStr = eq.star > 0 ? `<div style="position:absolute; top:-6px; right:-10px; font-size:12px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${eq.star}</div>` : '';
-            // 🔥 인벤토리 내부 장비도 Flex로 강제 정렬
-            el.innerHTML = `<div style="position:relative; display:flex; justify-content:center; align-items:center; height:36px; margin-top:4px;">${starStr}${getEquipIcon(eq.type)}</div><div style="font-size:10px; font-weight:bold; margin-top:2px; color:#37474f; text-align:center;">${statStr}</div>`; 
+            let starStr = eq.star > 0 ? `<div style="position:absolute; top:-10px; right:-10px; font-size:11px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${eq.star}</div>` : '';
+            let fileName = eq.type === '뱃지' ? 'emblem.png' : (eq.type === '엠블럼' ? 'badge.png' : 'ring.png'); 
+            let size = eq.type === '링' ? '30px' : '36px'; 
+            let imgSrc = `<img src="image/${fileName}" style="width: ${size}; height: ${size}; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.4));">`;
+            // 🔥 인벤토리 내부 장비도 원래의 안정적인 블록 구조로 원복하여 글씨 겹침 해결
+            el.innerHTML = `<div style="position:relative; display:inline-block; margin-top:5px;">${starStr}${imgSrc}</div><div style="font-size:10px; font-weight:bold; margin-top:4px; color:#37474f; text-align:center;">${statStr}</div>`; 
             el.onclick = () => openEquipDetailModal(eq, idx, false); 
             list.appendChild(el);
         });
@@ -709,7 +696,7 @@ window.modalActionDisassemble = () => {
 };
 
 // ==========================================
-// 🌟 스타포스 강화 팝업 및 로직 
+// 🌟 스타포스 강화 팝업 및 로직
 // ==========================================
 window.openStarForceModal = () => {
     let eqModal = document.getElementById('equip-detail-modal');
@@ -1025,15 +1012,20 @@ function endRaidGame() {
     if (raidState.pendingDmg > 0) {
         let dmgToApply = raidState.pendingDmg; raidState.pendingDmg = 0;
         runTransaction(ref(database, 'worldBoss'), (bossData) => {
-            if (!bossData) bossData = { hp: 7000000, killCount: 0, lastKillerUid: null }; bossData.hp -= dmgToApply;
+            if (!bossData) bossData = { hp: 7000000, killCount: 0, lastKillerUid: null };
+            bossData.hp -= dmgToApply;
             if (bossData.hp <= 0) { bossData.hp = 7000000; bossData.killCount = (bossData.killCount || 0) + 1; bossData.lastKillerUid = currentUserUid; }
             return bossData;
         }).then(({committed, snapshot}) => {
-            if(committed && snapshot.exists()) { let data = snapshot.val(); if (data.lastKillerUid === currentUserUid && !raidState.rewardClaimedForKills.includes(data.killCount)) { raidState.rewardClaimedForKills.push(data.killCount); raidState.gotLastHit = true; } }
-            finishProcess();
+            if(committed && snapshot.exists()) {
+                let data = snapshot.val();
+                if (data.lastKillerUid === currentUserUid && !raidState.rewardClaimedForKills.includes(data.killCount)) {
+                    raidState.rewardClaimedForKills.push(data.killCount); raidState.gotLastHit = true; showBossToast("막타 달성! 챌린저 상자 확정!", true);
+                }
+            }
         }).catch(e => {
-            console.warn("보스 데이터 통신 에러 발생:", e);
-            finishProcess();
+            raidState.pendingDmg += dmgToApply; 
+            console.warn("데미지 전송 지연, 다음 틱에 재전송합니다.");
         });
     } else { finishProcess(); }
 }
@@ -1218,7 +1210,7 @@ function processOpponentTick(dt) {
                         let splashDmg = p.dmg; if (p.type === '전사' && m.isBoss) splashDmg *= 1.5; m.hp -= splashDmg;
                         if (p.isCrit) oppDamageTexts.push({ val: Math.floor(splashDmg), x: m.x, y: m.y - 15, timer: 0.8 });
                         if (p.type === '전사' && Math.random() < 0.2) m.stunTimer = 1;
-                        if (p.type === '법사' && oppSkillLevels.mage_freeze > 0 && Math.random() < ((10 + skillLevels.mage_freeze * 2) / 100)) { if (m.freezeTimer <= 0) { m.freezeTimer = 3; m.freezeTickTimer = 1; m.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][skillLevels.mage_freeze - 1]; } }
+                        if (p.type === '법사' && oppSkillLevels.mage_freeze > 0 && Math.random() < ((10 + skillLevels.mage_freeze * 2) / 100)) { if (m.freezeTimer <= 0) { m.freezeTimer = 3; m.freezeTickTimer = 1; m.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][oppSkillLevels.mage_freeze - 1]; } }
                     }
                 });
             }
@@ -1437,6 +1429,8 @@ window.draw = () => {
         
         if (m.isBoss && bossImages[m.name] && bossImages[m.name].complete) {
             ctx.drawImage(bossImages[m.name], -size*1.5, -size*1.5, size*3, size*3);
+        } else if (!m.isBoss && mobImg && mobImg.complete && mobImg.naturalWidth > 0) {
+            ctx.drawImage(mobImg, -size*1.5, -size*1.5, size*3, size*3);
         } else {
             ctx.fillStyle = m.isBoss ? "#ef5350" : "#ffca28";
             ctx.beginPath(); ctx.arc(0, 0, size, 0, Math.PI*2); ctx.fill();
@@ -1525,6 +1519,8 @@ window.drawOpp = () => {
         
         if (m.isBoss && bossImages[m.name] && bossImages[m.name].complete) {
             oppCtx.drawImage(bossImages[m.name], -size*1.5, -size*1.5, size*3, size*3);
+        } else if (!m.isBoss && mobImg && mobImg.complete && mobImg.naturalWidth > 0) {
+            oppCtx.drawImage(mobImg, -size*1.5, -size*1.5, size*3, size*3);
         } else {
             oppCtx.fillStyle = m.isBoss ? "#ef5350" : "#ffca28";
             oppCtx.beginPath(); oppCtx.arc(0, 0, size, 0, Math.PI*2); oppCtx.fill();
