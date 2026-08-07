@@ -1,5 +1,5 @@
-// 🔥 1.0.56 버전 - 전리품 팝업 추가, 장비 UI 규격 통일 및 스타포스 정렬, AI 장비 스펙 반영
-const GAME_VERSION = "1.0.56"; 
+// 🔥 1.0.57 버전 - 뱃지/엠블럼 이미지 임시 반전, 인벤토리 UI 겹침 원상복구 및 별 위치 상향 조정
+const GAME_VERSION = "1.0.57"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -63,7 +63,7 @@ let oppMonsters = [], oppProjectiles = [], oppTowers = [];
 let oppVisualEffects = [], oppFumaList = [], oppDamageTexts = [];
 let oppWaveTimer = 0, oppSpawnTimer = 0;
 let oppCardData = {}, oppSkillLevels = {};
-let oppEquipStats = { atk: 0, spd: 0, crit: 0, flatAtk: 0 }; // 🔥 랭크 게임 상대방 장비 스탯 추가
+let oppEquipStats = { atk: 0, spd: 0, crit: 0, flatAtk: 0 }; 
 let currentPath = [];
 
 // ==========================================
@@ -137,7 +137,6 @@ window.showMessage = (msg) => {
     setTimeout(() => { ov.style.display = 'none'; }, 2000); 
 };
 
-// 🔥 [신규] 전리품 획득 팝업 렌더링 함수
 window.showLootPopup = (drops) => {
     document.getElementById('overlay').style.display = 'block';
     let modal = document.getElementById('loot-popup-modal');
@@ -507,9 +506,10 @@ function renderEquippedSlots() {
         let item = userEquipped[slot]; 
         if (item) { 
             el.className = `equip-slot equip-${item.grade.toLowerCase()}`; 
-            // 🔥 40x40 박스로 규격 통일, 별은 우측 상단 모서리 고정
-            let starStr = item.star > 0 ? `<div style="position:absolute; top:-5px; right:-5px; font-size:11px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${item.star}</div>` : '';
-            el.querySelector('.slot-item').innerHTML = `<div style="position:relative; display:flex; justify-content:center; align-items:center; width:40px; height:40px;">${starStr}${getEquipIcon(slot)}</div>`;
+            // 🔥 스타포스 위치를 좀 더 위로(-10px) 올림
+            let starStr = item.star > 0 ? `<div style="position:absolute; top:-10px; right:-10px; font-size:11px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${item.star}</div>` : '';
+            // 🔥 1.0.54 버전의 inline-block 방식으로 되돌려 글씨(slot-name)와 겹치지 않게 함
+            el.querySelector('.slot-item').innerHTML = `<div style="position:relative; display:inline-block; line-height:1;">${starStr}${getEquipIcon(slot)}</div>`;
             el.onclick = () => openEquipDetailModal(item, slot, true); 
         } else { 
             el.className = `equip-slot`; 
@@ -520,10 +520,11 @@ function renderEquippedSlots() {
     document.getElementById('equip-total-stats').innerText = `적용 능력치: 공 +${equipStats.atk}% (추가 공격력 +${equipStats.flatAtk}) / 공속 +${equipStats.spd}% / 크확 +${equipStats.crit}%`; 
 }
 
-// 🔥 아이콘 사이즈를 컨테이너 내부에 쏙 들어가게 통일 (32px)
 function getEquipIcon(type) { 
-    let fileName = type === '뱃지' ? 'badge.png' : (type === '엠블럼' ? 'emblem.png' : 'ring.png'); 
-    return `<img src="image/${fileName}" style="width: 32px; height: 32px; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.4));">`; 
+    // 🔥 뱃지와 엠블럼 이미지 이름 반전 적용
+    let fileName = type === '뱃지' ? 'emblem.png' : (type === '엠블럼' ? 'badge.png' : 'ring.png'); 
+    let size = type === '링' ? '30px' : '36px'; 
+    return `<img src="image/${fileName}" style="width: ${size}; height: ${size}; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.4)); vertical-align: bottom;">`; 
 }
 
 window.isCombiningCoin = false;
@@ -557,9 +558,9 @@ window.renderInventoryTab = (tab) => {
         userEquips.forEach((eq, idx) => {
             let el = document.createElement('div'); el.className = `inv-item-box equip-${eq.grade.toLowerCase()}`; let statStr = "";
             if (eq.atk > 0) statStr = `공+${eq.atk}%`; else if (eq.spd > 0) statStr = `속+${eq.spd}%`; else if (eq.crit > 0) statStr = `크+${eq.crit}%`;
-            // 🔥 인벤토리 창의 박스 사이즈도 40x40으로 균일화, 별을 우측 상단 모서리에 고정
-            let starStr = eq.star > 0 ? `<div style="position:absolute; top:-5px; right:-5px; font-size:11px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${eq.star}</div>` : '';
-            el.innerHTML = `<div style="position:relative; display:flex; justify-content:center; align-items:center; width:40px; height:40px; margin: 0 auto; margin-top:5px;">${starStr}${getEquipIcon(eq.type)}</div><div style="font-size:10px; font-weight:bold; margin-top:4px; color:#37474f; text-align:center;">${statStr}</div>`; 
+            // 🔥 인벤토리 창 박스도 원래대로 롤백하되 별 위치만 조정
+            let starStr = eq.star > 0 ? `<div style="position:absolute; top:-10px; right:-10px; font-size:11px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${eq.star}</div>` : '';
+            el.innerHTML = `<div style="position:relative; display:inline-block; margin-top:5px; line-height:1;">${starStr}${getEquipIcon(eq.type)}</div><div style="font-size:10px; font-weight:bold; margin-top:4px; color:#37474f; text-align:center;">${statStr}</div>`; 
             el.onclick = () => openEquipDetailModal(eq, idx, false); 
             list.appendChild(el);
         });
@@ -695,7 +696,7 @@ window.modalActionDisassemble = () => {
 };
 
 // ==========================================
-// 🌟 스타포스 강화 팝업 및 로직 
+// 🌟 스타포스 강화 팝업 및 로직
 // ==========================================
 window.openStarForceModal = () => {
     let eqModal = document.getElementById('equip-detail-modal');
@@ -1070,7 +1071,7 @@ window.startRankMatchmaking = async () => {
     let playCount = parseInt(localStorage.getItem('mapleDefenseRankCount')) || 0; if (playCount >= 10) { window.showMessage("오늘의 랭크 게임 제한 횟수를 모두 소진했습니다!"); return; }
     document.getElementById('rank-lobby-modal').style.display = 'none'; document.getElementById('rank-waiting-modal').style.display = 'block';
     let oppName = "의문의 용사 (AI)"; let oppRp = userRankData.rp + Math.floor(Math.random() * 40 - 20); oppCardData = {}; oppSkillLevels = { ...skillLevels };
-    oppEquipStats = { atk: 0, spd: 0, crit: 0, flatAtk: 0 }; // 🔥 초기화
+    oppEquipStats = { atk: 0, spd: 0, crit: 0, flatAtk: 0 }; 
     
     try { 
         const snap = await get(child(ref(database), `users`)); 
@@ -1091,7 +1092,6 @@ window.startRankMatchmaking = async () => {
                 if(aiUser.cloudData.cards) oppCardData = JSON.parse(aiUser.cloudData.cards); 
                 if(aiUser.cloudData.skills) oppSkillLevels = JSON.parse(aiUser.cloudData.skills); 
                 
-                // 🔥 AI 상대방의 클라우드 장비 정보(깡공/퍼센트) 긁어오기
                 if(aiUser.cloudData.equipped) {
                     ['뱃지', '엠블럼', '링'].forEach(slot => {
                         let item = aiUser.cloudData.equipped[slot];
@@ -1147,7 +1147,6 @@ function processOpponentTick(dt) {
     if(oppMonsters.length >= 25) { oppState.isDead = true; state.status = 'GAMEOVER'; processRankResult('WIN', '상대방의 몹이 25마리 쌓여 패배했습니다!'); return; }
     let oppCardBonus = 0; for(let k in oppCardData) { if(oppCardData[k].grade > 0) oppCardBonus += 1 + (oppCardData[k].grade - 1) * 0.5; }
     
-    // 🔥 상대방(AI) 장비 스탯을 완벽히 전투 공식에 융합
     let cardMulti = 1 + (oppCardBonus / 100); 
     let rageMulti = 1 + ((oppSkillLevels.common_rage || 0) * 0.01) + (oppEquipStats.atk * 0.01); 
     let sharpChance = ((oppSkillLevels.common_sharp || 0) * 0.05) + (oppEquipStats.crit * 0.01); 
@@ -1693,7 +1692,6 @@ window.loop = () => {
                 if(monsters[i].isBoss) {
                     let bInfo = getBossInfo(state.wave); state.meso += bInfo.meso; state.tickets.push(bInfo.ticket);
                     
-                    // 🔥 [신규 업데이트 1] 전리품 팝업을 위한 보상 리스트 생성
                     let drops = [];
                     if (Math.random() * 100 <= 15) {
                         userInventory.equipBoxes = (userInventory.equipBoxes || 0) + 1;
@@ -1708,9 +1706,9 @@ window.loop = () => {
                     }
 
                     if (drops.length > 0) {
-                        window.showLootPopup(drops); // 전리품 팝업 노출
+                        window.showLootPopup(drops);
                     } else {
-                        window.showMessage(`${state.wave}라운드 보스 처치!`); // 꽝일 때만 기본 텍스트
+                        window.showMessage(`${state.wave}라운드 보스 처치!`);
                     }
                 }
             }
