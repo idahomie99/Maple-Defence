@@ -1,5 +1,5 @@
-// 🔥 1.0.57 버전 - 뱃지/엠블럼 이미지 임시 반전, 인벤토리 UI 겹침 원상복구 및 별 위치 상향 조정
-const GAME_VERSION = "1.0.57"; 
+// 🔥 1.0.58 버전 - A to Z 전면 검증 및 인벤토리 장비 텍스트 겹침 완벽 해결
+const GAME_VERSION = "1.0.58"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -495,7 +495,7 @@ window.openActiveSkillsModal = () => {
 };
 
 // ==========================================
-// 6. 인벤토리 및 장비 시스템 
+// 6. 인벤토리 및 장비 시스템
 // ==========================================
 window.openInventoryModal = () => { document.getElementById('inventory-modal').style.display = 'block'; document.getElementById('overlay').style.display = 'block'; calculateEquipStats(); renderEquippedSlots(); renderInventoryTab('consumable'); };
 window.closeInventoryModal = () => { document.getElementById('inventory-modal').style.display = 'none'; document.getElementById('overlay').style.display = 'none'; };
@@ -503,13 +503,22 @@ window.closeInventoryModal = () => { document.getElementById('inventory-modal').
 function renderEquippedSlots() { 
     ['뱃지', '엠블럼', '링'].forEach(slot => { 
         let el = document.getElementById(`slot-${slot}`); 
+        
+        // 🔥 텍스트(slot-name)가 이미지와 겹치지 않게 하단으로 살짝 내리기
+        let nameEl = el.querySelector('.slot-name');
+        if(nameEl) {
+            nameEl.style.position = 'relative';
+            nameEl.style.top = '4px'; 
+            nameEl.style.zIndex = '5';
+        }
+
         let item = userEquipped[slot]; 
         if (item) { 
             el.className = `equip-slot equip-${item.grade.toLowerCase()}`; 
-            // 🔥 스타포스 위치를 좀 더 위로(-10px) 올림
+            // 🔥 스타포스 위치를 좀 더 우측 상단 밖으로 배치
             let starStr = item.star > 0 ? `<div style="position:absolute; top:-10px; right:-10px; font-size:11px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${item.star}</div>` : '';
-            // 🔥 1.0.54 버전의 inline-block 방식으로 되돌려 글씨(slot-name)와 겹치지 않게 함
-            el.querySelector('.slot-item').innerHTML = `<div style="position:relative; display:inline-block; line-height:1;">${starStr}${getEquipIcon(slot)}</div>`;
+            // 🔥 이미지 자체도 글씨 공간을 위해 살짝 위로 올림
+            el.querySelector('.slot-item').innerHTML = `<div style="position:relative; display:inline-block; line-height:1; transform: translateY(-4px);">${starStr}${getEquipIcon(slot)}</div>`;
             el.onclick = () => openEquipDetailModal(item, slot, true); 
         } else { 
             el.className = `equip-slot`; 
@@ -521,10 +530,9 @@ function renderEquippedSlots() {
 }
 
 function getEquipIcon(type) { 
-    // 🔥 뱃지와 엠블럼 이미지 이름 반전 적용
     let fileName = type === '뱃지' ? 'emblem.png' : (type === '엠블럼' ? 'badge.png' : 'ring.png'); 
     let size = type === '링' ? '30px' : '36px'; 
-    return `<img src="image/${fileName}" style="width: ${size}; height: ${size}; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.4)); vertical-align: bottom;">`; 
+    return `<img src="image/${fileName}" style="width: ${size}; height: ${size}; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.4));">`; 
 }
 
 window.isCombiningCoin = false;
@@ -558,9 +566,9 @@ window.renderInventoryTab = (tab) => {
         userEquips.forEach((eq, idx) => {
             let el = document.createElement('div'); el.className = `inv-item-box equip-${eq.grade.toLowerCase()}`; let statStr = "";
             if (eq.atk > 0) statStr = `공+${eq.atk}%`; else if (eq.spd > 0) statStr = `속+${eq.spd}%`; else if (eq.crit > 0) statStr = `크+${eq.crit}%`;
-            // 🔥 인벤토리 창 박스도 원래대로 롤백하되 별 위치만 조정
             let starStr = eq.star > 0 ? `<div style="position:absolute; top:-10px; right:-10px; font-size:11px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${eq.star}</div>` : '';
-            el.innerHTML = `<div style="position:relative; display:inline-block; margin-top:5px; line-height:1;">${starStr}${getEquipIcon(eq.type)}</div><div style="font-size:10px; font-weight:bold; margin-top:4px; color:#37474f; text-align:center;">${statStr}</div>`; 
+            // 🔥 이미지 박스 여백 수정 및 이미지 살짝 위로 이동
+            el.innerHTML = `<div style="position:relative; display:inline-block; margin-top:5px; line-height:1; transform: translateY(-2px);">${starStr}${getEquipIcon(eq.type)}</div><div style="font-size:10px; font-weight:bold; margin-top:6px; color:#37474f; text-align:center;">${statStr}</div>`; 
             el.onclick = () => openEquipDetailModal(eq, idx, false); 
             list.appendChild(el);
         });
@@ -830,7 +838,7 @@ window.openRaidMenu = () => {
 
 window.summonRaidUnit = () => {
     if(raidState.status !== 'PREP') return; if(raidState.meso < 10) { window.showMessage("메소가 부족합니다."); return; }
-    let emptyIdx = raidState.units.findIndex(v => v === null); if(emptyIdx === -1) { window.showMessage("더 이상 배치할 수 없습니다."); return; }
+    let emptyIdx = raidState.units.findIndex(v => v === null); if(emptyIdx === -1) { window.showMessage("더 이상 배치할 수ীকার"); return; }
     raidState.meso -= 10; document.getElementById('raid-meso').innerText = raidState.meso;
     let r = Math.random() * 100; let gradeIdx = r < 60 ? 5 : (r < 90 ? 6 : (r < 99 ? 7 : 8)); 
     let clsNames = Object.keys(CLASSES); let clsName = clsNames[Math.floor(Math.random() * clsNames.length)]; let cls = CLASSES[clsName]; let grade = GRADES[gradeIdx];
@@ -1161,7 +1169,7 @@ function processOpponentTick(dt) {
                         let baseDmg = (t.cls.baseDmg + oppEquipStats.flatAtk) * t.grade.mult * cardMulti * rageMulti;
                         if (t.cls.type === '전사' && oppSkillLevels.war_death > 0) { let gdmg = baseDmg * (5 + oppSkillLevels.war_death * 5); oppVisualEffects.push({ type: 'death', timer: 1.2, dmg: gdmg }); t.globalCooldown += 60000; }
                         else if (t.cls.type === '법사' && oppSkillLevels.mage_thunder > 0) { let gdmg = baseDmg * (5 + oppSkillLevels.mage_thunder * 5); oppVisualEffects.push({ type: 'thunder', timer: 0.5, dmg: gdmg }); t.globalCooldown += 60000; }
-                        else if (t.cls.type === '도적' && oppSkillLevels.thief_fuma > 0) { let gdmg = baseDmg * (5 + oppSkillLevels.thief_fuma * 5); oppFumaList.push({ x: t.x, y: t.y, targetNode: 0, nodesVisited: 0, dmg: gdmg, hitSet: new Set(), angle: 0 }); t.globalCooldown += 60000; }
+                        else if (t.cls.type === '도적' && oppSkillLevels.thief_fuma > 0) { let gdmg = baseDmg * (5 + skillLevels.thief_fuma * 5); oppFumaList.push({ x: t.x, y: t.y, targetNode: 0, nodesVisited: 0, dmg: gdmg, hitSet: new Set(), angle: 0 }); t.globalCooldown += 60000; }
                     } else {
                         t.globalCooldown = 0;
                     }
