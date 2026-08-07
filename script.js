@@ -1,5 +1,5 @@
-// 🔥 1.0.54 버전 - 팝업 튕김 수정, 스타포스 정렬 교정, 스턴 복구, UI 용어 수정
-const GAME_VERSION = "1.0.54"; 
+// 🔥 1.0.55 버전 - A to Z 전면 검토 및 페이백 비용 누적 버그 완벽 수정
+const GAME_VERSION = "1.0.55"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -171,29 +171,24 @@ window.switchScreen = (screenId) => {
     if (screenId === 'start-screen') window.checkSave();
 };
 
-// 🔥 바깥쪽 배경(Overlay) 클릭 시, 서브 팝업만 우선적으로 닫히도록 로직 완벽 교정
+// 🔥 팝업 오버레이 제어 교정: 닫기 시 인벤토리가 꺼지지 않도록 독립적 처리
 window.closeAllModals = () => { 
     if (state.status === 'GAMEOVER') return; 
 
-    // 스타포스 창이 열려있다면 스타포스 창만 닫음 (인벤토리는 유지)
     let sfModal = document.getElementById('starforce-modal');
     if (sfModal && sfModal.style.display === 'block') {
         sfModal.style.display = 'none';
-        
-        // 스타포스를 닫고 이전 장비 팝업을 다시 열어줌
         let eqModal = document.getElementById('equip-detail-modal');
         if (eqModal) eqModal.style.display = 'block';
         return; 
     }
 
-    // 장비 상세 팝업창이 열려있다면 장비 팝업창만 닫음 (인벤토리는 유지)
     let eqModal = document.getElementById('equip-detail-modal');
     if (eqModal && eqModal.style.display === 'block') {
         eqModal.style.display = 'none';
         return;
     }
 
-    // 그 외에는 모든 창과 오버레이를 정상적으로 닫음
     ['overlay', 'bulk-sell-modal', 'ticket-modal', 'book-modal', 'shop-modal', 'active-skills-modal', 'inventory-modal', 'equip-detail-modal', 'starforce-modal'].forEach(id => { 
         let el = document.getElementById(id); 
         if(el) el.style.display = 'none'; 
@@ -455,7 +450,7 @@ window.openActiveSkillsModal = () => {
 };
 
 // ==========================================
-// 6. 인벤토리 및 장비 시스템 (🔥 팝업 유실 방지 및 UI 재배치)
+// 6. 인벤토리 및 장비 시스템
 // ==========================================
 window.openInventoryModal = () => { document.getElementById('inventory-modal').style.display = 'block'; document.getElementById('overlay').style.display = 'block'; calculateEquipStats(); renderEquippedSlots(); renderInventoryTab('consumable'); };
 window.closeInventoryModal = () => { document.getElementById('inventory-modal').style.display = 'none'; document.getElementById('overlay').style.display = 'none'; };
@@ -466,8 +461,8 @@ function renderEquippedSlots() {
         let item = userEquipped[slot]; 
         if (item) { 
             el.className = `equip-slot equip-${item.grade.toLowerCase()}`; 
-            // 🔥 스타포스 뱃지 정렬 (아이콘 컨테이너 내부 우측 상단으로 이동)
-            let starStr = item.star > 0 ? `<div style="position:absolute; top:-6px; right:-6px; font-size:11px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${item.star}</div>` : '';
+            // 🔥 스타포스 뱃지 정렬 완벽 교정 (부모를 relative로 두고, ★을 우측 상단 모서리에 absolute 고정)
+            let starStr = item.star > 0 ? `<div style="position:absolute; top:-5px; right:-5px; font-size:11px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${item.star}</div>` : '';
             el.querySelector('.slot-item').innerHTML = `<div style="position:relative; display:inline-block;">${starStr}${getEquipIcon(slot)}</div>`;
             el.onclick = () => openEquipDetailModal(item, slot, true); 
         } else { 
@@ -476,7 +471,6 @@ function renderEquippedSlots() {
             el.onclick = null;
         } 
     }); 
-    // 🔥 용어 변경: 깡공 -> 추가 공격력
     document.getElementById('equip-total-stats').innerText = `적용 능력치: 공 +${equipStats.atk}% (추가 공격력 +${equipStats.flatAtk}) / 공속 +${equipStats.spd}% / 크확 +${equipStats.crit}%`; 
 }
 
@@ -513,7 +507,7 @@ window.renderInventoryTab = (tab) => {
         userEquips.forEach((eq, idx) => {
             let el = document.createElement('div'); el.className = `inv-item-box equip-${eq.grade.toLowerCase()}`; let statStr = "";
             if (eq.atk > 0) statStr = `공+${eq.atk}%`; else if (eq.spd > 0) statStr = `속+${eq.spd}%`; else if (eq.crit > 0) statStr = `크+${eq.crit}%`;
-            // 🔥 인벤토리 정렬 교정
+            // 🔥 인벤토리 정렬 완벽 교정
             let starStr = eq.star > 0 ? `<div style="position:absolute; top:-5px; right:-5px; font-size:11px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${eq.star}</div>` : '';
             el.innerHTML = `<div style="position:relative; display:inline-block; margin-top:5px;">${starStr}<div class="inv-item-icon">${getEquipIcon(eq.type)}</div></div><div style="font-size:10px; font-weight:bold; margin-top:4px; color:#37474f;">${statStr}</div>`; 
             el.onclick = () => openEquipDetailModal(eq, idx, false); 
@@ -580,7 +574,6 @@ window.openEquipDetailModal = (eq, targetIdx, isEquipped) => {
     let baseOpt = eq.atk > 0 ? `기본 옵션: 공격력 +${eq.atk}%` : (eq.spd > 0 ? `기본 옵션: 공격 속도 +${eq.spd}%` : `기본 옵션: 치명타 +${eq.crit}%`);
     let perStar = eq.grade === 'Rare' ? 4 : (eq.grade === 'Epic' ? 8 : (eq.grade === 'Unique' ? 12 : 16));
     let flatAtkVal = (eq.star || 0) * perStar;
-    // 🔥 용어 변경: 깡공 -> 공격력
     let starOpt = flatAtkVal > 0 ? `<br><span style="color:#e65100;">스타포스 추가 공격력: +${flatAtkVal}</span>` : `<br><span style="color:#777;">스타포스 강화 없음</span>`;
     
     document.getElementById('modal-eq-body').innerHTML = `${baseOpt}<br>${starOpt}<br><div style="font-size:11px; color:#555; margin-top:5px;">현재 보유 별의 기운: <b style="color:#d32f2f;">${userInventory.starPieces || 0}개</b></div>`;
@@ -603,7 +596,6 @@ window.closeEquipModalOnly = () => {
 window.closeStarForceModalOnly = () => {
     let modal = document.getElementById('starforce-modal');
     if (modal) modal.style.display = 'none';
-    // 이전 장비 상세 팝업 다시 표시
     let eqModal = document.getElementById('equip-detail-modal');
     if (eqModal) eqModal.style.display = 'block';
 };
@@ -653,7 +645,7 @@ window.modalActionDisassemble = () => {
 };
 
 // ==========================================
-// 🌟 스타포스 강화 팝업 및 로직
+// 🌟 스타포스 강화 팝업 및 로직 (🔥 페이백 누적금 버그 수정 완료)
 // ==========================================
 window.openStarForceModal = () => {
     let eqModal = document.getElementById('equip-detail-modal');
@@ -706,7 +698,6 @@ function updateStarForceUI() {
     let perStar = eq.grade === 'Rare' ? 4 : (eq.grade === 'Epic' ? 8 : (eq.grade === 'Unique' ? 12 : 16));
     let nextFlatAtk = (curStar + 1) * perStar;
 
-    // 🔥 용어 변경: 깡공 -> 공격력
     document.getElementById('sf-modal-info').innerHTML = `
         현재 성급: <span style="font-size:16px;">★${curStar}성 ➔ ★${curStar+1}성</span><br>
         소모 비용: <b style="color:#d32f2f;">별의 기운 ${info.cost}개</b> (보유: ${userInventory.starPieces || 0}개)<br>
@@ -741,11 +732,13 @@ window.executeStarForce = () => {
         return;
     }
 
+    // 🔥 시도 시 비용 차감
     userInventory.starPieces -= info.cost;
-    eq.totalSpentStar = (eq.totalSpentStar || 0) + info.cost;
 
     let rand = Math.random() * 100;
     if (rand < info.succ) {
+        // 🔥 성공 시에만 환급 비용을 누적하도록 버그 픽스 완료!
+        eq.totalSpentStar = (eq.totalSpentStar || 0) + info.cost;
         eq.star = curStar + 1;
         window.showMessage(`🎉 스타포스 강화 성공! (★${eq.star})`);
     } else if (rand < info.succ + info.keep) {
@@ -928,9 +921,8 @@ function drawRaid() {
         ctx.restore(); 
     });
     
-    // 🔥 월드보스 스턴 시 이모지 출력
     if (raidState.units.some(u => u && u.cls.type === '전사')) {
-        let hasStun = raidState.projectiles.some(p => p.type === '전사' && p.isFinal); // 레이드에선 임시로 보스 머리위 기절효과 적용
+        let hasStun = raidState.projectiles.some(p => p.type === '전사' && p.isFinal); 
         if (hasStun) {
             ctx.font = "bold 18px Arial"; ctx.fillStyle = "yellow"; ctx.textAlign = "center";
             ctx.fillText("💫", 250, 100);
@@ -1350,7 +1342,6 @@ window.draw = () => {
             ctx.fillStyle = "rgba(0, 200, 255, 0.4)"; ctx.beginPath(); ctx.arc(0, 0, size * 1.5, 0, Math.PI * 2); ctx.fill();
         }
         
-        // 🔥 전사 스턴 이모지 복구
         if (m.stunTimer > 0) {
             ctx.font = "bold 16px Arial"; ctx.fillStyle = "yellow"; ctx.textAlign = "center";
             ctx.fillText("💫", 0, -size - 10);
@@ -1435,7 +1426,6 @@ window.drawOpp = () => {
             oppCtx.beginPath(); oppCtx.arc(0, 0, size, 0, Math.PI*2); oppCtx.fill();
         }
         
-        // 🔥 상대방 필드 전사 스턴 이모지 복구
         if (m.stunTimer > 0) {
             oppCtx.font = "bold 10px Arial"; oppCtx.fillStyle = "yellow"; oppCtx.textAlign = "center";
             oppCtx.fillText("💫", 0, -size - 5);
