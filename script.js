@@ -1,5 +1,5 @@
-// 🔥 1.0.55 버전 - A to Z 전면 검토 및 페이백 비용 누적 버그 완벽 수정
-const GAME_VERSION = "1.0.55"; 
+// 🔥 1.0.56 버전 - 전리품 팝업 추가, 장비 UI 규격 통일 및 스타포스 정렬, AI 장비 스펙 반영
+const GAME_VERSION = "1.0.56"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -63,6 +63,7 @@ let oppMonsters = [], oppProjectiles = [], oppTowers = [];
 let oppVisualEffects = [], oppFumaList = [], oppDamageTexts = [];
 let oppWaveTimer = 0, oppSpawnTimer = 0;
 let oppCardData = {}, oppSkillLevels = {};
+let oppEquipStats = { atk: 0, spd: 0, crit: 0, flatAtk: 0 }; // 🔥 랭크 게임 상대방 장비 스탯 추가
 let currentPath = [];
 
 // ==========================================
@@ -136,6 +137,53 @@ window.showMessage = (msg) => {
     setTimeout(() => { ov.style.display = 'none'; }, 2000); 
 };
 
+// 🔥 [신규] 전리품 획득 팝업 렌더링 함수
+window.showLootPopup = (drops) => {
+    document.getElementById('overlay').style.display = 'block';
+    let modal = document.getElementById('loot-popup-modal');
+    if (!modal) {
+        let mDiv = document.createElement('div');
+        mDiv.id = 'loot-popup-modal';
+        mDiv.className = 'maple-modal';
+        mDiv.style.cssText = "display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:4500; width:85%; max-width:300px; background:#fff; border:2px solid #546e7a; padding:15px; border-radius:8px; text-align:center;";
+        document.body.appendChild(mDiv);
+        modal = mDiv;
+    }
+    
+    let dropHtml = drops.map(d => {
+        if (d.type === 'equip') {
+            return `<div style="display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:10px; background:#f1f8e9; padding:10px; border-radius:8px; border:1px solid #c5e1a5;">
+                        <span style="font-size:24px;">🎁</span>
+                        <span style="font-weight:bold; color:#2e7d32; font-size:15px;">장비 상자 1개</span>
+                    </div>`;
+        } else if (d.type === 'card') {
+            let imgSrc = bossImages[d.name] ? bossImages[d.name].src : '';
+            return `<div style="display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:10px; background:#fff8e1; padding:10px; border-radius:8px; border:1px solid #ffe082;">
+                        <img src="${imgSrc}" style="width:30px; height:30px; object-fit:contain;">
+                        <span style="font-weight:bold; color:#f57f17; font-size:15px;">${d.name} 카드 1장</span>
+                    </div>`;
+        }
+    }).join('');
+    
+    modal.innerHTML = `
+        <h3 style="color:#e65100; margin-top:0;">✨ 전리품 획득!</h3>
+        <p style="font-size:13px; color:#555; margin-bottom:15px;">보스를 처치하고 다음 아이템을 얻었습니다.</p>
+        ${dropHtml}
+        <button class="ingame-btn premium-blue" style="width:100%; padding:12px; margin-top:10px;" onclick="closeLootPopup()">확인</button>
+    `;
+    modal.style.display = 'block';
+};
+
+window.closeLootPopup = () => {
+    let modal = document.getElementById('loot-popup-modal');
+    if(modal) modal.style.display = 'none';
+    let eqModal = document.getElementById('equip-detail-modal');
+    let invModal = document.getElementById('inventory-modal');
+    if ((!eqModal || eqModal.style.display === 'none') && (!invModal || invModal.style.display === 'none')) {
+        document.getElementById('overlay').style.display = 'none';
+    }
+};
+
 function calculateEquipStats() {
     equipStats = { atk: 0, spd: 0, crit: 0, flatAtk: 0 };
     ['뱃지', '엠블럼', '링'].forEach(slot => { 
@@ -171,7 +219,6 @@ window.switchScreen = (screenId) => {
     if (screenId === 'start-screen') window.checkSave();
 };
 
-// 🔥 팝업 오버레이 제어 교정: 닫기 시 인벤토리가 꺼지지 않도록 독립적 처리
 window.closeAllModals = () => { 
     if (state.status === 'GAMEOVER') return; 
 
@@ -189,7 +236,7 @@ window.closeAllModals = () => {
         return;
     }
 
-    ['overlay', 'bulk-sell-modal', 'ticket-modal', 'book-modal', 'shop-modal', 'active-skills-modal', 'inventory-modal', 'equip-detail-modal', 'starforce-modal'].forEach(id => { 
+    ['overlay', 'bulk-sell-modal', 'ticket-modal', 'book-modal', 'shop-modal', 'active-skills-modal', 'inventory-modal', 'equip-detail-modal', 'starforce-modal', 'loot-popup-modal'].forEach(id => { 
         let el = document.getElementById(id); 
         if(el) el.style.display = 'none'; 
     }); 
@@ -341,7 +388,6 @@ window.summonUnit = () => {
 };
 
 function showSummonToast(gradeName, gradeIdx, clsName, color) { let toast = document.getElementById('summon-toast'); let fontSize = 16 + (gradeIdx * 2); toast.innerHTML = `<span style="color:${color}">${gradeName}</span> ${clsName}!`; toast.style.fontSize = fontSize + 'px'; toast.style.color = '#fff'; toast.className = 'toast-show'; setTimeout(() => { toast.className = ''; }, 1500); if (gradeIdx >= 5) { let container = document.getElementById('game-container'); container.classList.add('shake-active'); setTimeout(() => container.classList.remove('shake-active'), 400); } }
-function showBossToast(name, isDrop = false) { let toast = document.getElementById('boss-toast'); if (isDrop) { toast.innerHTML = `🃏 ${name} 카드 획득! 🃏`; toast.style.color = '#ffca28'; } else { toast.innerHTML = `⚠️ 보스 출현: ${name} ⚠️`; toast.style.color = '#ff5252'; } toast.className = 'toast-show'; setTimeout(() => { toast.className = ''; }, 2500); }
 
 window.addUnit = (idx, gradeIdx, clsName, isLoad = false) => { let grade = GRADES[gradeIdx]; let cls = CLASSES[clsName]; let unit = { idx: idx, gradeIdx: gradeIdx, grade: grade, cls: cls, x: 75 + (idx % 5) * 70 + 35, y: 75 + Math.floor(idx / 5) * 70 + 35, lastAttack: 0, bindCooldown: 0, globalCooldown: 0 }; grid[idx] = unit; towers.push(unit); if(!isLoad) showSummonToast(grade.name, gradeIdx, clsName, cls.color); renderGrid(); };
 function addUnitOpp(idx, gradeIdx, clsName) { let grade = GRADES[gradeIdx]; let cls = CLASSES[clsName]; let unit = { idx: idx, gradeIdx: gradeIdx, grade: grade, cls: cls, x: 75 + (idx % 5) * 70 + 35, y: 75 + Math.floor(idx / 5) * 70 + 35, lastAttack: 0, bindCooldown: 0, globalCooldown: 0 }; oppGrid[idx] = unit; oppTowers.push(unit); renderOppGrid(); }
@@ -401,7 +447,7 @@ function nextWave() {
     if(state.isBoss && monsters.some(m => m.isBoss)) { if(state.isRank) return handleRankGameOver("보스 사냥 실패!"); else return gameOver("보스 처치 실패!"); }
     state.wave++; waveTimer = 0; spawnTimer = 0; let bInfo = getBossInfo(state.wave); state.isBoss = !!bInfo;
     if (!state.isRank && state.wave > bestWave) { bestWave = state.wave; localStorage.setItem('mapleDefenseBestWave', bestWave); document.getElementById('ui-best-wave').innerText = bestWave; if (currentUserUid) window.syncToCloud(); }
-    if(state.isBoss) { showBossToast(bInfo.name); spawnMonster(); }
+    if(state.isBoss) { spawnMonster(); }
     window.updateUI();
 }
 
@@ -450,7 +496,7 @@ window.openActiveSkillsModal = () => {
 };
 
 // ==========================================
-// 6. 인벤토리 및 장비 시스템
+// 6. 인벤토리 및 장비 시스템 
 // ==========================================
 window.openInventoryModal = () => { document.getElementById('inventory-modal').style.display = 'block'; document.getElementById('overlay').style.display = 'block'; calculateEquipStats(); renderEquippedSlots(); renderInventoryTab('consumable'); };
 window.closeInventoryModal = () => { document.getElementById('inventory-modal').style.display = 'none'; document.getElementById('overlay').style.display = 'none'; };
@@ -461,9 +507,9 @@ function renderEquippedSlots() {
         let item = userEquipped[slot]; 
         if (item) { 
             el.className = `equip-slot equip-${item.grade.toLowerCase()}`; 
-            // 🔥 스타포스 뱃지 정렬 완벽 교정 (부모를 relative로 두고, ★을 우측 상단 모서리에 absolute 고정)
+            // 🔥 40x40 박스로 규격 통일, 별은 우측 상단 모서리 고정
             let starStr = item.star > 0 ? `<div style="position:absolute; top:-5px; right:-5px; font-size:11px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${item.star}</div>` : '';
-            el.querySelector('.slot-item').innerHTML = `<div style="position:relative; display:inline-block;">${starStr}${getEquipIcon(slot)}</div>`;
+            el.querySelector('.slot-item').innerHTML = `<div style="position:relative; display:flex; justify-content:center; align-items:center; width:40px; height:40px;">${starStr}${getEquipIcon(slot)}</div>`;
             el.onclick = () => openEquipDetailModal(item, slot, true); 
         } else { 
             el.className = `equip-slot`; 
@@ -474,7 +520,11 @@ function renderEquippedSlots() {
     document.getElementById('equip-total-stats').innerText = `적용 능력치: 공 +${equipStats.atk}% (추가 공격력 +${equipStats.flatAtk}) / 공속 +${equipStats.spd}% / 크확 +${equipStats.crit}%`; 
 }
 
-function getEquipIcon(type) { let fileName = type === '뱃지' ? 'badge.png' : (type === '엠블럼' ? 'emblem.png' : 'ring.png'); let size = type === '링' ? '30px' : '36px'; return `<img src="image/${fileName}" style="width: ${size}; height: ${size}; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.4));">`; }
+// 🔥 아이콘 사이즈를 컨테이너 내부에 쏙 들어가게 통일 (32px)
+function getEquipIcon(type) { 
+    let fileName = type === '뱃지' ? 'badge.png' : (type === '엠블럼' ? 'emblem.png' : 'ring.png'); 
+    return `<img src="image/${fileName}" style="width: 32px; height: 32px; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.4));">`; 
+}
 
 window.isCombiningCoin = false;
 window.combineCoinPieces = () => {
@@ -507,9 +557,9 @@ window.renderInventoryTab = (tab) => {
         userEquips.forEach((eq, idx) => {
             let el = document.createElement('div'); el.className = `inv-item-box equip-${eq.grade.toLowerCase()}`; let statStr = "";
             if (eq.atk > 0) statStr = `공+${eq.atk}%`; else if (eq.spd > 0) statStr = `속+${eq.spd}%`; else if (eq.crit > 0) statStr = `크+${eq.crit}%`;
-            // 🔥 인벤토리 정렬 완벽 교정
+            // 🔥 인벤토리 창의 박스 사이즈도 40x40으로 균일화, 별을 우측 상단 모서리에 고정
             let starStr = eq.star > 0 ? `<div style="position:absolute; top:-5px; right:-5px; font-size:11px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${eq.star}</div>` : '';
-            el.innerHTML = `<div style="position:relative; display:inline-block; margin-top:5px;">${starStr}<div class="inv-item-icon">${getEquipIcon(eq.type)}</div></div><div style="font-size:10px; font-weight:bold; margin-top:4px; color:#37474f;">${statStr}</div>`; 
+            el.innerHTML = `<div style="position:relative; display:flex; justify-content:center; align-items:center; width:40px; height:40px; margin: 0 auto; margin-top:5px;">${starStr}${getEquipIcon(eq.type)}</div><div style="font-size:10px; font-weight:bold; margin-top:4px; color:#37474f; text-align:center;">${statStr}</div>`; 
             el.onclick = () => openEquipDetailModal(eq, idx, false); 
             list.appendChild(el);
         });
@@ -645,7 +695,7 @@ window.modalActionDisassemble = () => {
 };
 
 // ==========================================
-// 🌟 스타포스 강화 팝업 및 로직 (🔥 페이백 누적금 버그 수정 완료)
+// 🌟 스타포스 강화 팝업 및 로직 
 // ==========================================
 window.openStarForceModal = () => {
     let eqModal = document.getElementById('equip-detail-modal');
@@ -732,12 +782,10 @@ window.executeStarForce = () => {
         return;
     }
 
-    // 🔥 시도 시 비용 차감
     userInventory.starPieces -= info.cost;
 
     let rand = Math.random() * 100;
     if (rand < info.succ) {
-        // 🔥 성공 시에만 환급 비용을 누적하도록 버그 픽스 완료!
         eq.totalSpentStar = (eq.totalSpentStar || 0) + info.cost;
         eq.star = curStar + 1;
         window.showMessage(`🎉 스타포스 강화 성공! (★${eq.star})`);
@@ -1022,7 +1070,46 @@ window.startRankMatchmaking = async () => {
     let playCount = parseInt(localStorage.getItem('mapleDefenseRankCount')) || 0; if (playCount >= 10) { window.showMessage("오늘의 랭크 게임 제한 횟수를 모두 소진했습니다!"); return; }
     document.getElementById('rank-lobby-modal').style.display = 'none'; document.getElementById('rank-waiting-modal').style.display = 'block';
     let oppName = "의문의 용사 (AI)"; let oppRp = userRankData.rp + Math.floor(Math.random() * 40 - 20); oppCardData = {}; oppSkillLevels = { ...skillLevels };
-    try { const snap = await get(child(ref(database), `users`)); if (snap.exists()) { let users = []; snap.forEach(c => { let v = c.val(); if (v.cloudData && v.nickname && c.key !== currentUserUid) { let diff = Math.abs((parseInt(v.cloudData.rp)||1000) - userRankData.rp); users.push({ ...v, diff: diff }); } }); users.sort((a,b) => a.diff - b.diff); if(users.length > 0) { let aiUser = users[Math.floor(Math.random() * Math.min(3, users.length))]; oppName = aiUser.nickname + " (AI)"; oppRp = parseInt(aiUser.cloudData.rp) || 1000; if(aiUser.cloudData.cards) oppCardData = JSON.parse(aiUser.cloudData.cards); if(aiUser.cloudData.skills) oppSkillLevels = JSON.parse(aiUser.cloudData.skills); } } } catch(e) { console.log("AI Load Failed"); }
+    oppEquipStats = { atk: 0, spd: 0, crit: 0, flatAtk: 0 }; // 🔥 초기화
+    
+    try { 
+        const snap = await get(child(ref(database), `users`)); 
+        if (snap.exists()) { 
+            let users = []; 
+            snap.forEach(c => { 
+                let v = c.val(); 
+                if (v.cloudData && v.nickname && c.key !== currentUserUid) { 
+                    let diff = Math.abs((parseInt(v.cloudData.rp)||1000) - userRankData.rp); 
+                    users.push({ ...v, diff: diff }); 
+                } 
+            }); 
+            users.sort((a,b) => a.diff - b.diff); 
+            if(users.length > 0) { 
+                let aiUser = users[Math.floor(Math.random() * Math.min(3, users.length))]; 
+                oppName = aiUser.nickname + " (AI)"; 
+                oppRp = parseInt(aiUser.cloudData.rp) || 1000; 
+                if(aiUser.cloudData.cards) oppCardData = JSON.parse(aiUser.cloudData.cards); 
+                if(aiUser.cloudData.skills) oppSkillLevels = JSON.parse(aiUser.cloudData.skills); 
+                
+                // 🔥 AI 상대방의 클라우드 장비 정보(깡공/퍼센트) 긁어오기
+                if(aiUser.cloudData.equipped) {
+                    ['뱃지', '엠블럼', '링'].forEach(slot => {
+                        let item = aiUser.cloudData.equipped[slot];
+                        if (item) {
+                            oppEquipStats.atk += item.atk || 0;
+                            oppEquipStats.spd += item.spd || 0;
+                            oppEquipStats.crit += item.crit || 0;
+                            let star = item.star || 0;
+                            if (star > 0) {
+                                let perStar = item.grade === 'Rare' ? 4 : (item.grade === 'Epic' ? 8 : (item.grade === 'Unique' ? 12 : (item.grade === 'Legendary' ? 16 : 0)));
+                                oppEquipStats.flatAtk += star * perStar;
+                            }
+                        }
+                    });
+                }
+            } 
+        } 
+    } catch(e) { console.log("AI Load Failed"); }
     setTimeout(() => { document.getElementById('rank-waiting-modal').style.display = 'none'; playCount++; localStorage.setItem('mapleDefenseRankCount', playCount); showMatchIntro(oppName, oppRp, () => { enterRankGameAI(oppName, oppRp); }); }, 1500);
 };
 
@@ -1059,7 +1146,12 @@ function processOpponentTick(dt) {
     }
     if(oppMonsters.length >= 25) { oppState.isDead = true; state.status = 'GAMEOVER'; processRankResult('WIN', '상대방의 몹이 25마리 쌓여 패배했습니다!'); return; }
     let oppCardBonus = 0; for(let k in oppCardData) { if(oppCardData[k].grade > 0) oppCardBonus += 1 + (oppCardData[k].grade - 1) * 0.5; }
-    let cardMulti = 1 + (oppCardBonus / 100); let rageMulti = 1 + ((oppSkillLevels.common_rage || 0) * 0.01); let sharpChance = (oppSkillLevels.common_sharp || 0) * 0.05; let windReduc = 1 + ((oppSkillLevels.common_wind || 0) * 0.2);
+    
+    // 🔥 상대방(AI) 장비 스탯을 완벽히 전투 공식에 융합
+    let cardMulti = 1 + (oppCardBonus / 100); 
+    let rageMulti = 1 + ((oppSkillLevels.common_rage || 0) * 0.01) + (oppEquipStats.atk * 0.01); 
+    let sharpChance = ((oppSkillLevels.common_sharp || 0) * 0.05) + (oppEquipStats.crit * 0.01); 
+    let windReduc = 1 + ((oppSkillLevels.common_wind || 0) * 0.2) + (oppEquipStats.spd * 0.01);
     
     oppTowers.forEach(t => {
         if (t.gradeIdx >= 5) {
@@ -1067,7 +1159,7 @@ function processOpponentTick(dt) {
                 t.globalCooldown -= dt * 1000;
                 if (t.globalCooldown <= 0) {
                     if (oppMonsters.length > 0) {
-                        let baseDmg = t.cls.baseDmg * t.grade.mult * cardMulti * rageMulti;
+                        let baseDmg = (t.cls.baseDmg + oppEquipStats.flatAtk) * t.grade.mult * cardMulti * rageMulti;
                         if (t.cls.type === '전사' && oppSkillLevels.war_death > 0) { let gdmg = baseDmg * (5 + oppSkillLevels.war_death * 5); oppVisualEffects.push({ type: 'death', timer: 1.2, dmg: gdmg }); t.globalCooldown += 60000; }
                         else if (t.cls.type === '법사' && oppSkillLevels.mage_thunder > 0) { let gdmg = baseDmg * (5 + oppSkillLevels.mage_thunder * 5); oppVisualEffects.push({ type: 'thunder', timer: 0.5, dmg: gdmg }); t.globalCooldown += 60000; }
                         else if (t.cls.type === '도적' && oppSkillLevels.thief_fuma > 0) { let gdmg = baseDmg * (5 + oppSkillLevels.thief_fuma * 5); oppFumaList.push({ x: t.x, y: t.y, targetNode: 0, nodesVisited: 0, dmg: gdmg, hitSet: new Set(), angle: 0 }); t.globalCooldown += 60000; }
@@ -1083,7 +1175,7 @@ function processOpponentTick(dt) {
             let range = t.cls.range * t.grade.rangeMul; let target = null;
             for(let m of oppMonsters) { if(Math.hypot(m.x - t.x, m.y - t.y) <= range) { target = m; break; } }
             if(target) {
-                let dmg = t.cls.baseDmg * t.grade.mult * cardMulti * rageMulti; let isCrit = Math.random() < sharpChance; if (isCrit) dmg *= 1.2; let isFinal = false; if (t.cls.type === '전사' && oppSkillLevels.war_final > 0 && Math.random() < (oppSkillLevels.war_final * 0.03)) { isFinal = true; dmg *= 2; }
+                let dmg = (t.cls.baseDmg + oppEquipStats.flatAtk) * t.grade.mult * cardMulti * rageMulti; let isCrit = Math.random() < sharpChance; if (isCrit) dmg *= 1.2; let isFinal = false; if (t.cls.type === '전사' && oppSkillLevels.war_final > 0 && Math.random() < (oppSkillLevels.war_final * 0.03)) { isFinal = true; dmg *= 2; }
                 oppProjectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: isFinal, baseDmgToPass: dmg });
                 if (t.cls.type === '도적' && oppSkillLevels.thief_shadow > 0 && Math.random() < (oppSkillLevels.thief_shadow * 0.03)) { oppProjectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: false, isShadow: true }); }
                 t.lastAttack += attackCd;
@@ -1601,15 +1693,27 @@ window.loop = () => {
                 if(monsters[i].isBoss) {
                     let bInfo = getBossInfo(state.wave); state.meso += bInfo.meso; state.tickets.push(bInfo.ticket);
                     
+                    // 🔥 [신규 업데이트 1] 전리품 팝업을 위한 보상 리스트 생성
+                    let drops = [];
                     if (Math.random() * 100 <= 15) {
                         userInventory.equipBoxes = (userInventory.equipBoxes || 0) + 1;
-                        window.showMessage("🎁 보스 처치! 장비 상자를 획득했습니다!");
+                        drops.push({ type: 'equip' });
+                    }
+                    if (Math.random() * 100 <= 20) { 
+                        cardData[bInfo.name] = cardData[bInfo.name] || { owned: 0, grade: 0 }; 
+                        cardData[bInfo.name].owned++; 
+                        localStorage.setItem('mapleDefenseCards', JSON.stringify(cardData)); 
+                        if (currentUserUid) window.syncToCloud(); 
+                        drops.push({ type: 'card', name: bInfo.name });
                     }
 
-                    if (Math.random() * 100 <= 20) { cardData[bInfo.name] = cardData[bInfo.name] || { owned: 0, grade: 0 }; cardData[bInfo.name].owned++; localStorage.setItem('mapleDefenseCards', JSON.stringify(cardData)); if (currentUserUid) window.syncToCloud(); showBossToast(bInfo.name, true); }
+                    if (drops.length > 0) {
+                        window.showLootPopup(drops); // 전리품 팝업 노출
+                    } else {
+                        window.showMessage(`${state.wave}라운드 보스 처치!`); // 꽝일 때만 기본 텍스트
+                    }
                 }
             }
-            if(monsters[i].isBoss) window.showMessage(`${state.wave}라운드 보스 처치!`);
             monsters.splice(i, 1); window.updateUI();
         }
     }
