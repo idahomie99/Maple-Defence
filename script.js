@@ -1,5 +1,5 @@
-// 🔥 1.0.48 버전 - 광역 스킬 1000% ~ 3000% 하향 적용 및 오리지널 스킬 이펙트 복구 완료!
-const GAME_VERSION = "1.0.48"; 
+// 🔥 1.0.49 버전 - 모험모드 멈춤 버그 해결, 오리지널 스킬 이펙트 복구, 밸런스 패치 완료
+const GAME_VERSION = "1.0.49"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -264,13 +264,14 @@ window.saveGameData = () => {
 
 setInterval(() => { if((state.status === 'PLAY' || state.status === 'PREP') && !state.isRank) window.saveGameData(); }, 3000);
 
+// 🔥 오류 수정 완료! 루프가 끊어지지 않도록 강제 매핑
 window.startNewGame = () => {
     localStorage.removeItem('mapleDefenseSave'); setGridMode('ADVENTURE'); 
     state = { status: 'PREP', meso: 25, mp: 0, mpTotal: 0, kills: 0, wave: 1, time: 5, speed: 1, isBoss: false, upgrades: { '전사': {val: 0, cost: 10}, '법사': {val: 0, cost: 10}, '도적': {val: 0, cost: 10} }, tickets: [], isRank: false };
     document.getElementById('best-wave-container').style.display = 'block'; document.getElementById('btn-speed').innerText = "1배속"; document.getElementById('btn-speed').style.display = 'block'; document.getElementById('btn-exit').style.display = 'block'; let surrenderBtn = document.getElementById('btn-rank-surrender'); if (surrenderBtn) surrenderBtn.style.display = 'none'; document.getElementById('opp-board-wrapper').style.display = 'none';
     monsters = []; projectiles = []; towers = []; hitEffects = []; visualEffects = []; fumaList = []; damageTexts = []; waveTimer = 0; spawnTimer = 0; selectedUnitIdx = -1; bestWave = parseInt(localStorage.getItem('mapleDefenseBestWave')) || 0;
     if (currentUserUid) window.syncToCloud();
-    renderGrid(); window.switchScreen('game-container'); lastTime = performance.now(); cancelAnimationFrame(mainReqId); updateUI(); mainReqId = requestAnimationFrame(window.loop);
+    renderGrid(); window.switchScreen('game-container'); lastTime = performance.now(); cancelAnimationFrame(mainReqId); window.updateUI(); mainReqId = requestAnimationFrame(window.loop);
 };
 
 window.loadAndStartGame = () => {
@@ -279,7 +280,7 @@ window.loadAndStartGame = () => {
     document.getElementById('best-wave-container').style.display = 'block'; document.getElementById('btn-speed').innerText = "1배속"; document.getElementById('btn-speed').style.display = 'block'; document.getElementById('btn-exit').style.display = 'block'; let surrenderBtn = document.getElementById('btn-rank-surrender'); if (surrenderBtn) surrenderBtn.style.display = 'none'; document.getElementById('opp-board-wrapper').style.display = 'none';
     towers = []; if(saved.gridData && Array.isArray(saved.gridData)) { saved.gridData.forEach((u) => { if(u) window.addUnit(u.idx, u.gradeIdx, u.clsName, true); }); }
     window.switchScreen('game-container'); state.status = 'PREP'; state.time = 5; lastTime = performance.now(); state.isBoss = !!getBossInfo(state.wave);
-    cancelAnimationFrame(mainReqId); updateUI(); mainReqId = requestAnimationFrame(window.loop);
+    cancelAnimationFrame(mainReqId); window.updateUI(); mainReqId = requestAnimationFrame(window.loop);
 };
 
 window.goToLobby = () => { if(!state.isRank) window.saveGameData(); state.status = 'TITLE'; cancelAnimationFrame(mainReqId); let gameOverModal = document.getElementById('gameover-modal'); if(gameOverModal) gameOverModal.style.display = 'none'; window.closeAllModals(); document.getElementById('ui-best-wave').innerText = bestWave; window.switchScreen('start-screen'); if (currentUserUid) window.syncToCloud(); };
@@ -292,7 +293,7 @@ window.summonUnit = () => {
     let emptyIdx = grid.findIndex(v => v === null); if(emptyIdx === -1) { showMessage("배치 공간이 부족합니다!"); return; }
     state.meso -= 10; let gradeIdx = getGradeByProb(); let clsNames = Object.keys(CLASSES); let clsName = clsNames[Math.floor(Math.random() * clsNames.length)]; window.addUnit(emptyIdx, gradeIdx, clsName);
     if (state.isRank) { let oppEmptyIdx = oppGrid.findIndex(v => v === null); if (oppEmptyIdx !== -1) { let oppGradeIdx = getGradeByProb(); let oppClsName = clsNames[Math.floor(Math.random() * clsNames.length)]; addUnitOpp(oppEmptyIdx, oppGradeIdx, oppClsName); } }
-    updateUI();
+    window.updateUI();
 };
 
 function showSummonToast(gradeName, gradeIdx, clsName, color) { let toast = document.getElementById('summon-toast'); let fontSize = 16 + (gradeIdx * 2); toast.innerHTML = `<span style="color:${color}">${gradeName}</span> ${clsName}!`; toast.style.fontSize = fontSize + 'px'; toast.style.color = '#fff'; toast.className = 'toast-show'; setTimeout(() => { toast.className = ''; }, 1500); if (gradeIdx >= 5) { let container = document.getElementById('game-container'); container.classList.add('shake-active'); setTimeout(() => container.classList.remove('shake-active'), 400); } }
@@ -306,16 +307,16 @@ window.onCellClick = (idx) => {
     if (selectedUnitIdx !== -1) {
         if (selectedUnitIdx === idx) { selectedUnitIdx = -1; } else { let target = grid[idx]; grid[idx] = grid[selectedUnitIdx]; if (grid[idx]) { grid[idx].idx = idx; grid[idx].x = 75 + (idx % 5) * 70 + 35; grid[idx].y = 75 + Math.floor(idx / 5) * 70 + 35; } grid[selectedUnitIdx] = target; if(target) { target.idx = selectedUnitIdx; target.x = 75 + (selectedUnitIdx % 5) * 70 + 35; target.y = 75 + Math.floor(selectedUnitIdx / 5) * 70 + 35; } selectedUnitIdx = -1; }
     } else { if (grid[idx]) selectedUnitIdx = idx; }
-    renderGrid(); updateUI();
+    renderGrid(); window.updateUI();
 };
 
-window.sellSelectedUnit = () => { if(selectedUnitIdx === -1) return; let u = grid[selectedUnitIdx]; if(u && u.grade.sell > 0) { state.meso += u.grade.sell; towers = towers.filter(t => t !== u); grid[selectedUnitIdx] = null; selectedUnitIdx = -1; renderGrid(); updateUI(); } };
+window.sellSelectedUnit = () => { if(selectedUnitIdx === -1) return; let u = grid[selectedUnitIdx]; if(u && u.grade.sell > 0) { state.meso += u.grade.sell; towers = towers.filter(t => t !== u); grid[selectedUnitIdx] = null; selectedUnitIdx = -1; renderGrid(); window.updateUI(); } };
 window.openBulkSellModal = () => { document.getElementById('overlay').style.display = 'block'; document.getElementById('bulk-sell-modal').style.display = 'block'; };
 
 window.executeBulkSell = (type, value) => {
     let soldCount = 0; let earnedMeso = 0;
     for(let i = 0; i < grid.length; i++) { let u = grid[i]; if(!u || u.grade.sell === 0) continue; let match = false; if(type === 'class' && u.cls.type === value) match = true; if(type === 'grade' && u.gradeIdx <= value) match = true; if(match) { earnedMeso += u.grade.sell; towers = towers.filter(t => t !== u); grid[i] = null; soldCount++; } }
-    if(soldCount > 0) { state.meso += earnedMeso; showMessage(`${soldCount} 유닛 판매 (+${earnedMeso} 메소)`); selectedUnitIdx = -1; renderGrid(); updateUI(); } else { showMessage("조건에 맞는 유닛이 없습니다."); } window.closeAllModals();
+    if(soldCount > 0) { state.meso += earnedMeso; showMessage(`${soldCount} 유닛 판매 (+${earnedMeso} 메소)`); selectedUnitIdx = -1; renderGrid(); window.updateUI(); } else { showMessage("조건에 맞는 유닛이 없습니다."); } window.closeAllModals();
 };
 
 function renderGrid() {
@@ -357,18 +358,18 @@ function nextWave() {
     state.wave++; waveTimer = 0; spawnTimer = 0; let bInfo = getBossInfo(state.wave); state.isBoss = !!bInfo;
     if (!state.isRank && state.wave > bestWave) { bestWave = state.wave; localStorage.setItem('mapleDefenseBestWave', bestWave); document.getElementById('ui-best-wave').innerText = bestWave; if (currentUserUid) window.syncToCloud(); }
     if(state.isBoss) { showBossToast(bInfo.name); spawnMonster(); }
-    updateUI();
+    window.updateUI();
 }
 
 function showUpgradeToast(idChar, amt) { let box = document.getElementById(`upg-${idChar}-box`); let floatEl = document.createElement('div'); floatEl.className = 'upgrade-toast'; floatEl.innerText = '+' + amt; box.appendChild(floatEl); setTimeout(() => floatEl.remove(), 1000); }
 window.upgrade = (type) => {
     if(state.status !== 'PREP' && state.status !== 'PLAY') return; let u = state.upgrades[type];
-    if(state.mp >= u.cost) { state.mp -= u.cost; let amt = Math.floor(Math.random() * 6) + 1; u.val += amt; u.cost += Math.floor(u.cost * 0.2) + 3; let idChar = type === '전사' ? 'w' : (type === '법사' ? 'm' : 't'); showUpgradeToast(idChar, amt); document.getElementById(`upg-${idChar}-val`).innerText = u.val; document.getElementById(`upg-${idChar}-cost`).innerText = u.cost; updateUI(); } else { showMessage("메포가 부족합니다."); }
+    if(state.mp >= u.cost) { state.mp -= u.cost; let amt = Math.floor(Math.random() * 6) + 1; u.val += amt; u.cost += Math.floor(u.cost * 0.2) + 3; let idChar = type === '전사' ? 'w' : (type === '법사' ? 'm' : 't'); showUpgradeToast(idChar, amt); document.getElementById(`upg-${idChar}-val`).innerText = u.val; document.getElementById(`upg-${idChar}-cost`).innerText = u.cost; window.updateUI(); } else { showMessage("메포가 부족합니다."); }
 };
 
 let currentTicketTier = 0;
-window.openTicketModal = () => { if(state.tickets.length === 0) { showMessage("보유한 선택권이 없습니다."); return; } currentTicketTier = state.tickets[0]; document.getElementById('ticket-tier').innerText = currentTicketTier; document.getElementById('overlay').style.display = 'block'; document.getElementById('ticket-modal').style.display = 'block'; updateUI(); };
-window.useTicket = (choice) => { let emptyIdx = grid.findIndex(v => v === null); if(emptyIdx === -1) { showMessage("공간 부족!"); return; } state.tickets.shift(); let tier = currentTicketTier; let cls = choice === '랜덤' ? Object.keys(CLASSES)[Math.floor(Math.random()*3)] : choice; if(choice === '랜덤' && Math.random() < 0.2) tier++; window.addUnit(emptyIdx, tier, cls); window.closeAllModals(); updateUI(); };
+window.openTicketModal = () => { if(state.tickets.length === 0) { showMessage("보유한 선택권이 없습니다."); return; } currentTicketTier = state.tickets[0]; document.getElementById('ticket-tier').innerText = currentTicketTier; document.getElementById('overlay').style.display = 'block'; document.getElementById('ticket-modal').style.display = 'block'; window.updateUI(); };
+window.useTicket = (choice) => { let emptyIdx = grid.findIndex(v => v === null); if(emptyIdx === -1) { showMessage("공간 부족!"); return; } state.tickets.shift(); let tier = currentTicketTier; let cls = choice === '랜덤' ? Object.keys(CLASSES)[Math.floor(Math.random()*3)] : choice; if(choice === '랜덤' && Math.random() < 0.2) tier++; window.addUnit(emptyIdx, tier, cls); window.closeAllModals(); window.updateUI(); };
 
 function getTotalGrade() { let tg = 0; for(let k in cardData) tg += cardData[k].grade; return tg; }
 function getTotalCardBonus() { let bonus = 0; for(let k in cardData) { if(cardData[k].grade > 0) bonus += 1 + (cardData[k].grade - 1) * 0.5; } return bonus; }
@@ -712,7 +713,7 @@ function enterRankGameAI(oppName, oppRp) {
     monsters = []; projectiles = []; towers = []; hitEffects = []; visualEffects = []; fumaList = []; damageTexts = []; waveTimer = 0; spawnTimer = 0; selectedUnitIdx = -1;
     oppState = { wave: 1, meso: 100, isDead: false, isBoss: false }; oppMonsters = []; oppProjectiles = []; oppTowers = []; oppVisualEffects = []; oppFumaList = []; oppDamageTexts = []; oppWaveTimer = 0; oppSpawnTimer = 0;
     renderGrid(); window.switchScreen('game-container'); document.getElementById('btn-speed').style.display = 'none'; document.getElementById('btn-exit').style.display = 'none'; let surrenderBtn = document.getElementById('btn-rank-surrender'); if (surrenderBtn) surrenderBtn.style.display = 'block'; document.getElementById('opp-board-wrapper').style.display = 'flex'; document.getElementById('opp-name').innerText = oppName; document.getElementById('opp-wave').innerText = '1'; document.getElementById('opp-mobs').innerText = '0'; document.getElementById('best-wave-container').style.display = 'none';
-    lastTime = performance.now(); cancelAnimationFrame(mainReqId); updateUI(); mainReqId = requestAnimationFrame(loop);
+    lastTime = performance.now(); cancelAnimationFrame(mainReqId); window.updateUI(); mainReqId = requestAnimationFrame(window.loop);
 }
 
 window.surrenderRankGame = () => { if (confirm("정말로 항복하시겠습니까? (즉시 패배 처리됩니다)")) { handleRankGameOver("항복했습니다."); } };
@@ -737,12 +738,9 @@ function processOpponentTick(dt) {
         if (dx > 0) m.facingRight = true; else if (dx < 0) m.facingRight = false;
         if(dist <= move) { m.x = t.x; m.y = t.y; m.targetNode = (m.targetNode + 1) % currentPath.length; } else { m.x += (dx/dist)*move; m.y += (dy/dist)*move; }
     }
-    
     if(oppMonsters.length >= 25) { oppState.isDead = true; state.status = 'GAMEOVER'; processRankResult('WIN', '상대방의 몹이 25마리 쌓여 패배했습니다!'); return; }
-
     let oppCardBonus = 0; for(let k in oppCardData) { if(oppCardData[k].grade > 0) oppCardBonus += 1 + (oppCardData[k].grade - 1) * 0.5; }
     let cardMulti = 1 + (oppCardBonus / 100); let rageMulti = 1 + ((oppSkillLevels.common_rage || 0) * 0.01); let sharpChance = (oppSkillLevels.common_sharp || 0) * 0.05; let windReduc = 1 + ((oppSkillLevels.common_wind || 0) * 0.2);
-
     oppTowers.forEach(t => {
         if (t.gradeIdx >= 5) {
             if ((t.cls.type === '전사' && oppSkillLevels.war_death > 0) || (t.cls.type === '법사' && oppSkillLevels.mage_thunder > 0) || (t.cls.type === '도적' && oppSkillLevels.thief_fuma > 0)) {
@@ -760,24 +758,20 @@ function processOpponentTick(dt) {
             let range = t.cls.range * t.grade.rangeMul; let target = null;
             for(let m of oppMonsters) { if(Math.hypot(m.x - t.x, m.y - t.y) <= range) { target = m; break; } }
             if(target) {
-                let dmg = t.cls.baseDmg * t.grade.mult * cardMulti * rageMulti; let isCrit = Math.random() < sharpChance; if (isCrit) dmg *= 1.2;
-                let isFinal = false; if (t.cls.type === '전사' && oppSkillLevels.war_final > 0 && Math.random() < (oppSkillLevels.war_final * 0.03)) { isFinal = true; dmg *= 2; }
+                let dmg = t.cls.baseDmg * t.grade.mult * cardMulti * rageMulti; let isCrit = Math.random() < sharpChance; if (isCrit) dmg *= 1.2; let isFinal = false; if (t.cls.type === '전사' && oppSkillLevels.war_final > 0 && Math.random() < (oppSkillLevels.war_final * 0.03)) { isFinal = true; dmg *= 2; }
                 oppProjectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: isFinal, baseDmgToPass: dmg });
                 if (t.cls.type === '도적' && oppSkillLevels.thief_shadow > 0 && Math.random() < (oppSkillLevels.thief_shadow * 0.03)) { oppProjectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: false, isShadow: true }); }
                 t.lastAttack = (t.cls.cd * (t.grade.speedMul || 1)) / windReduc;
             }
         }
     });
-
     for(let i=oppFumaList.length-1; i>=0; i--) {
         let f = oppFumaList[i]; f.angle += 15 * dt; let t_node = currentPath[f.targetNode]; let dx = t_node.x - f.x, dy = t_node.y - f.y; let dist = Math.hypot(dx, dy); let move = 300 * dt; 
         oppMonsters.forEach(m => { if (!f.hitSet.has(m) && Math.hypot(m.x - f.x, m.y - f.y) <= 50) { m.hp -= f.dmg; f.hitSet.add(m); } });
         if(dist <= move) { f.x = t_node.x; f.y = t_node.y; f.targetNode++; f.nodesVisited++; if (f.targetNode >= currentPath.length) f.targetNode = 0; if (f.nodesVisited > currentPath.length) oppFumaList.splice(i, 1); } else { f.x += (dx/dist)*move; f.y += (dy/dist)*move; }
     }
-
     for(let i=oppProjectiles.length-1; i>=0; i--) {
-        let p = oppProjectiles[i]; let dx = p.tx - p.x, dy = p.ty - p.y; let dist = Math.hypot(dx, dy); let speed = 400 * dt;
-        if(p.type === '도적') p.angle += 15 * dt; 
+        let p = oppProjectiles[i]; let dx = p.tx - p.x, dy = p.ty - p.y; let dist = Math.hypot(dx, dy); let speed = 400 * dt; if(p.type === '도적') p.angle += 15 * dt; 
         if(dist <= speed) {
             if(oppMonsters.includes(p.target)) {
                 let hitDmg = p.dmg; if (p.type === '전사' && p.target.isBoss) hitDmg *= 1.5; p.target.hp -= hitDmg;
@@ -959,7 +953,8 @@ function drawPk() {
     pkState.dmgTexts.forEach(d => { pkCtx.save(); pkCtx.globalAlpha = Math.max(0, d.timer / 0.6); pkCtx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; pkCtx.font = d.isCrit ? "900 24px NanumSquare" : "bold 18px NanumSquare"; pkCtx.shadowColor = d.isCrit ? "#c62828" : "#000"; pkCtx.shadowBlur = 4; pkCtx.fillText(d.val, d.x, d.y); pkCtx.restore(); });
 }
 
-function updateUI() {
+// 🔥 핵심: window 영역에 확실하게 연결
+window.updateUI = () => {
     let skipWrapper = document.getElementById('boss-skip-wrapper'); if (state.isBoss && monsters.length === 0 && waveTimer > 0 && !state.isRank) skipWrapper.style.display = 'flex'; else skipWrapper.style.display = 'none';
     document.getElementById('ui-meso').innerText = state.meso; document.getElementById('ui-mp').innerText = state.mp; document.getElementById('ui-wave').innerText = state.wave; document.getElementById('ui-kills').innerText = state.kills.toLocaleString(); document.getElementById('ui-tickets').innerText = state.tickets.length; document.getElementById('btn-summon').disabled = (state.meso < 10);
     
@@ -968,9 +963,9 @@ function updateUI() {
     if (state.isRank) { document.getElementById('opp-wave').innerText = oppState.wave; document.getElementById('opp-mobs').innerText = oppMonsters.length; }
     let sellBtn = document.getElementById('btn-sell-single'); if (selectedUnitIdx !== -1 && grid[selectedUnitIdx] && grid[selectedUnitIdx].grade.sell > 0) { sellBtn.disabled = false; } else { sellBtn.disabled = true; }
     if (state.upgrades) { document.getElementById('upg-w-val').innerText = state.upgrades['전사'].val; document.getElementById('upg-w-cost').innerText = state.upgrades['전사'].cost; document.getElementById('upg-m-val').innerText = state.upgrades['법사'].val; document.getElementById('upg-m-cost').innerText = state.upgrades['법사'].cost; document.getElementById('upg-t-val').innerText = state.upgrades['도적'].val; document.getElementById('upg-t-cost').innerText = state.upgrades['도적'].cost; }
-}
+};
 
-function draw() {
+window.draw = () => {
     if(!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
@@ -1065,9 +1060,9 @@ function draw() {
         ctx.shadowColor = d.isCrit ? "#c62828" : "#000"; ctx.shadowBlur = 3;
         ctx.fillText(d.val, d.x, d.y); ctx.restore();
     });
-}
+};
 
-function drawOpp() {
+window.drawOpp = () => {
     if(!oppCtx) return;
     oppCtx.clearRect(0, 0, oppCanvas.width, oppCanvas.height);
     
@@ -1130,4 +1125,132 @@ function drawOpp() {
         oppCtx.shadowColor = "#000"; oppCtx.shadowBlur = 2;
         oppCtx.fillText(d.val, d.x, d.y); oppCtx.restore();
     });
-}
+};
+
+window.loop = () => {
+    if(state.status === 'GAMEOVER' || state.status === 'TITLE') return;
+    let now = performance.now(); 
+    
+    if (!lastTime) lastTime = now;
+    let dtReal = (now - lastTime) / 1000;
+    if (dtReal > 0.1) dtReal = 0.1; 
+    if (dtReal < 0) dtReal = 0.016; 
+    
+    let dt = dtReal * (state.speed || 1); 
+    lastTime = now;
+    
+    for (let i = hitEffects.length - 1; i >= 0; i--) { hitEffects[i].timer -= dt; if (hitEffects[i].timer <= 0) hitEffects.splice(i, 1); }
+    for (let i = visualEffects.length - 1; i >= 0; i--) {
+        visualEffects[i].timer -= dt;
+        if (visualEffects[i].timer <= 0) {
+            let v = visualEffects[i];
+            if (v.type === 'death') { monsters.forEach(m => m.hp -= v.dmg); let container = document.getElementById('game-container'); if (container) { container.classList.add('mild-shake-active'); setTimeout(() => container.classList.remove('mild-shake-active'), 300); } } else if (v.type === 'thunder') { monsters.forEach(m => m.hp -= v.dmg); }
+            visualEffects.splice(i, 1);
+        }
+    }
+    for (let i = damageTexts.length - 1; i >= 0; i--) { damageTexts[i].timer -= dt; damageTexts[i].y -= dt * 30; if (damageTexts[i].timer <= 0) damageTexts.splice(i, 1); }
+    
+    if (state.status === 'PREP') {
+        state.time -= dtReal; 
+        document.getElementById('ui-timer').innerText = Math.ceil(Math.max(0, state.time));
+        if (state.time <= 0) { state.status = 'PLAY'; state.wave = state.wave || 1; waveTimer = 0; spawnTimer = 0; showMessage(state.wave + "웨이브 시작!"); window.updateUI(); }
+        window.draw(); if(state.isRank) window.drawOpp(); mainReqId = requestAnimationFrame(window.loop); return;
+    }
+    
+    updateWave(dt); if(state.isRank) processOpponentTick(dt);
+    
+    for(let i=monsters.length-1; i>=0; i--) {
+        let m = monsters[i];
+        if (m.freezeTimer > 0) { m.freezeTimer -= dt; m.freezeTickTimer -= dt; if (m.freezeTickTimer <= 0) { m.hp -= m.freezeDmgVal; m.freezeTickTimer = 1; } }
+        if (m.bindTimer > 0) { m.bindTimer -= dt; continue; } if (m.stunTimer > 0) { m.stunTimer -= dt; continue; }
+        let t = currentPath[m.targetNode]; let dx = t.x - m.x, dy = t.y - m.y; let dist = Math.hypot(dx, dy); let currentSpeed = m.speed; if (m.freezeTimer > 0) currentSpeed *= 0.5; let move = currentSpeed * dt;
+        if (dx > 0) m.facingRight = true; else if (dx < 0) m.facingRight = false;
+        if(dist <= move) { m.x = t.x; m.y = t.y; m.targetNode = (m.targetNode + 1) % currentPath.length; } else { m.x += (dx/dist)*move; m.y += (dy/dist)*move; }
+    }
+    
+    if(state.isRank && monsters.length >= 25) return handleRankGameOver("몹 25마리 초과!");
+    if(!state.isRank && monsters.length >= 50) return gameOver("몬스터 50마리 초과! 게임 오버");
+    
+    let cardMulti = 1 + (getTotalCardBonus() / 100);
+    let rageMulti = 1 + (skillLevels.common_rage * 0.01) + (equipStats.atk * 0.01);
+    let sharpChance = (skillLevels.common_sharp * 0.05) + (equipStats.crit * 0.01);
+    let windReduc = 1 + (skillLevels.common_wind * 0.2) + (equipStats.spd * 0.01);
+
+    towers.forEach(t => {
+        if (t.gradeIdx === 6) {
+            t.bindCooldown -= dt * 1000; let bar = document.getElementById(`bind-bar-${t.idx}`); if (bar) bar.style.width = Math.max(0, Math.min(100, ((75000 - t.bindCooldown) / 75000) * 100)) + '%';
+            if (t.bindCooldown <= 0 && monsters.length > 0) { let target = null; for (let m of monsters) { if (m.bindTimer <= 0) { target = m; break; } } if (!target) target = monsters[0]; if (target) { target.bindTimer = 10; t.bindCooldown = 75000; } }
+        }
+        if (t.gradeIdx >= 5) {
+            if ((t.cls.type === '전사' && skillLevels.war_death > 0) || (t.cls.type === '법사' && skillLevels.mage_thunder > 0) || (t.cls.type === '도적' && skillLevels.thief_fuma > 0)) {
+                t.globalCooldown -= dt * 1000; let gbar = document.getElementById(`global-bar-${t.idx}`); if (gbar) gbar.style.width = Math.max(0, Math.min(100, ((60000 - t.globalCooldown) / 60000) * 100)) + '%';
+                if (t.globalCooldown <= 0 && monsters.length > 0) {
+                    let baseDmg = (t.cls.baseDmg + (state.upgrades[t.cls.type].val * 0.15)) * t.grade.mult * cardMulti * rageMulti;
+                    if (t.cls.type === '전사' && skillLevels.war_death > 0) { let gdmg = baseDmg * (5 + skillLevels.war_death * 5); visualEffects.push({ type: 'death', timer: 1.2, dmg: gdmg }); t.globalCooldown = 60000; if(state.isRank && state.isBoss) rankState.myBossDamage += gdmg; }
+                    else if (t.cls.type === '법사' && skillLevels.mage_thunder > 0) { let gdmg = baseDmg * (5 + skillLevels.mage_thunder * 5); visualEffects.push({ type: 'thunder', timer: 0.5, dmg: gdmg }); t.globalCooldown = 60000; if(state.isRank && state.isBoss) rankState.myBossDamage += gdmg; }
+                    else if (t.cls.type === '도적' && skillLevels.thief_fuma > 0) { let gdmg = baseDmg * (5 + skillLevels.thief_fuma * 5); fumaList.push({ x: t.x, y: t.y, targetNode: 0, nodesVisited: 0, dmg: gdmg, hitSet: new Set(), angle: 0 }); t.globalCooldown = 60000; }
+                }
+            }
+        }
+        t.lastAttack -= dt * 1000;
+        if(t.lastAttack <= 0) {
+            let range = t.cls.range * t.grade.rangeMul; let target = null;
+            for(let m of monsters) { let d = Math.hypot(m.x - t.x, m.y - t.y); if(d <= range) { target = m; break; } }
+            if(target) {
+                let dmg = (t.cls.baseDmg + (state.upgrades[t.cls.type].val * 0.15)) * t.grade.mult * cardMulti * rageMulti; let isCrit = Math.random() < sharpChance; if (isCrit) dmg *= 1.2;
+                let isFinal = false; if (t.cls.type === '전사' && skillLevels.war_final > 0 && Math.random() < (skillLevels.war_final * 0.03)) { isFinal = true; dmg *= 2; }
+                projectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: isFinal, baseDmgToPass: dmg });
+                if (t.cls.type === '도적' && skillLevels.thief_shadow > 0 && Math.random() < (skillLevels.thief_shadow * 0.03)) { projectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: false, isShadow: true }); }
+                t.lastAttack = (t.cls.cd * (t.grade.speedMul || 1)) / windReduc;
+            }
+        }
+    });
+    
+    for(let i=fumaList.length-1; i>=0; i--) {
+        let f = fumaList[i]; f.angle += 15 * dt; let t_node = currentPath[f.targetNode]; let dx = t_node.x - f.x, dy = t_node.y - f.y; let dist = Math.hypot(dx, dy); let move = 300 * dt; 
+        monsters.forEach(m => { if (!f.hitSet.has(m) && Math.hypot(m.x - f.x, m.y - f.y) <= 50) { m.hp -= f.dmg; f.hitSet.add(m); if(state.isRank && m.isBoss) rankState.myBossDamage += f.dmg; } });
+        if(dist <= move) { f.x = t_node.x; f.y = t_node.y; f.targetNode++; f.nodesVisited++; if (f.targetNode >= currentPath.length) f.targetNode = 0; if (f.nodesVisited > currentPath.length) fumaList.splice(i, 1); } else { f.x += (dx/dist)*move; f.y += (dy/dist)*move; }
+    }
+
+    for(let i=projectiles.length-1; i>=0; i--) {
+        let p = projectiles[i]; let dx = p.tx - p.x, dy = p.ty - p.y; let dist = Math.hypot(dx, dy); let speed = 400 * dt;
+        if(p.type === '도적') p.angle += 15 * dt; 
+        if(dist <= speed) {
+            if (p.gradeIdx >= 6) { hitEffects.push({ x: p.tx, y: p.ty, timer: 0.2, color: p.color }); }
+            if(monsters.includes(p.target)) {
+                let hitDmg = p.dmg; if (p.type === '전사' && p.target.isBoss) hitDmg *= 1.5; p.target.hp -= hitDmg; if(state.isRank && p.target.isBoss) rankState.myBossDamage += hitDmg;
+                if (p.isCrit) damageTexts.push({ val: Math.floor(hitDmg), x: p.target.x, y: p.target.y - 15, timer: 0.8 });
+                if (p.type === '전사' && Math.random() < 0.2) p.target.stunTimer = 1;
+                if (p.type === '법사' && skillLevels.mage_freeze > 0 && Math.random() < ((10 + skillLevels.mage_freeze * 2) / 100)) { if (p.target.freezeTimer <= 0) { p.target.freezeTimer = 3; p.target.freezeTickTimer = 1; p.target.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][skillLevels.mage_freeze - 1]; } }
+            }
+            if(p.splash > 0) {
+                monsters.forEach(m => {
+                    if(m !== p.target && Math.hypot(m.x - p.tx, m.y - p.ty) <= p.splash) {
+                        let splashDmg = p.dmg; if (p.type === '전사' && m.isBoss) splashDmg *= 1.5; m.hp -= splashDmg; if(state.isRank && m.isBoss) rankState.myBossDamage += splashDmg;
+                        if (p.isCrit) damageTexts.push({ val: Math.floor(splashDmg), x: m.x, y: m.y - 15, timer: 0.8 });
+                        if (p.type === '전사' && Math.random() < 0.2) m.stunTimer = 1;
+                        if (p.type === '법사' && skillLevels.mage_freeze > 0 && Math.random() < ((10 + skillLevels.mage_freeze * 2) / 100)) { if (m.freezeTimer <= 0) { m.freezeTimer = 3; m.freezeTickTimer = 1; m.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][skillLevels.mage_freeze - 1]; } }
+                    }
+                });
+            }
+            projectiles.splice(i, 1);
+        } else { let moveAmt = speed; if (p.isShadow) moveAmt *= 0.85; p.x += (dx/dist)*moveAmt; p.y += (dy/dist)*moveAmt; }
+    }
+    for(let i=monsters.length-1; i>=0; i--) {
+        if(monsters[i].hp <= 0) {
+            state.kills++;
+            if (!state.isRank) {
+                state.mp++; state.mpTotal++; if(state.mpTotal >= 10) { state.meso += 5; state.mpTotal -= 10; }
+                if(monsters[i].isBoss) {
+                    let bInfo = getBossInfo(state.wave); state.meso += bInfo.meso; state.tickets.push(bInfo.ticket);
+                    if (Math.random() * 100 <= 20) { cardData[bInfo.name] = cardData[bInfo.name] || { owned: 0, grade: 0 }; cardData[bInfo.name].owned++; localStorage.setItem('mapleDefenseCards', JSON.stringify(cardData)); if (currentUserUid) window.syncToCloud(); showBossToast(bInfo.name, true); }
+                }
+            }
+            if(monsters[i].isBoss) showMessage(`${state.wave}라운드 보스 처치!`);
+            monsters.splice(i, 1); window.updateUI();
+        }
+    }
+    
+    window.draw(); if(state.isRank) window.drawOpp(); 
+    mainReqId = requestAnimationFrame(window.loop);
+};
