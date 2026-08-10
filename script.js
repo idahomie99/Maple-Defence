@@ -523,7 +523,8 @@ window.openRaidLobby = () => {
             if(isNaN(hp)) hp = maxHp;
             let percent = (hp / maxHp) * 100;
             if(hpBar) hpBar.style.width = `${Math.max(0, percent)}%`;
-            if(hpText) hpText.innerText = `${Math.floor(hp).toLocaleString()} / ${maxHp.toLocaleString()}`;
+            // 🔥 UI 반올림 처리
+            if(hpText) hpText.innerText = `${Math.round(hp).toLocaleString()} / ${maxHp.toLocaleString()}`;
         } else {
             if(hpBar) hpBar.style.width = `100%`;
             if(hpText) hpText.innerText = `${maxHp.toLocaleString()} / ${maxHp.toLocaleString()}`;
@@ -557,7 +558,9 @@ window.startRaidGame = () => {
             raidState.bossHp = typeof val === 'number' ? val : (val.hp !== undefined ? val.hp : 7000000);
             if(isNaN(raidState.bossHp)) raidState.bossHp = 7000000;
             let percent = (raidState.bossHp / raidState.maxHp) * 100;
-            document.getElementById('raid-boss-hp-bar').style.width = `${Math.max(0, percent)}%`; document.getElementById('raid-boss-hp-text').innerText = `${Math.max(0, Math.floor(raidState.bossHp)).toLocaleString()} / ${raidState.maxHp.toLocaleString()}`;
+            document.getElementById('raid-boss-hp-bar').style.width = `${Math.max(0, percent)}%`; 
+            // 🔥 UI 반올림 처리
+            document.getElementById('raid-boss-hp-text').innerText = `${Math.max(0, Math.round(raidState.bossHp)).toLocaleString()} / ${raidState.maxHp.toLocaleString()}`;
         }
     });
     raidLoop();
@@ -571,7 +574,11 @@ window.showRaidRanking = async () => {
         if (snap.exists()) {
             let ranks = []; snap.forEach(c => { let v = c.val(); if(typeof v.damage === 'number' && !isNaN(v.damage)) ranks.push(v); }); 
             ranks.sort((a, b) => b.damage - a.damage); ranks = ranks.slice(0, 50); list.innerHTML = '';
-            ranks.forEach((entry, idx) => { let color = idx === 0 ? '#ffd700' : (idx === 1 ? '#e0e0e0' : (idx === 2 ? '#cd7f32' : '#fff')); list.innerHTML += `<div style="display:flex; justify-content:space-between; background:rgba(255,255,255,0.1); padding:10px; border-radius:6px; color:${color}; font-weight:bold;"><span>${idx + 1}위 - ${entry.nickname}</span><span>${entry.damage.toLocaleString()} <span style="font-size:10px; color:#aaa;">(${entry.date})</span></span></div>`; });
+            ranks.forEach((entry, idx) => { 
+                let color = idx === 0 ? '#ffd700' : (idx === 1 ? '#e0e0e0' : (idx === 2 ? '#cd7f32' : '#fff')); 
+                // 🔥 랭킹 점수 반올림 처리
+                list.innerHTML += `<div style="display:flex; justify-content:space-between; background:rgba(255,255,255,0.1); padding:10px; border-radius:6px; color:${color}; font-weight:bold;"><span>${idx + 1}위 - ${entry.nickname}</span><span>${Math.round(entry.damage).toLocaleString()} <span style="font-size:10px; color:#aaa;">(${entry.date})</span></span></div>`; 
+            });
         } else list.innerHTML = '<div style="text-align:center; padding:20px; color:#fff;">아직 등록된 순위가 없습니다.</div>';
     } catch(e) { list.innerHTML = '<div style="text-align:center; color:#ff5252;">서버 연결 실패.</div>'; }
 };
@@ -606,7 +613,6 @@ function renderRaidGrid() {
     document.getElementById('raid-grid-container').innerHTML = gridHtml;
 }
 
-// 🔥 데미지 전송 트랜잭션 완벽 보호 (DB 에러 자동 복구)
 setInterval(() => {
     if (raidState.active && raidState.pendingDmg > 0 && !isNaN(raidState.pendingDmg)) {
         let dmgToApply = raidState.pendingDmg; 
@@ -618,7 +624,8 @@ setInterval(() => {
             if (!bossData || typeof bossData !== 'object') bossData = { hp: 7000000, killCount: 0, lastKillerUid: null };
             
             if (typeof bossData.hp !== 'number' || isNaN(bossData.hp)) bossData.hp = 7000000;
-            let dmg = (typeof dmgToApply === 'number' && !isNaN(dmgToApply)) ? dmgToApply : 0;
+            // 🔥 서버 저장 시 데미지 반올림 처리
+            let dmg = (typeof dmgToApply === 'number' && !isNaN(dmgToApply)) ? Math.round(dmgToApply) : 0;
             
             bossData.hp -= dmg;
             
@@ -670,15 +677,16 @@ function raidLoop() {
                 
                 if (gdmg > 0 && !isNaN(gdmg)) {
                     raidState.totalDmg += gdmg; raidState.pendingDmg += gdmg;
-                    document.getElementById('raid-total-dmg').innerText = Math.floor(raidState.totalDmg).toLocaleString();
+                    // 🔥 UI 반올림 처리
+                    document.getElementById('raid-total-dmg').innerText = Math.round(raidState.totalDmg).toLocaleString();
                     
                     raidState.bossHp = Math.max(0, raidState.bossHp - gdmg);
                     let percent = (raidState.bossHp / raidState.maxHp) * 100;
                     document.getElementById('raid-boss-hp-bar').style.width = `${Math.max(0, percent)}%`;
-                    document.getElementById('raid-boss-hp-text').innerText = `${Math.max(0, Math.floor(raidState.bossHp)).toLocaleString()} / ${raidState.maxHp.toLocaleString()}`;
+                    document.getElementById('raid-boss-hp-text').innerText = `${Math.max(0, Math.round(raidState.bossHp)).toLocaleString()} / ${raidState.maxHp.toLocaleString()}`;
 
                     let ox = (Math.random() - 0.5) * 50; let oy = (Math.random() - 0.5) * 50;
-                    raidState.dmgTexts.push({ val: Math.floor(gdmg), x: bx + ox, y: by - 80 + oy, timer: 0.8, isCrit: true });
+                    raidState.dmgTexts.push({ val: Math.round(gdmg), x: bx + ox, y: by - 80 + oy, timer: 0.8, isCrit: true });
                 }
                 u.globalCooldown += 60000;
             }
@@ -710,15 +718,16 @@ function raidLoop() {
         if (dist <= speed) {
             if (!isNaN(p.dmg)) {
                 raidState.totalDmg += p.dmg; raidState.pendingDmg += p.dmg; 
-                document.getElementById('raid-total-dmg').innerText = Math.floor(raidState.totalDmg).toLocaleString();
+                // 🔥 UI 반올림 처리
+                document.getElementById('raid-total-dmg').innerText = Math.round(raidState.totalDmg).toLocaleString();
                 
                 raidState.bossHp = Math.max(0, raidState.bossHp - p.dmg);
                 let percent = (raidState.bossHp / raidState.maxHp) * 100;
                 document.getElementById('raid-boss-hp-bar').style.width = `${Math.max(0, percent)}%`;
-                document.getElementById('raid-boss-hp-text').innerText = `${Math.max(0, Math.floor(raidState.bossHp)).toLocaleString()} / ${raidState.maxHp.toLocaleString()}`;
+                document.getElementById('raid-boss-hp-text').innerText = `${Math.max(0, Math.round(raidState.bossHp)).toLocaleString()} / ${raidState.maxHp.toLocaleString()}`;
 
                 let ox = (Math.random() - 0.5) * 50; let oy = (Math.random() - 0.5) * 50; 
-                raidState.dmgTexts.push({ val: Math.floor(p.dmg), x: bx + ox, y: by + oy - 80, timer: 0.6, isCrit: p.isCrit });
+                raidState.dmgTexts.push({ val: Math.round(p.dmg), x: bx + ox, y: by + oy - 80, timer: 0.6, isCrit: p.isCrit });
             }
             raidState.projectiles.splice(i, 1);
         } else { 
@@ -815,7 +824,8 @@ function endRaidGame() {
         rewardMsg = `🎁 기여도 보상: ${rewardTier} 상자 1개 지급 완료!`; 
     }
 
-    document.getElementById('raid-result-dmg').innerText = Math.floor(raidState.totalDmg || 0).toLocaleString(); 
+    // 🔥 UI 반올림 처리
+    document.getElementById('raid-result-dmg').innerText = Math.round(raidState.totalDmg || 0).toLocaleString(); 
     document.getElementById('raid-result-percent').innerText = (percent || 0).toFixed(2) + "%"; 
     document.getElementById('raid-result-rewards').innerText = rewardMsg;
     document.getElementById('raid-result-overlay').style.display = 'block'; 
@@ -832,10 +842,11 @@ function endRaidGame() {
             }
             return {
                 nickname: currentUserName,
-                damage: accDmg,
+                // 🔥 서버 저장 시 누적 랭킹 점수 반올림 처리
+                damage: Math.round(accDmg),
                 date: new Date().toLocaleDateString()
             };
-        }).catch(e => console.warn("랭킹 저장 오류:", e));
+        }).catch(e => console.warn("랭킹 저장 비동기 오류:", e));
     }
 
     if (raidState.pendingDmg > 0 && !isNaN(raidState.pendingDmg)) {
@@ -847,7 +858,8 @@ function endRaidGame() {
             if (!bossData || typeof bossData !== 'object') bossData = { hp: 7000000, killCount: 0, lastKillerUid: null };
             
             if (typeof bossData.hp !== 'number' || isNaN(bossData.hp)) bossData.hp = 7000000;
-            let dmg = (typeof dmgToApply === 'number' && !isNaN(dmgToApply)) ? dmgToApply : 0;
+            // 🔥 서버 저장 시 데미지 반올림 처리
+            let dmg = (typeof dmgToApply === 'number' && !isNaN(dmgToApply)) ? Math.round(dmgToApply) : 0;
             
             bossData.hp -= dmg;
             if (bossData.hp <= 0) { 
