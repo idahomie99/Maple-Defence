@@ -527,7 +527,7 @@ window.openRaidLobby = () => {
             if(hpBar) hpBar.style.width = `100%`;
             if(hpText) hpText.innerText = `${maxHp.toLocaleString()} / ${maxHp.toLocaleString()}`;
         }
-    }, { onlyOnce: true });
+    });
 };
 
 window.openRaidMenu = window.openRaidLobby;
