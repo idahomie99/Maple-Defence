@@ -152,10 +152,16 @@
             <p style="font-size:13px; font-weight:bold; color:#4e342e; margin-bottom:15px; text-align:center;">
                 전 서버 유저들이 힘을 합쳐<br>강력한 보스를 처치하세요!
             </p>
+            
+            <!-- 🔥 수정된 로비 팝업 체력 바 UI -->
             <div style="background:rgba(0,0,0,0.7); padding:15px; border-radius:8px; margin-bottom:15px; border: 1px solid #b91c1c; text-align:center;">
                 <div style="color:#ddd; font-size:14px; margin-bottom:5px;">현재 보스 체력</div>
-                <div id="ui-raid-hp" style="color:#ff5252; font-size:22px; font-weight:900;">7,000,000</div>
+                <div style="width: 100%; background: #333; height: 16px; border-radius: 8px; border: 2px solid #111; overflow: hidden; margin-bottom: 5px;">
+                    <div id="lobby-raid-boss-hp-bar" style="width: 100%; height: 100%; background: linear-gradient(to right, #ef4444, #b91c1c); transition: width 0.2s ease;"></div>
+                </div>
+                <div id="lobby-raid-boss-hp-text" style="color:#ff5252; font-size:14px; font-weight:900;">불러오는 중...</div>
             </div>
+
             <button class="ingame-btn premium-red" style="width:100%; height:55px; margin-bottom:10px; font-size:16px;" onclick="startRaidGame()">⚔️ 도전하기 (1일 1회)</button>
             <button class="ingame-btn premium-orange" style="width:100%; height:55px; margin-bottom:15px; font-size:16px;" onclick="showRaidRanking()">🏆 누적 데미지 순위</button>
             <button class="ingame-btn premium-white" style="width:100%; padding: 10px;" onclick="closeRaidLobby()">로비로 돌아가기</button>
