@@ -1,5 +1,5 @@
-// 🔥 1.0.66 버전 - 월드보스 통신 오류 픽스, Z-index 팝업 우선순위, 로비 복귀 버그 완벽 해결
-const GAME_VERSION = "1.0.66"; 
+// 🔥 1.0.67 버전 - Firebase 권한 거부 시 UI 충돌 완벽 방지 및 트랜잭션 순수성 강화
+const GAME_VERSION = "1.0.67"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -135,7 +135,7 @@ window.showMessage = (msg) => {
     let ov = document.getElementById('msg-overlay'); 
     if(!ov) return; 
     ov.innerHTML = msg; 
-    ov.style.zIndex = '9999'; // 🔥 버그 1 픽스: 토스트 메시지 Z-index 최상위 배정
+    ov.style.zIndex = '9999';
     ov.style.display = 'block'; 
     setTimeout(() => { ov.style.display = 'none'; }, 2000); 
 };
@@ -630,6 +630,9 @@ setInterval(() => {
             return bossData;
         }).catch(e => {
             raidState.pendingDmg += dmgToApply; 
+            if (e.message && e.message.toLowerCase().includes('permission_denied')) {
+                window.showMessage("파이어베이스 보안 규칙(Rules) 설정이 필요합니다!");
+            }
         });
     }
 }, 1000);
@@ -820,7 +823,6 @@ function endRaidGame() {
 
     window.syncToCloud();
     
-    // 🔥 랭킹 저장 트랜잭션 추가 (안전한 기록 보장)
     if (currentUserUid) {
         let myRankRef = ref(database, `worldBoss_rankings/${currentUserUid}`);
         runTransaction(myRankRef, (rankData) => {
@@ -947,9 +949,7 @@ function processOpponentTick(dt) {
                         if (t.cls.type === '전사' && oppSkillLevels.war_death > 0) { let gdmg = baseDmg * (1.5 + oppSkillLevels.war_death * 1.5); oppVisualEffects.push({ type: 'death', timer: 1.2, dmg: gdmg }); t.globalCooldown += 60000; }
                         else if (t.cls.type === '법사' && oppSkillLevels.mage_thunder > 0) { let gdmg = baseDmg * (1.5 + oppSkillLevels.mage_thunder * 1.5); oppVisualEffects.push({ type: 'thunder', timer: 0.5, dmg: gdmg }); t.globalCooldown += 60000; }
                         else if (t.cls.type === '도적' && oppSkillLevels.thief_fuma > 0) { let gdmg = baseDmg * (1.5 + skillLevels.thief_fuma * 1.5); oppFumaList.push({ x: t.x, y: t.y, targetNode: 0, nodesVisited: 0, dmg: gdmg, hitSet: new Set(), angle: 0 }); t.globalCooldown += 60000; }
-                    } else {
-                        t.globalCooldown = 0;
-                    }
+                    } else { t.globalCooldown = 0; }
                 }
             }
         }
@@ -962,10 +962,7 @@ function processOpponentTick(dt) {
                 oppProjectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: isFinal, baseDmgToPass: dmg });
                 if (t.cls.type === '도적' && oppSkillLevels.thief_shadow > 0 && Math.random() < (oppSkillLevels.thief_shadow * 0.03)) { oppProjectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: false, isShadow: true }); }
                 t.lastAttack += attackCd;
-            } else {
-                t.lastAttack = 0;
-                break;
-            }
+            } else { t.lastAttack = 0; break; }
         }
     });
 
@@ -1010,7 +1007,7 @@ async function processRankResult(result, desc) {
 window.exitRankGame = () => { document.getElementById('rank-result-overlay').style.display = 'none'; document.getElementById('rank-result-modal').style.display = 'none'; rankState = { active: false }; state.status = 'TITLE'; window.switchScreen('start-screen'); };
 
 // ==========================================
-// 9. 월드 펀치킹 시스템
+// 9. 월드 펀킹킹 시스템
 // ==========================================
 window.loadPkLiveRanking = async () => {
     let list = document.getElementById('pk-live-ranking-list'); if(!list) return;
@@ -1304,13 +1301,11 @@ window.loop = () => {
     }
 
     for(let i=projectiles.length-1; i>=0; i--) {
-        let p = projectiles[i]; let dx = p.tx - p.x, dy = p.ty - p.y; let dist = Math.hypot(dx, dy); let speed = 400 * dt;
-        if(p.type === '도적') p.angle += 15 * dt; 
+        let p = projectiles[i]; let dx = p.tx - p.x, dy = p.ty - p.y; let dist = Math.hypot(dx, dy); let speed = 400 * dt; if(p.type === '도적') p.angle += 15 * dt; 
         if(dist <= speed) {
             if (p.gradeIdx >= 6) { hitEffects.push({ x: p.tx, y: p.ty, timer: 0.2, color: p.color }); }
             if(monsters.includes(p.target)) {
                 let hitDmg = p.dmg; if (p.type === '전사' && p.target.isBoss) hitDmg *= 1.5; p.target.hp -= hitDmg; if(state.isRank && p.target.isBoss) rankState.myBossDamage += hitDmg;
-                // 🔥 데미지 텍스트 Y좌표 상향 (-35)
                 if (p.isCrit) damageTexts.push({ val: Math.floor(hitDmg), x: p.target.x, y: p.target.y - 35, timer: 0.8 });
                 if (p.type === '전사' && Math.random() < 0.2) p.target.stunTimer = 1;
                 if (p.type === '법사' && (skillLevels.mage_freeze||0) > 0 && Math.random() < ((10 + (skillLevels.mage_freeze||0) * 2) / 100)) { if (p.target.freezeTimer <= 0) { p.target.freezeTimer = 3; p.target.freezeTickTimer = 1; p.target.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][(skillLevels.mage_freeze||0) - 1]; } }
@@ -1319,7 +1314,6 @@ window.loop = () => {
                 monsters.forEach(m => {
                     if(m !== p.target && Math.hypot(m.x - p.tx, m.y - p.ty) <= p.splash) {
                         let splashDmg = p.dmg; if (p.type === '전사' && m.isBoss) splashDmg *= 1.5; m.hp -= splashDmg; if(state.isRank && m.isBoss) rankState.myBossDamage += splashDmg;
-                        // 🔥 스플래시 데미지 텍스트 Y좌표 상향 (-35)
                         if (p.isCrit) damageTexts.push({ val: Math.floor(splashDmg), x: m.x, y: m.y - 35, timer: 0.8 });
                         if (p.type === '전사' && Math.random() < 0.2) m.stunTimer = 1;
                         if (p.type === '법사' && (skillLevels.mage_freeze||0) > 0 && Math.random() < ((10 + (skillLevels.mage_freeze||0) * 2) / 100)) { if (m.freezeTimer <= 0) { m.freezeTimer = 3; m.freezeTickTimer = 1; m.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][(skillLevels.mage_freeze||0) - 1]; } }
