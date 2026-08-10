@@ -131,22 +131,22 @@ const CLASSES = {
 
 // 🔥 160~200층 신규 보스 및 보상 추가
 const BOSS_WAVES = { 
-    24: { hp: 10000, meso: 50, ticket: 1, name: "킹 슬라임" }, 
-    37: { hp: 30000, meso: 50, ticket: 2, name: "알리샤르" }, 
-    58: { hp: 100000, meso: 50, ticket: 2, name: "파풀라투스" }, 
-    79: { hp: 300000, meso: 70, ticket: 2, name: "피아누스" }, 
-    90: { hp: 800000, meso: 100, ticket: 3, name: "자쿰" }, 
-    100: { name: "혼테일", meso: 100, ticket: 3 }, 
-    110: { name: "시그너스", meso: 120, ticket: 3 }, 
-    120: { name: "반반", meso: 120, ticket: 3 }, 
-    130: { name: "피에르", meso: 120, ticket: 3 }, 
-    140: { name: "블러드퀸", meso: 120, ticket: 3 }, 
-    150: { name: "벨룸", meso: 150, ticket: 3 }, 
-    160: { name: "스우", meso: 180, ticket: 3 }, 
-    170: { name: "데미안", meso: 180, ticket: 3 }, 
-    180: { name: "루시드", meso: 200, ticket: 3 }, 
-    190: { name: "윌", meso: 200, ticket: 3 }, 
-    200: { name: "가디언엔젤슬라임", meso: 250, ticket: 4 } 
+    24: { hp: 10000, meso: 50, tier: 3, count: 1, name: "킹 슬라임" }, 
+    37: { hp: 30000, meso: 50, tier: 4, count: 1, name: "알리샤르" }, 
+    58: { hp: 100000, meso: 50, tier: 4, count: 1, name: "파풀라투스" }, 
+    79: { hp: 300000, meso: 70, tier: 4, count: 1, name: "피아누스" }, 
+    90: { hp: 800000, meso: 100, tier: 5, count: 1, name: "자쿰" }, 
+    100: { name: "혼테일", meso: 100, tier: 5, count: 1 }, 
+    110: { name: "시그너스", meso: 120, tier: 5, count: 1 }, 
+    120: { name: "반반", meso: 120, tier: 5, count: 1 }, 
+    130: { name: "피에르", meso: 120, tier: 5, count: 1 }, 
+    140: { name: "블러드퀸", meso: 120, tier: 5, count: 1 }, 
+    150: { name: "벨룸", meso: 150, tier: 5, count: 1 }, 
+    160: { name: "스우", meso: 180, tier: 5, count: 1 }, 
+    170: { name: "데미안", meso: 180, tier: 5, count: 1 }, 
+    180: { name: "루시드", meso: 200, tier: 5, count: 1 }, 
+    190: { name: "윌", meso: 200, tier: 5, count: 1 }, 
+    200: { name: "가디언엔젤슬라임", meso: 250, tier: 5, count: 2 } // 200층만 특별히 2장
 };
 
 // ==========================================
@@ -305,10 +305,8 @@ function getBossInfo(w) {
     if (w >= 100 && w % 5 === 0) { 
         let n = (w - 100) / 5; 
         
-        // 100층 이상 기본 체력 공식 (n² 계수 소폭 상향)
         let calculatedHp = 1200000 + (n * 300000) + (Math.pow(n, 2) * 55000); 
         
-        // 150층 초과 시 5층마다 5% 복리 증폭 (서서히 압박)
         if (w > 150) {
             let overN = (w - 150) / 5;
             calculatedHp = calculatedHp * Math.pow(1.05, overN);
@@ -316,8 +314,12 @@ function getBossInfo(w) {
 
         let bName = BOSS_WAVES[w] ? BOSS_WAVES[w].name : (w % 10 === 5 ? "어둠의 늑대" : `심연의 보스 (${w}층)`); 
         let bMeso = BOSS_WAVES[w] ? BOSS_WAVES[w].meso : (w >= 160 ? 200 : 150); 
-        let bTicket = BOSS_WAVES[w] ? BOSS_WAVES[w].ticket : 3; 
-        return { hp: Math.floor(calculatedHp), meso: bMeso, ticket: bTicket, name: bName }; 
+        
+        // 🔥 100층 이상의 심연의 보스들은 설정값이 없다면 기본적으로 5차 선택권 1장 지급!
+        let bTier = BOSS_WAVES[w] ? BOSS_WAVES[w].tier : 5; 
+        let bCount = BOSS_WAVES[w] ? BOSS_WAVES[w].count : 1; 
+        
+        return { hp: Math.floor(calculatedHp), meso: bMeso, tier: bTier, count: bCount, name: bName }; 
     } 
     return null;
 }
@@ -1421,7 +1423,16 @@ window.loop = () => {
             if (!state.isRank) {
                 state.mp++; state.mpTotal++; if(state.mpTotal >= 10) { state.meso += 5; state.mpTotal -= 10; }
                 if(monsters[i].isBoss) {
-                    let bInfo = getBossInfo(state.wave); state.meso += bInfo.meso; state.tickets.push(bInfo.ticket);
+                    let bInfo = getBossInfo(state.wave); 
+                    state.meso += bInfo.meso; 
+                    
+                    // 🔥 설정된 장수(count)만큼 해당 등급(tier)의 선택권을 반복해서 지급!
+                    let tCount = bInfo.count || 1;
+                    let tTier = bInfo.tier || 5; 
+                    for (let t = 0; t < tCount; t++) {
+                        state.tickets.push(tTier);
+                    }
+                    
                     let drops = [];
                     if (Math.random() * 100 <= 15) { userInventory.equipBoxes = (userInventory.equipBoxes || 0) + 1; drops.push({ type: 'equip' }); }
                     if (Math.random() * 100 <= 20) { cardData[bInfo.name] = cardData[bInfo.name] || { owned: 0, grade: 0 }; cardData[bInfo.name].owned++; localStorage.setItem('mapleDefenseCards', JSON.stringify(cardData)); if (currentUserUid) window.syncToCloud(); drops.push({ type: 'card', name: bInfo.name }); }
