@@ -1,5 +1,5 @@
-// 🔥 1.0.64 버전 - 5차 이상 고급 투사체 적용, NaN 딜 오류 완벽 차단, 월드보스 로비 체력바 연동
-const GAME_VERSION = "1.0.64"; 
+// 🔥 1.0.65 버전 - 월드보스 실시간 피통 감소 및 팝업 강제 출력 보장 (최종)
+const GAME_VERSION = "1.0.65"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -88,7 +88,6 @@ let cardData = JSON.parse(localStorage.getItem('mapleDefenseCards')) || {};
 const CARD_REQ = [1, 2, 4, 8, 12, 16, 20, 24, 28, 32]; 
 let spentCoins = parseInt(localStorage.getItem('mapleDefenseSpentCoins')) || 0;
 
-// 🔥 [핵심 버그 수정] 스킬 레벨 NaN 파생 딜 버그 원천 차단
 const DEFAULT_SKILLS = { common_wind: 0, common_sharp: 0, common_rage: 0, war_final: 0, war_death: 0, mage_freeze: 0, mage_thunder: 0, thief_shadow: 0, thief_fuma: 0 };
 let skillLevels = JSON.parse(localStorage.getItem('mapleDefenseSkills')) || {};
 skillLevels = { ...DEFAULT_SKILLS, ...skillLevels };
@@ -394,7 +393,7 @@ window.renderInventoryTab = (tab) => {
     if (tab === 'consumable') {
         if(userInventory.coinPieces > 0) list.innerHTML += createInvBox('🧩', '코인 조각', userInventory.coinPieces, "combineCoinPieces()");
         if(userInventory.equipBoxes > 0) list.innerHTML += createInvBox('🎁', '장비 상자', userInventory.equipBoxes, "openBox('equipBoxes')");
-        list.innerHTML += createInvBox('🌟', '별의 기운', userInventory.starPieces || 0, ""); 
+        list.innerHTML += createInvBox('🌟', '별 기운', userInventory.starPieces || 0, ""); 
         ['브론즈', '실버', '골드', '플래티넘', '다이아몬드', '챌린저'].forEach(tier => { if (userInventory.boxes[tier] > 0) { list.innerHTML += createInvBox('🧰', `${tier} 상자`, userInventory.boxes[tier], `openBox('${tier}')`); } });
     } else if (tab === 'equip') {
         userEquips.forEach((eq, idx) => {
@@ -597,6 +596,35 @@ function renderRaidGrid() {
     document.getElementById('raid-grid-container').innerHTML = gridHtml;
 }
 
+// 🔥 1초마다 실행되는 데미지 전송 (실시간 로컬 피통 감소 연동)
+setInterval(() => {
+    if (raidState.active && raidState.pendingDmg > 0 && !isNaN(raidState.pendingDmg)) {
+        let dmgToApply = raidState.pendingDmg; 
+        raidState.pendingDmg = 0;
+        
+        runTransaction(ref(database, 'worldBoss/hp'), (currentHp) => {
+            if (currentHp === null || isNaN(currentHp)) currentHp = 7000000;
+            if (isNaN(dmgToApply)) dmgToApply = 0;
+            currentHp -= dmgToApply;
+            if (isNaN(currentHp) || currentHp <= 0) currentHp = 7000000;
+            return currentHp;
+        }).then(({committed, snapshot}) => {
+            if(committed && snapshot.exists()) {
+                let hp = snapshot.val();
+                let maxHp = 7000000;
+                let percent = (hp / maxHp) * 100;
+                let hpBar = document.getElementById('raid-boss-hp-bar');
+                let hpText = document.getElementById('raid-boss-hp-text');
+                if(hpBar) hpBar.style.width = `${Math.max(0, percent)}%`;
+                if(hpText) hpText.innerText = `${Math.max(0, Math.floor(hp)).toLocaleString()} / ${maxHp.toLocaleString()}`;
+            }
+        }).catch(e => {
+            raidState.pendingDmg += dmgToApply; 
+            console.warn("데미지 전송 지연, 다음 틱에 재전송합니다.");
+        });
+    }
+}, 1000);
+
 function raidLoop() {
     if (!raidState.active) return;
     let now = performance.now(); let dtReal = (now - raidState.lastTime) / 1000; if (dtReal > 0.1) dtReal = 0.1; raidState.lastTime = now;
@@ -631,6 +659,13 @@ function raidLoop() {
                 if (gdmg > 0 && !isNaN(gdmg)) {
                     raidState.totalDmg += gdmg; raidState.pendingDmg += gdmg;
                     document.getElementById('raid-total-dmg').innerText = Math.floor(raidState.totalDmg).toLocaleString();
+                    
+                    // 🔥 [실시간 반영] 유닛이 스킬 쓸 때 내 화면 보스 피통도 즉시 깎기
+                    raidState.bossHp = Math.max(0, raidState.bossHp - gdmg);
+                    let percent = (raidState.bossHp / raidState.maxHp) * 100;
+                    document.getElementById('raid-boss-hp-bar').style.width = `${Math.max(0, percent)}%`;
+                    document.getElementById('raid-boss-hp-text').innerText = `${Math.max(0, Math.floor(raidState.bossHp)).toLocaleString()} / ${raidState.maxHp.toLocaleString()}`;
+
                     let ox = (Math.random() - 0.5) * 50; let oy = (Math.random() - 0.5) * 50;
                     raidState.dmgTexts.push({ val: Math.floor(gdmg), x: bx + ox, y: by - 80 + oy, timer: 0.8, isCrit: true });
                 }
@@ -663,8 +698,17 @@ function raidLoop() {
         let p = raidState.projectiles[i]; let dx = p.tx - p.x, dy = p.ty - p.y; let dist = Math.hypot(dx, dy); let speed = 600 * dt;
         if (dist <= speed) {
             if (!isNaN(p.dmg)) {
-                raidState.totalDmg += p.dmg; raidState.pendingDmg += p.dmg; document.getElementById('raid-total-dmg').innerText = Math.floor(raidState.totalDmg).toLocaleString();
-                let ox = (Math.random() - 0.5) * 50; let oy = (Math.random() - 0.5) * 50; raidState.dmgTexts.push({ val: Math.floor(p.dmg), x: bx + ox, y: by + oy - 80, timer: 0.6, isCrit: p.isCrit });
+                raidState.totalDmg += p.dmg; raidState.pendingDmg += p.dmg; 
+                document.getElementById('raid-total-dmg').innerText = Math.floor(raidState.totalDmg).toLocaleString();
+                
+                // 🔥 [실시간 반영] 평타 맞을 때 내 화면 보스 피통 즉시 깎기
+                raidState.bossHp = Math.max(0, raidState.bossHp - p.dmg);
+                let percent = (raidState.bossHp / raidState.maxHp) * 100;
+                document.getElementById('raid-boss-hp-bar').style.width = `${Math.max(0, percent)}%`;
+                document.getElementById('raid-boss-hp-text').innerText = `${Math.max(0, Math.floor(raidState.bossHp)).toLocaleString()} / ${raidState.maxHp.toLocaleString()}`;
+
+                let ox = (Math.random() - 0.5) * 50; let oy = (Math.random() - 0.5) * 50; 
+                raidState.dmgTexts.push({ val: Math.floor(p.dmg), x: bx + ox, y: by + oy - 80, timer: 0.6, isCrit: p.isCrit });
             }
             raidState.projectiles.splice(i, 1);
         } else { 
@@ -738,37 +782,35 @@ function drawRaid() {
 
 function endRaidGame() {
     if (!raidState.active) return; raidState.active = false; cancelAnimationFrame(raidReqId);
-    let finishProcess = () => {
-        let percent = (raidState.totalDmg / 7000000) * 100; let rewardTier = '';
-        if (percent <= 5) rewardTier = '브론즈'; else if (percent <= 10) rewardTier = '실버'; else if (percent <= 20) rewardTier = '골드'; else if (percent <= 30) rewardTier = '플래티넘'; else if (percent <= 50) rewardTier = '다이아몬드'; else rewardTier = '챌린저';
-        let rewardMsg = ""; if (!userInventory.boxes) userInventory.boxes = {};
-        
-        if (raidState.gotLastHit) { userInventory.boxes['챌린저'] = (userInventory.boxes['챌린저'] || 0) + 1; rewardMsg = `🎁 막타 보상: 챌린저 상자 1개 (기여도 보상 대체)`; } 
-        else { userInventory.boxes[rewardTier] = (userInventory.boxes[rewardTier] || 0) + 1; rewardMsg = `🎁 기여도 보상: ${rewardTier} 상자 1개 지급 완료!`; }
-        
+    let percent = (raidState.totalDmg / 7000000) * 100; let rewardTier = '';
+    if (percent <= 5) rewardTier = '브론즈'; else if (percent <= 10) rewardTier = '실버'; else if (percent <= 20) rewardTier = '골드'; else if (percent <= 30) rewardTier = '플래티넘'; else if (percent <= 50) rewardTier = '다이아몬드'; else rewardTier = '챌린저';
+    let rewardMsg = ""; if (!userInventory.boxes) userInventory.boxes = {};
+    if (raidState.gotLastHit) { userInventory.boxes['챌린저'] = (userInventory.boxes['챌린저'] || 0) + 1; rewardMsg = `🎁 막타 보상: 챌린저 상자 1개 (기여도 보상 대체)`; } 
+    else { userInventory.boxes[rewardTier] = (userInventory.boxes[rewardTier] || 0) + 1; rewardMsg = `🎁 기여도 보상: ${rewardTier} 상자 1개 지급 완료!`; }
+    
+    document.getElementById('raid-result-dmg').innerText = Math.floor(raidState.totalDmg || 0).toLocaleString(); document.getElementById('raid-result-percent').innerText = (percent || 0).toFixed(2) + "%"; document.getElementById('raid-result-rewards').innerText = rewardMsg; document.getElementById('raid-result-overlay').style.display = 'block'; document.getElementById('raid-result-modal').style.display = 'block';
+    
+    window.syncToCloud();
+    if (currentUserUid) {
         let myRankRef = ref(database, `worldBoss_rankings/${currentUserUid}`);
         get(myRankRef).then(snap => {
             let accDmg = raidState.totalDmg; if (isNaN(accDmg)) accDmg = 0;
             if(snap.exists() && snap.val().damage && !isNaN(snap.val().damage)) { accDmg += snap.val().damage; }
-            return set(myRankRef, { nickname: currentUserName, damage: accDmg, date: new Date().toLocaleDateString() });
-        }).then(() => {
-            window.syncToCloud(); document.getElementById('raid-result-dmg').innerText = Math.floor(raidState.totalDmg || 0).toLocaleString(); document.getElementById('raid-result-percent').innerText = (percent || 0).toFixed(2) + "%"; document.getElementById('raid-result-rewards').innerText = rewardMsg; document.getElementById('raid-result-overlay').style.display = 'block'; document.getElementById('raid-result-modal').style.display = 'block';
-        }).catch(e => console.error(e));
-    };
+            set(myRankRef, { nickname: currentUserName, damage: accDmg, date: new Date().toLocaleDateString() });
+        }).catch(e => console.warn("랭킹 저장 오류:", e));
+    }
     
     if (raidState.pendingDmg > 0 && !isNaN(raidState.pendingDmg)) {
-        let dmgToApply = raidState.pendingDmg; raidState.pendingDmg = 0; let fallbackTimer = setTimeout(() => { finishProcess(); }, 1500);
-        runTransaction(ref(database, 'worldBoss'), (bossData) => {
-            if (!bossData) bossData = { hp: 7000000, killCount: 0, lastKillerUid: null }; if (isNaN(dmgToApply)) dmgToApply = 0; bossData.hp -= dmgToApply;
-            if (isNaN(bossData.hp)) bossData.hp = 7000000; if (bossData.hp <= 0) { bossData.hp = 7000000; bossData.killCount = (bossData.killCount || 0) + 1; bossData.lastKillerUid = currentUserUid; }
-            return bossData;
-        }).then(({committed, snapshot}) => { clearTimeout(fallbackTimer); if(committed && snapshot.exists()) { let data = snapshot.val(); if (data.lastKillerUid === currentUserUid && !raidState.rewardClaimedForKills.includes(data.killCount)) { raidState.rewardClaimedForKills.push(data.killCount); raidState.gotLastHit = true; } } finishProcess();
-        }).catch(e => { clearTimeout(fallbackTimer); console.warn("보스 데이터 통신 에러 발생:", e); finishProcess(); });
-    } else { finishProcess(); }
+        let dmgToApply = raidState.pendingDmg; raidState.pendingDmg = 0;
+        runTransaction(ref(database, 'worldBoss/hp'), (currentHp) => {
+            if (currentHp === null || isNaN(currentHp)) currentHp = 7000000;
+            if (isNaN(dmgToApply)) dmgToApply = 0;
+            currentHp -= dmgToApply;
+            if (isNaN(currentHp) || currentHp <= 0) currentHp = 7000000;
+            return currentHp;
+        }).catch(e => console.warn("보스 데이터 통신 에러 발생:", e));
+    }
 }
-
-window.closeRaidResult = () => { document.getElementById('raid-result-overlay').style.display = 'none'; document.getElementById('raid-result-modal').style.display = 'none'; document.getElementById('raid-game').style.display = 'none'; document.getElementById('start-screen').style.display = 'flex'; };
-
 // ==========================================
 // 8. 랭크 게임 (AI 대전) 시스템
 // ==========================================
@@ -1033,7 +1075,6 @@ function drawPk() {
     pkState.projectiles.forEach(p => {
         pkCtx.save(); pkCtx.translate(p.x, p.y); let dir = Math.atan2(p.ty - p.y, p.tx - p.x); let scale = 1.5; if (p.isFinal) scale *= 1.3; pkCtx.scale(scale, scale); if (p.isShadow) pkCtx.globalAlpha = 0.5;
         let img = null; let psize = 35; 
-        // 🔥 [버그수정] 5차 이상부터 고급 투사체 적용
         if (p.type === '전사') { img = p.gradeIdx >= 5 ? projImages.warrior2 : projImages.warrior1; pkCtx.rotate(dir + Math.PI); } else if (p.type === '법사') { img = p.gradeIdx >= 5 ? projImages.mage2 : projImages.mage1; pkCtx.rotate(dir + (15 * Math.PI / 180)); } else if (p.type === '도적') { img = p.gradeIdx >= 5 ? projImages.rogue2 : projImages.rogue1; psize = 25; pkCtx.rotate(p.angle); }
         if (img && img.complete) { pkCtx.drawImage(img, -psize/2, -psize/2, psize, psize); } pkCtx.restore();
     });
@@ -1086,7 +1127,6 @@ window.draw = () => {
     projectiles.forEach(p => {
         ctx.save(); ctx.translate(p.x, p.y); let dir = Math.atan2(p.ty - p.y, p.tx - p.x); let scale = 1.0; if (p.isFinal) scale *= 1.3; ctx.scale(scale, scale); if (p.isShadow) ctx.globalAlpha = 0.5;
         let img = null; let psize = 20;
-        // 🔥 [버그수정] 5차 이상부터 고급 투사체 적용 (p.gradeIdx >= 5)
         if (p.type === '전사') { img = p.gradeIdx >= 5 ? projImages.warrior2 : projImages.warrior1; ctx.rotate(dir + Math.PI); psize = p.gradeIdx >= 5 ? 30 : 20; }
         else if (p.type === '법사') { img = p.gradeIdx >= 5 ? projImages.mage2 : projImages.mage1; ctx.rotate(dir + (15 * Math.PI / 180)); psize = p.gradeIdx >= 5 ? 30 : 20; }
         else if (p.type === '도적') { img = p.gradeIdx >= 5 ? projImages.rogue2 : projImages.rogue1; ctx.rotate(p.angle); }
@@ -1128,7 +1168,6 @@ window.drawOpp = () => {
 
     oppProjectiles.forEach(p => {
         oppCtx.save(); oppCtx.translate(p.x, p.y); let dir = Math.atan2(p.ty - p.y, p.tx - p.x); let img = null; let psize = 12;
-        // 🔥 [버그수정] 5차 이상부터 고급 투사체 적용 (p.gradeIdx >= 5)
         if (p.type === '전사') { img = p.gradeIdx >= 5 ? projImages.warrior2 : projImages.warrior1; oppCtx.rotate(dir + Math.PI); }
         else if (p.type === '법사') { img = p.gradeIdx >= 5 ? projImages.mage2 : projImages.mage1; oppCtx.rotate(dir + (15 * Math.PI / 180)); }
         else if (p.type === '도적') { img = p.gradeIdx >= 5 ? projImages.rogue2 : projImages.rogue1; oppCtx.rotate(p.angle); }
@@ -1206,11 +1245,13 @@ window.loop = () => {
     }
 
     for(let i=projectiles.length-1; i>=0; i--) {
-        let p = projectiles[i]; let dx = p.tx - p.x, dy = p.ty - p.y; let dist = Math.hypot(dx, dy); let speed = 400 * dt; if(p.type === '도적') p.angle += 15 * dt; 
+        let p = projectiles[i]; let dx = p.tx - p.x, dy = p.ty - p.y; let dist = Math.hypot(dx, dy); let speed = 400 * dt;
+        if(p.type === '도적') p.angle += 15 * dt; 
         if(dist <= speed) {
             if (p.gradeIdx >= 6) { hitEffects.push({ x: p.tx, y: p.ty, timer: 0.2, color: p.color }); }
             if(monsters.includes(p.target)) {
                 let hitDmg = p.dmg; if (p.type === '전사' && p.target.isBoss) hitDmg *= 1.5; p.target.hp -= hitDmg; if(state.isRank && p.target.isBoss) rankState.myBossDamage += hitDmg;
+                // 🔥 데미지 텍스트 Y좌표 상향 (-35)
                 if (p.isCrit) damageTexts.push({ val: Math.floor(hitDmg), x: p.target.x, y: p.target.y - 35, timer: 0.8 });
                 if (p.type === '전사' && Math.random() < 0.2) p.target.stunTimer = 1;
                 if (p.type === '법사' && (skillLevels.mage_freeze||0) > 0 && Math.random() < ((10 + (skillLevels.mage_freeze||0) * 2) / 100)) { if (p.target.freezeTimer <= 0) { p.target.freezeTimer = 3; p.target.freezeTickTimer = 1; p.target.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][(skillLevels.mage_freeze||0) - 1]; } }
@@ -1219,6 +1260,7 @@ window.loop = () => {
                 monsters.forEach(m => {
                     if(m !== p.target && Math.hypot(m.x - p.tx, m.y - p.ty) <= p.splash) {
                         let splashDmg = p.dmg; if (p.type === '전사' && m.isBoss) splashDmg *= 1.5; m.hp -= splashDmg; if(state.isRank && m.isBoss) rankState.myBossDamage += splashDmg;
+                        // 🔥 스플래시 데미지 텍스트 Y좌표 상향 (-35)
                         if (p.isCrit) damageTexts.push({ val: Math.floor(splashDmg), x: m.x, y: m.y - 35, timer: 0.8 });
                         if (p.type === '전사' && Math.random() < 0.2) m.stunTimer = 1;
                         if (p.type === '법사' && (skillLevels.mage_freeze||0) > 0 && Math.random() < ((10 + (skillLevels.mage_freeze||0) * 2) / 100)) { if (m.freezeTimer <= 0) { m.freezeTimer = 3; m.freezeTickTimer = 1; m.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][(skillLevels.mage_freeze||0) - 1]; } }
