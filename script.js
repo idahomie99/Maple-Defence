@@ -1,5 +1,5 @@
-// 🔥 1.0.65 버전 - 월드보스 실시간 피통 감소 및 팝업 강제 출력 보장 (최종)
-const GAME_VERSION = "1.0.65"; 
+// 🔥 1.0.66 버전 - 월드보스 통신 오류 픽스, Z-index 팝업 우선순위, 로비 복귀 버그 완벽 해결
+const GAME_VERSION = "1.0.66"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -133,7 +133,11 @@ const BOSS_WAVES = { 24: { hp: 10000, meso: 50, ticket: 3, name: "킹 슬라임"
 // ==========================================
 window.showMessage = (msg) => { 
     let ov = document.getElementById('msg-overlay'); 
-    if(!ov) return; ov.innerHTML = msg; ov.style.display = 'block'; setTimeout(() => { ov.style.display = 'none'; }, 2000); 
+    if(!ov) return; 
+    ov.innerHTML = msg; 
+    ov.style.zIndex = '9999'; // 🔥 버그 1 픽스: 토스트 메시지 Z-index 최상위 배정
+    ov.style.display = 'block'; 
+    setTimeout(() => { ov.style.display = 'none'; }, 2000); 
 };
 
 window.showLootPopup = (drops) => {
@@ -527,7 +531,10 @@ window.openRaidLobby = () => {
 };
 
 window.openRaidMenu = window.openRaidLobby;
-window.closeRaidLobby = () => { document.getElementById('raid-lobby-overlay').style.display = 'none'; };
+
+window.closeRaidLobby = () => {
+    document.getElementById('raid-lobby-overlay').style.display = 'none';
+};
 
 window.startRaidGame = () => {
     let today = new Date().toLocaleDateString(); let lastRaidDate = localStorage.getItem('mapleDefenseRaidDate');
@@ -602,25 +609,19 @@ setInterval(() => {
         let dmgToApply = raidState.pendingDmg; 
         raidState.pendingDmg = 0;
         
-        runTransaction(ref(database, 'worldBoss/hp'), (currentHp) => {
-            if (currentHp === null || isNaN(currentHp)) currentHp = 7000000;
-            if (isNaN(dmgToApply)) dmgToApply = 0;
-            currentHp -= dmgToApply;
-            if (isNaN(currentHp) || currentHp <= 0) currentHp = 7000000;
-            return currentHp;
-        }).then(({committed, snapshot}) => {
-            if(committed && snapshot.exists()) {
-                let hp = snapshot.val();
-                let maxHp = 7000000;
-                let percent = (hp / maxHp) * 100;
-                let hpBar = document.getElementById('raid-boss-hp-bar');
-                let hpText = document.getElementById('raid-boss-hp-text');
-                if(hpBar) hpBar.style.width = `${Math.max(0, percent)}%`;
-                if(hpText) hpText.innerText = `${Math.max(0, Math.floor(hp)).toLocaleString()} / ${maxHp.toLocaleString()}`;
+        runTransaction(ref(database, 'worldBoss'), (bossData) => {
+            if (!bossData) bossData = { hp: 7000000, killCount: 0, lastKillerUid: null };
+            if (typeof bossData.hp !== 'number' || isNaN(bossData.hp)) bossData.hp = 7000000;
+            let dmg = (typeof dmgToApply === 'number' && !isNaN(dmgToApply)) ? dmgToApply : 0;
+            bossData.hp -= dmg;
+            if (bossData.hp <= 0) { 
+                bossData.hp = 7000000; 
+                bossData.killCount = (bossData.killCount || 0) + 1; 
+                bossData.lastKillerUid = currentUserUid; 
             }
+            return bossData;
         }).catch(e => {
             raidState.pendingDmg += dmgToApply; 
-            console.warn("데미지 전송 지연, 다음 틱에 재전송합니다.");
         });
     }
 }, 1000);
@@ -781,36 +782,84 @@ function drawRaid() {
 }
 
 function endRaidGame() {
-    if (!raidState.active) return; raidState.active = false; cancelAnimationFrame(raidReqId);
-    let percent = (raidState.totalDmg / 7000000) * 100; let rewardTier = '';
-    if (percent <= 5) rewardTier = '브론즈'; else if (percent <= 10) rewardTier = '실버'; else if (percent <= 20) rewardTier = '골드'; else if (percent <= 30) rewardTier = '플래티넘'; else if (percent <= 50) rewardTier = '다이아몬드'; else rewardTier = '챌린저';
-    let rewardMsg = ""; if (!userInventory.boxes) userInventory.boxes = {};
-    if (raidState.gotLastHit) { userInventory.boxes['챌린저'] = (userInventory.boxes['챌린저'] || 0) + 1; rewardMsg = `🎁 막타 보상: 챌린저 상자 1개 (기여도 보상 대체)`; } 
-    else { userInventory.boxes[rewardTier] = (userInventory.boxes[rewardTier] || 0) + 1; rewardMsg = `🎁 기여도 보상: ${rewardTier} 상자 1개 지급 완료!`; }
+    if (!raidState.active) return; 
+    raidState.active = false; 
+    cancelAnimationFrame(raidReqId);
+
+    let percent = (raidState.totalDmg / 7000000) * 100; 
+    let rewardTier = '';
+    if (percent <= 5) rewardTier = '브론즈'; 
+    else if (percent <= 10) rewardTier = '실버'; 
+    else if (percent <= 20) rewardTier = '골드'; 
+    else if (percent <= 30) rewardTier = '플래티넘'; 
+    else if (percent <= 50) rewardTier = '다이아몬드'; 
+    else rewardTier = '챌린저';
     
-    document.getElementById('raid-result-dmg').innerText = Math.floor(raidState.totalDmg || 0).toLocaleString(); document.getElementById('raid-result-percent').innerText = (percent || 0).toFixed(2) + "%"; document.getElementById('raid-result-rewards').innerText = rewardMsg; document.getElementById('raid-result-overlay').style.display = 'block'; document.getElementById('raid-result-modal').style.display = 'block';
+    let rewardMsg = ""; 
+    if (!userInventory.boxes) userInventory.boxes = {};
     
+    if (raidState.gotLastHit) { 
+        userInventory.boxes['챌린저'] = (userInventory.boxes['챌린저'] || 0) + 1; 
+        rewardMsg = `🎁 막타 보상: 챌린저 상자 1개 (기여도 보상 대체)`; 
+    } else { 
+        userInventory.boxes[rewardTier] = (userInventory.boxes[rewardTier] || 0) + 1; 
+        rewardMsg = `🎁 기여도 보상: ${rewardTier} 상자 1개 지급 완료!`; 
+    }
+
+    // 🔥 [핵심 수정] 네트워크 통신 오류/지연과 상관없이 결과 팝업을 무조건 즉시 강제로 띄우기!
+    document.getElementById('raid-result-dmg').innerText = Math.floor(raidState.totalDmg || 0).toLocaleString(); 
+    document.getElementById('raid-result-percent').innerText = (percent || 0).toFixed(2) + "%"; 
+    document.getElementById('raid-result-rewards').innerText = rewardMsg;
+    document.getElementById('raid-result-overlay').style.display = 'block'; 
+    document.getElementById('raid-result-modal').style.display = 'block';
+
+    // 백그라운드에서 안전하게 클라우드 및 랭킹 업데이트 수행
     window.syncToCloud();
     if (currentUserUid) {
         let myRankRef = ref(database, `worldBoss_rankings/${currentUserUid}`);
         get(myRankRef).then(snap => {
-            let accDmg = raidState.totalDmg; if (isNaN(accDmg)) accDmg = 0;
-            if(snap.exists() && snap.val().damage && !isNaN(snap.val().damage)) { accDmg += snap.val().damage; }
-            set(myRankRef, { nickname: currentUserName, damage: accDmg, date: new Date().toLocaleDateString() });
-        }).catch(e => console.warn("랭킹 저장 오류:", e));
+            let accDmg = raidState.totalDmg; 
+            if (isNaN(accDmg)) accDmg = 0;
+            if(snap.exists()) {
+                let prevDmg = snap.val().damage;
+                if(typeof prevDmg === 'number' && !isNaN(prevDmg)) {
+                    accDmg += prevDmg;
+                }
+            }
+            set(myRankRef, {
+                nickname: currentUserName,
+                damage: accDmg,
+                date: new Date().toLocaleDateString()
+            });
+        }).catch(e => console.warn("랭킹 저장 비동기 오류:", e));
     }
-    
+
+    // 잔여 데미지 털어내기
     if (raidState.pendingDmg > 0 && !isNaN(raidState.pendingDmg)) {
-        let dmgToApply = raidState.pendingDmg; raidState.pendingDmg = 0;
-        runTransaction(ref(database, 'worldBoss/hp'), (currentHp) => {
-            if (currentHp === null || isNaN(currentHp)) currentHp = 7000000;
-            if (isNaN(dmgToApply)) dmgToApply = 0;
-            currentHp -= dmgToApply;
-            if (isNaN(currentHp) || currentHp <= 0) currentHp = 7000000;
-            return currentHp;
-        }).catch(e => console.warn("보스 데이터 통신 에러 발생:", e));
+        let dmgToApply = raidState.pendingDmg; 
+        raidState.pendingDmg = 0;
+        runTransaction(ref(database, 'worldBoss'), (bossData) => {
+            if (!bossData) bossData = { hp: 7000000, killCount: 0, lastKillerUid: null };
+            if (typeof bossData.hp !== 'number' || isNaN(bossData.hp)) bossData.hp = 7000000;
+            let dmg = (typeof dmgToApply === 'number' && !isNaN(dmgToApply)) ? dmgToApply : 0;
+            bossData.hp -= dmg;
+            if (bossData.hp <= 0) { 
+                bossData.hp = 7000000; 
+                bossData.killCount = (bossData.killCount || 0) + 1; 
+                bossData.lastKillerUid = currentUserUid; 
+            }
+            return bossData;
+        }).catch(e => console.warn("잔여 데미지 전송 오류:", e));
     }
 }
+
+window.closeRaidResult = () => { 
+    raidState.status = 'TITLE';
+    document.getElementById('raid-result-overlay').style.display = 'none'; 
+    document.getElementById('raid-result-modal').style.display = 'none'; 
+    window.switchScreen('start-screen'); 
+};
+
 // ==========================================
 // 8. 랭크 게임 (AI 대전) 시스템
 // ==========================================
@@ -893,7 +942,9 @@ function processOpponentTick(dt) {
                         if (t.cls.type === '전사' && oppSkillLevels.war_death > 0) { let gdmg = baseDmg * (1.5 + oppSkillLevels.war_death * 1.5); oppVisualEffects.push({ type: 'death', timer: 1.2, dmg: gdmg }); t.globalCooldown += 60000; }
                         else if (t.cls.type === '법사' && oppSkillLevels.mage_thunder > 0) { let gdmg = baseDmg * (1.5 + oppSkillLevels.mage_thunder * 1.5); oppVisualEffects.push({ type: 'thunder', timer: 0.5, dmg: gdmg }); t.globalCooldown += 60000; }
                         else if (t.cls.type === '도적' && oppSkillLevels.thief_fuma > 0) { let gdmg = baseDmg * (1.5 + skillLevels.thief_fuma * 1.5); oppFumaList.push({ x: t.x, y: t.y, targetNode: 0, nodesVisited: 0, dmg: gdmg, hitSet: new Set(), angle: 0 }); t.globalCooldown += 60000; }
-                    } else { t.globalCooldown = 0; }
+                    } else {
+                        t.globalCooldown = 0;
+                    }
                 }
             }
         }
@@ -906,7 +957,10 @@ function processOpponentTick(dt) {
                 oppProjectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: isFinal, baseDmgToPass: dmg });
                 if (t.cls.type === '도적' && oppSkillLevels.thief_shadow > 0 && Math.random() < (oppSkillLevels.thief_shadow * 0.03)) { oppProjectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: false, isShadow: true }); }
                 t.lastAttack += attackCd;
-            } else { t.lastAttack = 0; break; }
+            } else {
+                t.lastAttack = 0;
+                break;
+            }
         }
     });
 
