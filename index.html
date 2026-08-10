@@ -233,7 +233,7 @@
 
     <div id="pk-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:2000; flex-direction:column; align-items:center;">
         <div id="pk-menu" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 20vh;">
-            <h3>월드 펀킹</h3>
+            <h3>월드 펀치킹</h3>
             <p style="font-size:12px; color:#555; margin-bottom:15px;">혼줌/보스추뎀 제외, 전 직업 기본공격 완전 동일!<br>순수 도감과 스킬 내실로 승부합니다. (1분)</p>
             <button class="ingame-btn premium-blue" style="width:100%; height:55px; margin-bottom:10px;" onclick="showPkClassSelect()">시작하기</button>
             <button class="ingame-btn premium-orange" style="width:100%; height:55px; margin-bottom:15px;" onclick="showPkRanking()">🏆 서버 랭킹 보드</button>
@@ -371,9 +371,12 @@
                 <div>총 데미지: <span id="raid-total-dmg" class="highlight" style="color:#e65100;">0</span></div>
                 <div>타이머: <span id="raid-time" class="highlight" style="color:#ff5252;">60</span>초</div>
             </div>
-            <div style="margin-top: 10px; width: 100%; background: #333; height: 25px; border-radius: 12px; border: 2px solid #111; position: relative; overflow: hidden;">
-                <div id="raid-boss-hp-bar" style="width: 100%; height: 100%; background: linear-gradient(to right, #ef4444, #b91c1c); transition: width 0.2s ease;"></div>
-                <div id="raid-boss-hp-text" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; text-align: center; color: white; font-size: 13px; line-height: 25px; text-shadow: 1px 1px 2px black;">7,000,000 / 7,000,000</div>
+            <!-- 🔥 월드보스 피통 UI 변경 (바 아래에 작게 숫자 표기) -->
+            <div style="margin-top: 10px; width: 100%;">
+                <div style="width: 100%; background: #333; height: 16px; border-radius: 8px; border: 2px solid #111; overflow: hidden;">
+                    <div id="raid-boss-hp-bar" style="width: 100%; height: 100%; background: linear-gradient(to right, #ef4444, #b91c1c); transition: width 0.2s ease;"></div>
+                </div>
+                <div id="raid-boss-hp-text" style="text-align: center; color: #d32f2f; font-size: 11px; margin-top: 3px; font-weight: 900;">7,000,000 / 7,000,000</div>
             </div>
         </div>
         
@@ -384,12 +387,11 @@
             </div>
             <div id="raid-grid-container" style="position: absolute; bottom: 15%; left: 20%; width: 60%; height: 25%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; background-color: rgba(220, 190, 170, 0.85); border: 3px solid rgba(120, 80, 60, 0.9); z-index: 5; border-radius: 8px; padding: 5px;"></div>
             
-            <div id="raid-prep-ui" style="display:none; position: absolute; bottom: 2%; left: 50%; transform: translateX(-50%); width: 90%; background: transparent; z-index: 50; flex-direction: column; justify-content: space-between; align-items: center; box-sizing: border-box;">
-                <div style="text-align:center; background: rgba(0,0,0,0.85); padding: 10px 25px; border-radius: 12px; border: 1px solid #ff5252; margin-bottom: 10px; width: 100%; box-sizing:border-box;">
-                    <h2 style="color: #ffeb3b; font-size: 20px; margin-top: 0; margin-bottom: 5px;">전투 준비</h2>
-                    <p style="color: #fff; font-size: 14px; margin: 0;">남은 시간: <span id="raid-prep-time" style="color:#ff5252; font-weight:bold; font-size:20px;">5</span>초</p>
-                </div>
+            <!-- 🔥 월드 보스 소환 UI 위치 상단으로 이동 -->
+            <div id="raid-prep-ui" style="display:none; position: absolute; top: 10%; left: 50%; transform: translateX(-50%); width: 85%; background: transparent; z-index: 50; flex-direction: column; align-items: center; box-sizing: border-box;">
                 <div style="background: rgba(0,0,0,0.85); padding: 15px 20px; border-radius: 12px; border: 1px solid #777; text-align: center; width: 100%; box-sizing:border-box;">
+                    <h2 style="color: #ffeb3b; font-size: 20px; margin-top: 0; margin-bottom: 5px;">전투 준비</h2>
+                    <p style="color: #fff; font-size: 14px; margin: 0 0 10px 0;">남은 시간: <span id="raid-prep-time" style="color:#ff5252; font-weight:bold; font-size:20px;">5</span>초</p>
                     <div style="color: #eee; font-size: 14px; margin-bottom: 10px;">보유 메소: <span id="raid-meso" style="color: #ffeb3b; font-weight:bold; font-size: 18px;">30</span></div>
                     <button class="ingame-btn premium-green" style="width: 100%; padding: 12px 24px; font-size: 16px;" onclick="summonRaidUnit()">유닛 소환 (10 메소)</button>
                 </div>

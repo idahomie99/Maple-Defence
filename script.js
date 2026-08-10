@@ -1,5 +1,5 @@
-// 🔥 1.0.62 버전 - 월드보스 로비/랭킹 추가, 합성 문구 교정, 인벤토리 UI 겹침 최종 해결
-const GAME_VERSION = "1.0.62"; 
+// 🔥 1.0.63 버전 - 스타포스 노출 제한, 랭크게임 합성 금지, 보스 피통/합성 텍스트 교정
+const GAME_VERSION = "1.0.63"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -387,9 +387,11 @@ window.summonUnit = () => {
     window.updateUI();
 };
 
-// 🔥 [수정] 스마트 일괄 합성 로직 - 유저 요청 포맷 텍스트 반영
+// 🔥 [완벽 픽스] 스마트 일괄 합성 로직 - 메시지 커스텀 포맷 적용 & 랭겜 합성 금지
 window.autoMerge = () => {
     if(state.status !== 'PREP' && state.status !== 'PLAY') return;
+    if(state.isRank) { window.showMessage("랭크 게임에서는 합성할 수 없습니다."); return; } // 🔥 랭겜 합성 차단
+    
     let merged = true;
     let mergeLogs = {}; 
     
@@ -446,9 +448,10 @@ window.autoMerge = () => {
             let type = parts[0];
             let gIdx = parseInt(parts[1]);
             let req = parseInt(parts[2]);
+            let cls = CLASSES[type];
             let oldGrade = GRADES[gIdx].name;
             let newGrade = GRADES[gIdx+1].name;
-            msg += `${type} ${oldGrade} ${req}유닛을 통해 ${type} ${newGrade} 유닛으로 합성하였습니다.<br>`;
+            msg += `${cls.icon} ${type} ${oldGrade} ${req}유닛을 통해 ${type} ${newGrade} 유닛으로 합성하였습니다.<br>`;
         }
         window.showMessage(msg);
         renderGrid();
@@ -572,7 +575,7 @@ window.openActiveSkillsModal = () => {
 window.openInventoryModal = () => { document.getElementById('inventory-modal').style.display = 'block'; document.getElementById('overlay').style.display = 'block'; calculateEquipStats(); renderEquippedSlots(); renderInventoryTab('consumable'); };
 window.closeInventoryModal = () => { document.getElementById('inventory-modal').style.display = 'none'; document.getElementById('overlay').style.display = 'none'; };
 
-// 🔥 [완벽 픽스] 장착 슬롯 텍스트 하단, 이미지 상단 고정 (Flexbox column 방향 활용)
+// 🔥 [완벽 픽스] 장착 슬롯에서 별표(★) 노출 제거
 function renderEquippedSlots() { 
     ['뱃지', '엠블럼', '링'].forEach(slot => { 
         let el = document.getElementById(`slot-${slot}`); 
@@ -588,10 +591,9 @@ function renderEquippedSlots() {
         let item = userEquipped[slot]; 
         if (item) { 
             el.className = `equip-slot equip-${item.grade.toLowerCase()}`; 
-            let starStr = item.star > 0 ? `<div style="position:absolute; top:-8px; right:-8px; font-size:12px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${item.star}</div>` : '';
             el.innerHTML = `
                 <div class="slot-item" style="position:relative; transform:translateY(-2px);">
-                    ${starStr}${getEquipIcon(slot)}
+                    ${getEquipIcon(slot)}
                 </div>
                 <div class="slot-name" style="font-size:11px; font-weight:bold; color:#333; margin:0; line-height:1;">${slot}</div>
             `;
@@ -645,10 +647,9 @@ window.renderInventoryTab = (tab) => {
         userEquips.forEach((eq, idx) => {
             let el = document.createElement('div'); el.className = `inv-item-box equip-${eq.grade.toLowerCase()}`; let statStr = "";
             if (eq.atk > 0) statStr = `공+${eq.atk}%`; else if (eq.spd > 0) statStr = `속+${eq.spd}%`; else if (eq.crit > 0) statStr = `크+${eq.crit}%`;
-            let starStr = eq.star > 0 ? `<div style="position:absolute; top:-10px; right:-10px; font-size:11px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${eq.star}</div>` : '';
-            // 🔥 인벤토리 내부 장비도 Flex로 강제 정렬하여 글씨 겹침 해결
+            // 🔥 인벤토리 내부 장비에서도 별표 노출 제거
             el.innerHTML = `<div style="display:flex; flex-direction:column; justify-content:space-between; align-items:center; height:100%; width:100%;">
-                                <div style="position:relative; display:inline-block; margin-top:2px;">${starStr}${getEquipIcon(eq.type)}</div>
+                                <div style="position:relative; display:inline-block; margin-top:2px;">${getEquipIcon(eq.type)}</div>
                                 <div style="font-size:10px; font-weight:bold; color:#37474f; text-align:center; line-height:1; margin-bottom:2px;">${statStr}</div>
                             </div>`; 
             el.onclick = () => openEquipDetailModal(eq, idx, false); 
@@ -709,6 +710,7 @@ window.openEquipDetailModal = (eq, targetIdx, isEquipped) => {
     modal.style.display = 'block';
 
     let gradeColor = eq.grade === 'Rare' ? '#1e88e5' : (eq.grade === 'Epic' ? '#8e24aa' : (eq.grade === 'Unique' ? '#fb8c00' : '#d32f2f'));
+    // 🔥 아이템 팝업에서는 별표시 정상 유지
     let starStr = eq.star > 0 ? ` <span style="color:#fbc02d;">★${eq.star}</span>` : '';
     document.getElementById('modal-eq-title').innerHTML = `<span style="color:${gradeColor}">${eq.grade} ${eq.type}</span>${starStr}`;
     
@@ -893,7 +895,7 @@ window.executeStarForce = () => {
 };
 
 // ==========================================
-// 7. 월드 보스 레이드 시스템 (🔥 로비 및 랭킹 추가)
+// 7. 월드 보스 레이드 시스템
 // ==========================================
 window.openRaidLobby = () => {
     if (!currentUserUid) { window.showMessage("로그인이 필요한 서비스입니다."); return; }
@@ -1543,7 +1545,6 @@ window.updateUI = () => {
     let skipWrapper = document.getElementById('boss-skip-wrapper'); if (state.isBoss && monsters.length === 0 && waveTimer > 0 && !state.isRank) skipWrapper.style.display = 'flex'; else skipWrapper.style.display = 'none';
     document.getElementById('ui-meso').innerText = state.meso; document.getElementById('ui-mp').innerText = state.mp; document.getElementById('ui-wave').innerText = state.wave; document.getElementById('ui-kills').innerText = state.kills.toLocaleString(); document.getElementById('ui-tickets').innerText = state.tickets.length; document.getElementById('btn-summon').disabled = (state.meso < 10);
     
-    // 🔥 초반 가이드 로직 (10라운드 이후 자동 숨김)
     let guideEl = document.getElementById('early-guide');
     if (guideEl) {
         if (state.wave <= 10 && !state.isRank) guideEl.style.display = 'block';
@@ -1835,6 +1836,7 @@ window.loop = () => {
             if (p.gradeIdx >= 6) { hitEffects.push({ x: p.tx, y: p.ty, timer: 0.2, color: p.color }); }
             if(monsters.includes(p.target)) {
                 let hitDmg = p.dmg; if (p.type === '전사' && p.target.isBoss) hitDmg *= 1.5; p.target.hp -= hitDmg; if(state.isRank && p.target.isBoss) rankState.myBossDamage += hitDmg;
+                // 🔥 데미지 텍스트 Y좌표 상향 (-35)
                 if (p.isCrit) damageTexts.push({ val: Math.floor(hitDmg), x: p.target.x, y: p.target.y - 35, timer: 0.8 });
                 if (p.type === '전사' && Math.random() < 0.2) p.target.stunTimer = 1;
                 if (p.type === '법사' && skillLevels.mage_freeze > 0 && Math.random() < ((10 + skillLevels.mage_freeze * 2) / 100)) { if (p.target.freezeTimer <= 0) { p.target.freezeTimer = 3; p.target.freezeTickTimer = 1; p.target.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][skillLevels.mage_freeze - 1]; } }
@@ -1843,6 +1845,7 @@ window.loop = () => {
                 monsters.forEach(m => {
                     if(m !== p.target && Math.hypot(m.x - p.tx, m.y - p.ty) <= p.splash) {
                         let splashDmg = p.dmg; if (p.type === '전사' && m.isBoss) splashDmg *= 1.5; m.hp -= splashDmg; if(state.isRank && m.isBoss) rankState.myBossDamage += splashDmg;
+                        // 🔥 스플래시 데미지 텍스트 Y좌표 상향 (-35)
                         if (p.isCrit) damageTexts.push({ val: Math.floor(splashDmg), x: m.x, y: m.y - 35, timer: 0.8 });
                         if (p.type === '전사' && Math.random() < 0.2) m.stunTimer = 1;
                         if (p.type === '법사' && skillLevels.mage_freeze > 0 && Math.random() < ((10 + skillLevels.mage_freeze * 2) / 100)) { if (m.freezeTimer <= 0) { m.freezeTimer = 3; m.freezeTickTimer = 1; m.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][skillLevels.mage_freeze - 1]; } }
