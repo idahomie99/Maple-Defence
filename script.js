@@ -1,5 +1,5 @@
-// 🔥 1.0.67 버전 - Firebase 권한 거부 시 UI 충돌 완벽 방지 및 트랜잭션 순수성 강화
-const GAME_VERSION = "1.0.67"; 
+// 🔥 1.0.68 버전 - 신규 군단장 보스 5종 추가 (160~200층 10% 체력 보정) 및 도감 완벽 연동
+const GAME_VERSION = "1.0.69"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -104,8 +104,11 @@ const SKILL_INFO = {
     thief_fuma: { name: "풍마 수리검", max: 5, getDesc: (lv) => `60초마다 맵 순회 수리검 ${300 + lv * 150}% (도적 5차↑)`, img: "image/fumashuriken.png" }
 };
 
-const bossImages = { "킹 슬라임": new Image(), "알리샤르": new Image(), "파풀라투스": new Image(), "피아누스": new Image(), "자쿰": new Image(), "혼테일": new Image(), "시그너스": new Image(), "반반": new Image(), "피에르": new Image(), "블러드퀸": new Image(), "벨룸": new Image(), "어둠의 늑대": new Image() };
+// 🔥 신규 군단장 보스 이미지 추가
+const bossImages = { "킹 슬라임": new Image(), "알리샤르": new Image(), "파풀라투스": new Image(), "피아누스": new Image(), "자쿰": new Image(), "혼테일": new Image(), "시그너스": new Image(), "반반": new Image(), "피에르": new Image(), "블러드퀸": new Image(), "벨룸": new Image(), "어둠의 늑대": new Image(), "스우": new Image(), "데미안": new Image(), "루시드": new Image(), "윌": new Image(), "가디언엔젤슬라임": new Image() };
 bossImages["킹 슬라임"].src = "image/kingslime.png"; bossImages["알리샤르"].src = "image/alishar.png"; bossImages["파풀라투스"].src = "image/papulatus.png"; bossImages["피아누스"].src = "image/pianus.png"; bossImages["자쿰"].src = "image/zakum.png"; bossImages["혼테일"].src = "image/horntail.png"; bossImages["시그너스"].src = "image/signus.png"; bossImages["반반"].src = "image/banban.png"; bossImages["피에르"].src = "image/pierr.png"; bossImages["블러드퀸"].src = "image/bloodqueen.png"; bossImages["벨룸"].src = "image/velroom.png"; bossImages["어둠의 늑대"].src = "image/darkwolf.png";
+bossImages["스우"].src = "image/swoo.png"; bossImages["데미안"].src = "image/demian.png"; bossImages["루시드"].src = "image/lucid.png"; bossImages["윌"].src = "image/will.png"; bossImages["가디언엔젤슬라임"].src = "image/guardianangelslime.png";
+
 const husooabiImg = new Image(); husooabiImg.src = "image/husooabi.png";
 const projImages = { warrior1: new Image(), warrior2: new Image(), mage1: new Image(), mage2: new Image(), rogue1: new Image(), rogue2: new Image() };
 projImages.warrior1.src = "image/warrior1.png"; projImages.warrior2.src = "image/warrior2.png"; projImages.mage1.src = "image/magician1.png"; projImages.mage2.src = "image/magician2.png"; projImages.rogue1.src = "image/rogue1.png"; projImages.rogue2.src = "image/rogue2.png";
@@ -126,7 +129,25 @@ const CLASSES = {
     '도적': { type: '도적', icon: '✦', color: '#6a1b9a', baseDmg: 18, range: 200, cd: 800, splash: 0 }
 };
 
-const BOSS_WAVES = { 24: { hp: 10000, meso: 50, ticket: 3, name: "킹 슬라임" }, 37: { hp: 30000, meso: 50, ticket: 4, name: "알리샤르" }, 58: { hp: 100000, meso: 50, ticket: 4, name: "파풀라투스" }, 79: { hp: 300000, meso: 70, ticket: 5, name: "피아누스" }, 90: { hp: 800000, meso: 100, ticket: 5, name: "자쿰" }, 100: { name: "혼테일", meso: 100, ticket: 5 }, 110: { name: "시그너스", meso: 150, ticket: 5 }, 120: { name: "반반", meso: 150, ticket: 5 }, 130: { name: "피에르", meso: 150, ticket: 5 }, 140: { name: "블러드퀸", meso: 150, ticket: 5 }, 150: { name: "벨룸", meso: 150, ticket: 5 } };
+// 🔥 160~200층 신규 보스 및 보상 추가
+const BOSS_WAVES = { 
+    24: { hp: 10000, meso: 50, ticket: 1, name: "킹 슬라임" }, 
+    37: { hp: 30000, meso: 50, ticket: 2, name: "알리샤르" }, 
+    58: { hp: 100000, meso: 50, ticket: 2, name: "파풀라투스" }, 
+    79: { hp: 300000, meso: 70, ticket: 2, name: "피아누스" }, 
+    90: { hp: 800000, meso: 100, ticket: 3, name: "자쿰" }, 
+    100: { name: "혼테일", meso: 100, ticket: 3 }, 
+    110: { name: "시그너스", meso: 120, ticket: 3 }, 
+    120: { name: "반반", meso: 120, ticket: 3 }, 
+    130: { name: "피에르", meso: 120, ticket: 3 }, 
+    140: { name: "블러드퀸", meso: 120, ticket: 3 }, 
+    150: { name: "벨룸", meso: 150, ticket: 3 }, 
+    160: { name: "스우", meso: 180, ticket: 3 }, 
+    170: { name: "데미안", meso: 180, ticket: 3 }, 
+    180: { name: "루시드", meso: 200, ticket: 3 }, 
+    190: { name: "윌", meso: 200, ticket: 3 }, 
+    200: { name: "가디언엔젤슬라임", meso: 250, ticket: 4 } 
+};
 
 // ==========================================
 // 4. 유틸리티 및 인증 함수
@@ -135,7 +156,7 @@ window.showMessage = (msg) => {
     let ov = document.getElementById('msg-overlay'); 
     if(!ov) return; 
     ov.innerHTML = msg; 
-    ov.style.zIndex = '9999';
+    ov.style.zIndex = '9999'; 
     ov.style.display = 'block'; 
     setTimeout(() => { ov.style.display = 'none'; }, 2000); 
 };
@@ -259,20 +280,24 @@ window.logout = () => { signOut(auth).then(() => { location.reload(); }); };
 // ==========================================
 // 5. 모험모드, 도감, 상점 기본 기능
 // ==========================================
+// 🔥 160층 이상 10% 추가 보정된 몬스터 HP
 function getBossInfo(w) {
     if (w < 100 && BOSS_WAVES[w]) return BOSS_WAVES[w];
     if (w >= 100 && w % 5 === 0) { 
         let n = (w - 100) / 5; 
-        let calculatedHp = 1200000 + (n * 300000) + (Math.pow(n, 2) * 50000); 
         
-        // 🔥 160층 이상 군단장급 보스 체력 10% 고정 추가
-        if (w >= 160) {
-            calculatedHp = calculatedHp * 1.1;
+        // 100층 이상 기본 체력 공식 (n² 계수 소폭 상향)
+        let calculatedHp = 1200000 + (n * 300000) + (Math.pow(n, 2) * 55000); 
+        
+        // 150층 초과 시 5층마다 5% 복리 증폭 (서서히 압박)
+        if (w > 150) {
+            let overN = (w - 150) / 5;
+            calculatedHp = calculatedHp * Math.pow(1.05, overN);
         }
 
         let bName = BOSS_WAVES[w] ? BOSS_WAVES[w].name : (w % 10 === 5 ? "어둠의 늑대" : `심연의 보스 (${w}층)`); 
         let bMeso = BOSS_WAVES[w] ? BOSS_WAVES[w].meso : (w >= 160 ? 200 : 150); 
-        let bTicket = BOSS_WAVES[w] ? BOSS_WAVES[w].ticket : 5; 
+        let bTicket = BOSS_WAVES[w] ? BOSS_WAVES[w].ticket : 3; 
         return { hp: Math.floor(calculatedHp), meso: bMeso, ticket: bTicket, name: bName }; 
     } 
     return null;
@@ -378,13 +403,25 @@ function getTotalGrade() { let tg = 0; for(let k in cardData) tg += cardData[k].
 function getTotalCardBonus() { let bonus = 0; for(let k in cardData) { if(cardData[k].grade > 0) bonus += 1 + (cardData[k].grade - 1) * 0.5; } return bonus; }
 function getAvailableCoins() { return getTotalGrade() + userRankData.bonusCoins - spentCoins; }
 
+// 🔥 도감 신규 보스들 배열 추가
 window.openBookModal = () => { document.getElementById('overlay').style.display = 'block'; document.getElementById('book-modal').style.display = 'block'; window.renderBook(); };
-window.renderBook = () => { let list = document.getElementById('book-list'); list.innerHTML = ''; const BOOK_ORDER = [ "킹 슬라임", "알리샤르", "파풀라투스", "피아누스", "자쿰", "혼테일", "어둠의 늑대", "시그너스", "반반", "피에르", "블러드퀸", "벨룸" ]; let allBosses = [...BOOK_ORDER]; for(let k in cardData) { if(!allBosses.includes(k)) allBosses.push(k); } allBosses.forEach(bName => { let data = cardData[bName] || { owned: 0, grade: 0 }; let req = data.grade < 10 ? CARD_REQ[data.grade] : 'Max'; let canUpgrade = data.grade < 10 && data.owned >= req; let effectStr = data.grade > 0 ? `+${(1 + (data.grade-1)*0.5).toFixed(1)}%` : `0%`; let btnText = data.grade === 0 ? `등록 (${req})` : (data.grade === 10 ? 'MAX' : `강화 (${req})`); let imgSrc = bossImages[bName] ? bossImages[bName].src : ''; let imgHtml = imgSrc ? `<img src="${imgSrc}" style="width: 40px; height: 40px; object-fit: contain; margin-right: 8px; flex-shrink: 0; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.4));">` : ''; list.innerHTML += `<div style="background:#fff; border:2px solid #8d6e63; border-radius:6px; padding:6px 8px; text-align:left; display:flex; justify-content:space-between; align-items:center;"><div style="display:flex; align-items:center; overflow:hidden;">${imgHtml}<div style="overflow:hidden;"><div style="font-weight:900; color:#3e2723; font-size:13px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">${bName} (등급: ${data.grade})</div><div style="font-size:10.5px; color:#666; margin-top:2px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">효과: ${effectStr} / 보유: <b style="color:#e65100">${data.owned}장</b></div></div></div><button class="maple-btn small ${canUpgrade ? 'primary' : ''}" ${!canUpgrade ? 'disabled' : ''} style="white-space:nowrap; flex-shrink:0; margin-left:5px; min-width:65px;" onclick="upgradeCard('${bName}')">${btnText}</button></div>`; }); document.getElementById('book-total-grade').innerHTML = `총 등급 합계: <span style="color:#c62828;">${getTotalGrade()}</span> (코인: <span style="color:#f57c00;">${getAvailableCoins()}</span>)`; document.getElementById('book-total-bonus').innerText = `총 보유 효과: 공격력 +${getTotalCardBonus().toFixed(1)}%`; };
+window.renderBook = () => { 
+    let list = document.getElementById('book-list'); list.innerHTML = ''; 
+    const BOOK_ORDER = [ "킹 슬라임", "알리샤르", "파풀라투스", "피아누스", "자쿰", "혼테일", "어둠의 늑대", "시그너스", "반반", "피에르", "블러드퀸", "벨룸", "스우", "데미안", "루시드", "윌", "가디언엔젤슬라임" ]; 
+    let allBosses = [...BOOK_ORDER]; 
+    for(let k in cardData) { if(!allBosses.includes(k)) allBosses.push(k); } 
+    allBosses.forEach(bName => { 
+        let data = cardData[bName] || { owned: 0, grade: 0 }; let req = data.grade < 10 ? CARD_REQ[data.grade] : 'Max'; let canUpgrade = data.grade < 10 && data.owned >= req; let effectStr = data.grade > 0 ? `+${(1 + (data.grade-1)*0.5).toFixed(1)}%` : `0%`; let btnText = data.grade === 0 ? `등록 (${req})` : (data.grade === 10 ? 'MAX' : `강화 (${req})`); let imgSrc = bossImages[bName] ? bossImages[bName].src : ''; let imgHtml = imgSrc ? `<img src="${imgSrc}" style="width: 40px; height: 40px; object-fit: contain; margin-right: 8px; flex-shrink: 0; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.4));">` : ''; 
+        list.innerHTML += `<div style="background:#fff; border:2px solid #8d6e63; border-radius:6px; padding:6px 8px; text-align:left; display:flex; justify-content:space-between; align-items:center;"><div style="display:flex; align-items:center; overflow:hidden;">${imgHtml}<div style="overflow:hidden;"><div style="font-weight:800; color:#3e2723; font-size:13px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">${bName} (등급: ${data.grade})</div><div style="font-size:10.5px; color:#666; margin-top:2px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">효과: ${effectStr} / 보유: <b style="color:#e65100">${data.owned}장</b></div></div></div><button class="maple-btn small ${canUpgrade ? 'primary' : ''}" ${!canUpgrade ? 'disabled' : ''} style="white-space:nowrap; flex-shrink:0; margin-left:5px; min-width:65px;" onclick="upgradeCard('${bName}')">${btnText}</button></div>`; 
+    }); 
+    document.getElementById('book-total-grade').innerHTML = `총 등급 합계: <span style="color:#c62828;">${getTotalGrade()}</span> (코인: <span style="color:#f57c00;">${getAvailableCoins()}</span>)`; document.getElementById('book-total-bonus').innerText = `총 보유 효과: 공격력 +${getTotalCardBonus().toFixed(1)}%`; 
+};
+
 window.upgradeCard = (bName) => { let data = cardData[bName]; let req = CARD_REQ[data.grade]; if(data.grade < 10 && data.owned >= req) { data.owned -= req; data.grade++; localStorage.setItem('mapleDefenseCards', JSON.stringify(cardData)); if (currentUserUid) window.syncToCloud(); window.renderBook(); } };
 window.openShopModal = () => { document.getElementById('overlay').style.display = 'block'; document.getElementById('shop-modal').style.display = 'block'; window.renderShop('common'); };
-window.renderShop = (category) => { document.getElementById('ui-shop-coins').innerText = getAvailableCoins(); let list = document.getElementById('shop-list'); list.innerHTML = ''; let prefix = category === 'common' ? 'common_' : (category === 'warrior' ? 'war_' : (category === 'mage' ? 'mage_' : 'thief_')); for(let key in SKILL_INFO) { if(key.startsWith(prefix)) { let info = SKILL_INFO[key]; let lvl = skillLevels[key] || 0; let canUpgrade = lvl < info.max && getAvailableCoins() > 0; let btnText = lvl === info.max ? 'MAX' : `강화 (1코인)`; let displayLv = lvl === 0 ? 1 : lvl; list.innerHTML += `<div style="background:#fff; border:2px solid #8d6e63; border-radius:6px; padding:6px 8px; display:flex; justify-content:space-between; align-items:center;"><div style="display:flex; align-items:center; overflow:hidden;"><img src="${info.img}" onerror="this.src='image/mepo.png'" style="width:30px; height:30px; object-fit:contain; margin-right:8px; flex-shrink:0;"><div style="overflow:hidden;"><div style="font-weight:900; color:#3e2723; font-size:13px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">${info.name} <span style="color:#c62828;">Lv.${lvl}</span></div><div style="font-size:10px; color:#666; margin-top:2px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">${info.getDesc(displayLv)}</div></div></div><button class="maple-btn small ${canUpgrade ? 'primary' : ''}" ${!canUpgrade ? 'disabled' : ''} style="white-space:nowrap; flex-shrink:0; margin-left:5px; min-width:70px;" onclick="upgradeSkill('${key}', '${category}')">${btnText}</button></div>`; } } };
+window.renderShop = (category) => { document.getElementById('ui-shop-coins').innerText = getAvailableCoins(); let list = document.getElementById('shop-list'); list.innerHTML = ''; let prefix = category === 'common' ? 'common_' : (category === 'warrior' ? 'war_' : (category === 'mage' ? 'mage_' : 'thief_')); for(let key in SKILL_INFO) { if(key.startsWith(prefix)) { let info = SKILL_INFO[key]; let lvl = skillLevels[key] || 0; let canUpgrade = lvl < info.max && getAvailableCoins() > 0; let btnText = lvl === info.max ? 'MAX' : `강화 (1코인)`; let displayLv = lvl === 0 ? 1 : lvl; list.innerHTML += `<div style="background:#fff; border:2px solid #8d6e63; border-radius:6px; padding:6px 8px; display:flex; justify-content:space-between; align-items:center;"><div style="display:flex; align-items:center; overflow:hidden;"><img src="${info.img}" onerror="this.src='image/mepo.png'" style="width:30px; height:30px; object-fit:contain; margin-right:8px; flex-shrink:0;"><div style="overflow:hidden;"><div style="font-weight:800; color:#3e2723; font-size:13px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">${info.name} <span style="color:#c62828;">Lv.${lvl}</span></div><div style="font-size:10px; color:#666; margin-top:2px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">${info.getDesc(displayLv)}</div></div></div><button class="maple-btn small ${canUpgrade ? 'primary' : ''}" ${!canUpgrade ? 'disabled' : ''} style="white-space:nowrap; flex-shrink:0; margin-left:5px; min-width:70px;" onclick="upgradeSkill('${key}', '${category}')">${btnText}</button></div>`; } } };
 window.upgradeSkill = (key, category) => { if((skillLevels[key] || 0) < SKILL_INFO[key].max && getAvailableCoins() > 0) { skillLevels[key] = (skillLevels[key] || 0) + 1; spentCoins++; localStorage.setItem('mapleDefenseSkills', JSON.stringify(skillLevels)); localStorage.setItem('mapleDefenseSpentCoins', spentCoins); if (currentUserUid) window.syncToCloud(); window.renderShop(category); renderGrid(); } };
-window.openActiveSkillsModal = () => { document.getElementById('overlay').style.display = 'block'; document.getElementById('active-skills-modal').style.display = 'block'; let list = document.getElementById('active-skills-list'); list.innerHTML = ''; let hasSkill = false; for(let key in skillLevels) { if(skillLevels[key] > 0) { hasSkill = true; list.innerHTML += `<div style="background:#fff; border:2px solid #8d6e63; border-radius:6px; padding:6px 8px; display:flex; align-items:center; overflow:hidden;"><img src="${SKILL_INFO[key].img}" onerror="this.src='image/mepo.png'" style="width:30px; height:30px; object-fit:contain; margin-right:8px; flex-shrink:0;"><div style="overflow:hidden;"><div style="font-weight:900; color:#3e2723; font-size:13px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">${SKILL_INFO[key].name} <span style="color:#c62828;">Lv.${skillLevels[key]}</span></div><div style="font-size:10.5px; color:#666; margin-top:2px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">${SKILL_INFO[key].getDesc(skillLevels[key])}</div></div></div>`; } } if(!hasSkill) list.innerHTML = `<div style="text-align:center; padding: 20px; font-weight:bold; color:#666;">적용중인 스킬이 없습니다.</div>`; };
+window.openActiveSkillsModal = () => { document.getElementById('overlay').style.display = 'block'; document.getElementById('active-skills-modal').style.display = 'block'; let list = document.getElementById('active-skills-list'); list.innerHTML = ''; let hasSkill = false; for(let key in skillLevels) { if(skillLevels[key] > 0) { hasSkill = true; list.innerHTML += `<div style="background:#fff; border:2px solid #8d6e63; border-radius:6px; padding:6px 8px; display:flex; align-items:center; overflow:hidden;"><img src="${SKILL_INFO[key].img}" onerror="this.src='image/mepo.png'" style="width:30px; height:30px; object-fit:contain; margin-right:8px; flex-shrink:0;"><div style="overflow:hidden;"><div style="font-weight:800; color:#3e2723; font-size:13px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">${SKILL_INFO[key].name} <span style="color:#c62828;">Lv.${skillLevels[key]}</span></div><div style="font-size:10.5px; color:#666; margin-top:2px; white-space:nowrap; text-overflow:ellipsis; letter-spacing:-0.5px;">${SKILL_INFO[key].getDesc(skillLevels[key])}</div></div></div>`; } } if(!hasSkill) list.innerHTML = `<div style="text-align:center; padding: 20px; font-weight:bold; color:#666;">적용중인 스킬이 없습니다.</div>`; };
 
 // ==========================================
 // 6. 인벤토리 및 장비 시스템
@@ -537,7 +574,6 @@ window.openRaidLobby = () => {
             if(isNaN(hp)) hp = maxHp;
             let percent = (hp / maxHp) * 100;
             if(hpBar) hpBar.style.width = `${Math.max(0, percent)}%`;
-            // 🔥 UI 반올림 처리
             if(hpText) hpText.innerText = `${Math.round(hp).toLocaleString()} / ${maxHp.toLocaleString()}`;
         } else {
             if(hpBar) hpBar.style.width = `100%`;
@@ -573,7 +609,6 @@ window.startRaidGame = () => {
             if(isNaN(raidState.bossHp)) raidState.bossHp = 7000000;
             let percent = (raidState.bossHp / raidState.maxHp) * 100;
             document.getElementById('raid-boss-hp-bar').style.width = `${Math.max(0, percent)}%`; 
-            // 🔥 UI 반올림 처리
             document.getElementById('raid-boss-hp-text').innerText = `${Math.max(0, Math.round(raidState.bossHp)).toLocaleString()} / ${raidState.maxHp.toLocaleString()}`;
         }
     });
@@ -590,7 +625,6 @@ window.showRaidRanking = async () => {
             ranks.sort((a, b) => b.damage - a.damage); ranks = ranks.slice(0, 50); list.innerHTML = '';
             ranks.forEach((entry, idx) => { 
                 let color = idx === 0 ? '#ffd700' : (idx === 1 ? '#e0e0e0' : (idx === 2 ? '#cd7f32' : '#fff')); 
-                // 🔥 랭킹 점수 반올림 처리
                 list.innerHTML += `<div style="display:flex; justify-content:space-between; background:rgba(255,255,255,0.1); padding:10px; border-radius:6px; color:${color}; font-weight:bold;"><span>${idx + 1}위 - ${entry.nickname}</span><span>${Math.round(entry.damage).toLocaleString()} <span style="font-size:10px; color:#aaa;">(${entry.date})</span></span></div>`; 
             });
         } else list.innerHTML = '<div style="text-align:center; padding:20px; color:#fff;">아직 등록된 순위가 없습니다.</div>';
@@ -638,7 +672,6 @@ setInterval(() => {
             if (!bossData || typeof bossData !== 'object') bossData = { hp: 7000000, killCount: 0, lastKillerUid: null };
             
             if (typeof bossData.hp !== 'number' || isNaN(bossData.hp)) bossData.hp = 7000000;
-            // 🔥 서버 저장 시 데미지 반올림 처리
             let dmg = (typeof dmgToApply === 'number' && !isNaN(dmgToApply)) ? Math.round(dmgToApply) : 0;
             
             bossData.hp -= dmg;
@@ -691,7 +724,6 @@ function raidLoop() {
                 
                 if (gdmg > 0 && !isNaN(gdmg)) {
                     raidState.totalDmg += gdmg; raidState.pendingDmg += gdmg;
-                    // 🔥 UI 반올림 처리
                     document.getElementById('raid-total-dmg').innerText = Math.round(raidState.totalDmg).toLocaleString();
                     
                     raidState.bossHp = Math.max(0, raidState.bossHp - gdmg);
@@ -732,7 +764,6 @@ function raidLoop() {
         if (dist <= speed) {
             if (!isNaN(p.dmg)) {
                 raidState.totalDmg += p.dmg; raidState.pendingDmg += p.dmg; 
-                // 🔥 UI 반올림 처리
                 document.getElementById('raid-total-dmg').innerText = Math.round(raidState.totalDmg).toLocaleString();
                 
                 raidState.bossHp = Math.max(0, raidState.bossHp - p.dmg);
@@ -807,7 +838,7 @@ function drawRaid() {
     raidState.dmgTexts.forEach(d => { 
         ctx.save(); ctx.globalAlpha = Math.max(0, d.timer / 0.6); 
         ctx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; 
-        ctx.font = d.isCrit ? "900 24px NanumSquare" : "bold 18px NanumSquare"; 
+        ctx.font = d.isCrit ? "800 24px NanumSquare" : "bold 18px NanumSquare"; 
         ctx.shadowColor = d.isCrit ? "#c62828" : "#000"; ctx.shadowBlur = 4; 
         ctx.fillText(d.val, d.x - 20, d.y); ctx.restore(); 
     });
@@ -838,7 +869,6 @@ function endRaidGame() {
         rewardMsg = `🎁 기여도 보상: ${rewardTier} 상자 1개 지급 완료!`; 
     }
 
-    // 🔥 UI 반올림 처리
     document.getElementById('raid-result-dmg').innerText = Math.round(raidState.totalDmg || 0).toLocaleString(); 
     document.getElementById('raid-result-percent').innerText = (percent || 0).toFixed(2) + "%"; 
     document.getElementById('raid-result-rewards').innerText = rewardMsg;
@@ -856,11 +886,10 @@ function endRaidGame() {
             }
             return {
                 nickname: currentUserName,
-                // 🔥 서버 저장 시 누적 랭킹 점수 반올림 처리
                 damage: Math.round(accDmg),
                 date: new Date().toLocaleDateString()
             };
-        }).catch(e => console.warn("랭킹 저장 비동기 오류:", e));
+        }).catch(e => console.warn("랭킹 저장 오류:", e));
     }
 
     if (raidState.pendingDmg > 0 && !isNaN(raidState.pendingDmg)) {
@@ -872,7 +901,6 @@ function endRaidGame() {
             if (!bossData || typeof bossData !== 'object') bossData = { hp: 7000000, killCount: 0, lastKillerUid: null };
             
             if (typeof bossData.hp !== 'number' || isNaN(bossData.hp)) bossData.hp = 7000000;
-            // 🔥 서버 저장 시 데미지 반올림 처리
             let dmg = (typeof dmgToApply === 'number' && !isNaN(dmgToApply)) ? Math.round(dmgToApply) : 0;
             
             bossData.hp -= dmg;
@@ -975,7 +1003,9 @@ function processOpponentTick(dt) {
                         if (t.cls.type === '전사' && oppSkillLevels.war_death > 0) { let gdmg = baseDmg * (1.5 + oppSkillLevels.war_death * 1.5); oppVisualEffects.push({ type: 'death', timer: 1.2, dmg: gdmg }); t.globalCooldown += 60000; }
                         else if (t.cls.type === '법사' && oppSkillLevels.mage_thunder > 0) { let gdmg = baseDmg * (1.5 + oppSkillLevels.mage_thunder * 1.5); oppVisualEffects.push({ type: 'thunder', timer: 0.5, dmg: gdmg }); t.globalCooldown += 60000; }
                         else if (t.cls.type === '도적' && oppSkillLevels.thief_fuma > 0) { let gdmg = baseDmg * (1.5 + skillLevels.thief_fuma * 1.5); oppFumaList.push({ x: t.x, y: t.y, targetNode: 0, nodesVisited: 0, dmg: gdmg, hitSet: new Set(), angle: 0 }); t.globalCooldown += 60000; }
-                    } else { t.globalCooldown = 0; }
+                    } else {
+                        t.globalCooldown = 0;
+                    }
                 }
             }
         }
@@ -988,7 +1018,10 @@ function processOpponentTick(dt) {
                 oppProjectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: isFinal, baseDmgToPass: dmg });
                 if (t.cls.type === '도적' && oppSkillLevels.thief_shadow > 0 && Math.random() < (oppSkillLevels.thief_shadow * 0.03)) { oppProjectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: false, isShadow: true }); }
                 t.lastAttack += attackCd;
-            } else { t.lastAttack = 0; break; }
+            } else {
+                t.lastAttack = 0;
+                break;
+            }
         }
     });
 
@@ -1033,7 +1066,7 @@ async function processRankResult(result, desc) {
 window.exitRankGame = () => { document.getElementById('rank-result-overlay').style.display = 'none'; document.getElementById('rank-result-modal').style.display = 'none'; rankState = { active: false }; state.status = 'TITLE'; window.switchScreen('start-screen'); };
 
 // ==========================================
-// 9. 월드 펀킹킹 시스템
+// 9. 월드 펀치킹 시스템
 // ==========================================
 window.loadPkLiveRanking = async () => {
     let list = document.getElementById('pk-live-ranking-list'); if(!list) return;
@@ -1160,7 +1193,7 @@ function drawPk() {
         if (p.type === '전사') { img = p.gradeIdx >= 5 ? projImages.warrior2 : projImages.warrior1; pkCtx.rotate(dir + Math.PI); } else if (p.type === '법사') { img = p.gradeIdx >= 5 ? projImages.mage2 : projImages.mage1; pkCtx.rotate(dir + (15 * Math.PI / 180)); } else if (p.type === '도적') { img = p.gradeIdx >= 5 ? projImages.rogue2 : projImages.rogue1; psize = 25; pkCtx.rotate(p.angle); }
         if (img && img.complete) { pkCtx.drawImage(img, -psize/2, -psize/2, psize, psize); } pkCtx.restore();
     });
-    pkState.dmgTexts.forEach(d => { pkCtx.save(); pkCtx.globalAlpha = Math.max(0, d.timer / 0.6); pkCtx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; pkCtx.font = d.isCrit ? "900 24px NanumSquare" : "bold 18px NanumSquare"; pkCtx.shadowColor = d.isCrit ? "#c62828" : "#000"; pkCtx.shadowBlur = 4; pkCtx.fillText(d.val, d.x, d.y); pkCtx.restore(); });
+    pkState.dmgTexts.forEach(d => { pkCtx.save(); pkCtx.globalAlpha = Math.max(0, d.timer / 0.6); pkCtx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; pkCtx.font = d.isCrit ? "800 24px NanumSquare" : "bold 18px NanumSquare"; pkCtx.shadowColor = d.isCrit ? "#c62828" : "#000"; pkCtx.shadowBlur = 4; pkCtx.fillText(d.val, d.x, d.y); pkCtx.restore(); });
 }
 
 window.updateUI = () => {
@@ -1218,7 +1251,7 @@ window.draw = () => {
     });
 
     hitEffects.forEach(h => { ctx.save(); ctx.globalAlpha = h.timer / 0.2; ctx.fillStyle = h.color; ctx.beginPath(); ctx.arc(h.x, h.y, 15, 0, Math.PI*2); ctx.fill(); ctx.restore(); });
-    damageTexts.forEach(d => { ctx.save(); ctx.globalAlpha = Math.max(0, d.timer / 0.8); ctx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; ctx.font = d.isCrit ? "900 16px NanumSquare" : "bold 12px NanumSquare"; ctx.shadowColor = d.isCrit ? "#c62828" : "#000"; ctx.shadowBlur = 3; ctx.fillText(d.val, d.x, d.y); ctx.restore(); });
+    damageTexts.forEach(d => { ctx.save(); ctx.globalAlpha = Math.max(0, d.timer / 0.8); ctx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; ctx.font = d.isCrit ? "800 16px NanumSquare" : "bold 12px NanumSquare"; ctx.shadowColor = d.isCrit ? "#c62828" : "#000"; ctx.shadowBlur = 3; ctx.fillText(d.val, d.x, d.y); ctx.restore(); });
 };
 
 window.drawOpp = () => {
@@ -1327,7 +1360,8 @@ window.loop = () => {
     }
 
     for(let i=projectiles.length-1; i>=0; i--) {
-        let p = projectiles[i]; let dx = p.tx - p.x, dy = p.ty - p.y; let dist = Math.hypot(dx, dy); let speed = 400 * dt; if(p.type === '도적') p.angle += 15 * dt; 
+        let p = projectiles[i]; let dx = p.tx - p.x, dy = p.ty - p.y; let dist = Math.hypot(dx, dy); let speed = 400 * dt;
+        if(p.type === '도적') p.angle += 15 * dt; 
         if(dist <= speed) {
             if (p.gradeIdx >= 6) { hitEffects.push({ x: p.tx, y: p.ty, timer: 0.2, color: p.color }); }
             if(monsters.includes(p.target)) {
