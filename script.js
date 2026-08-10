@@ -261,7 +261,21 @@ window.logout = () => { signOut(auth).then(() => { location.reload(); }); };
 // ==========================================
 function getBossInfo(w) {
     if (w < 100 && BOSS_WAVES[w]) return BOSS_WAVES[w];
-    if (w >= 100 && w % 5 === 0) { let n = (w - 100) / 5; let calculatedHp = 1200000 + (n * 300000) + (Math.pow(n, 2) * 50000); let bName = BOSS_WAVES[w] ? BOSS_WAVES[w].name : (w % 10 === 5 ? "어둠의 늑대" : `심연의 보스 (${w}층)`); let bMeso = BOSS_WAVES[w] ? BOSS_WAVES[w].meso : 150; let bTicket = BOSS_WAVES[w] ? BOSS_WAVES[w].ticket : 5; return { hp: Math.floor(calculatedHp), meso: bMeso, ticket: bTicket, name: bName }; } return null;
+    if (w >= 100 && w % 5 === 0) { 
+        let n = (w - 100) / 5; 
+        let calculatedHp = 1200000 + (n * 300000) + (Math.pow(n, 2) * 50000); 
+        
+        // 🔥 160층 이상 군단장급 보스 체력 10% 고정 추가
+        if (w >= 160) {
+            calculatedHp = calculatedHp * 1.1;
+        }
+
+        let bName = BOSS_WAVES[w] ? BOSS_WAVES[w].name : (w % 10 === 5 ? "어둠의 늑대" : `심연의 보스 (${w}층)`); 
+        let bMeso = BOSS_WAVES[w] ? BOSS_WAVES[w].meso : (w >= 160 ? 200 : 150); 
+        let bTicket = BOSS_WAVES[w] ? BOSS_WAVES[w].ticket : 5; 
+        return { hp: Math.floor(calculatedHp), meso: bMeso, ticket: bTicket, name: bName }; 
+    } 
+    return null;
 }
 
 function setGridMode(mode) {
