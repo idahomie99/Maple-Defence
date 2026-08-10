@@ -582,26 +582,20 @@ function renderRaidGrid() {
     let gridHtml = '';
     for(let i=0; i<3; i++) {
         let u = raidState.units[i];
-        if (u) gridHtml += `<div class="grid-cell glow-${u.gradeIdx}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;"><div style="font-size:36px;">${u.cls.icon}</div><div style="font-size:10px; color:${u.cls.color}; font-weight:bold;">${u.grade.name}</div></div>`;
+        if (u) {
+            let barsHtml = '';
+            if (u.gradeIdx >= 5) {
+                if ((u.cls.type === '전사' && (skillLevels.war_death || 0) > 0) || (u.cls.type === '법사' && (skillLevels.mage_thunder || 0) > 0) || (u.cls.type === '도적' && (skillLevels.thief_fuma || 0) > 0)) {
+                    let color = u.cls.type === '전사' ? '#ffeb3b' : (u.cls.type === '법사' ? '#00e5ff' : '#ab47bc');
+                    barsHtml += `<div style="width: 80%; height: 3px; background: #333; margin-top: 2px; border-radius: 1.5px; overflow: hidden; border: 1px solid #111;"><div id="raid-global-bar-${i}" style="width: 0%; height: 100%; background: ${color};"></div></div>`;
+                }
+            }
+            gridHtml += `<div class="grid-cell glow-${u.gradeIdx}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;"><div style="font-size:36px;">${u.cls.icon}</div><div style="font-size:10px; color:${u.cls.color}; font-weight:bold;">${u.grade.name}</div>${barsHtml}</div>`;
+        }
         else gridHtml += `<div class="grid-cell" style="background:rgba(0,0,0,0.2); border:1px dashed #777;"></div>`;
     }
     document.getElementById('raid-grid-container').innerHTML = gridHtml;
 }
-
-setInterval(() => {
-    if (raidState.active && raidState.pendingDmg > 0 && !isNaN(raidState.pendingDmg)) {
-        let dmgToApply = raidState.pendingDmg; raidState.pendingDmg = 0;
-        runTransaction(ref(database, 'worldBoss'), (bossData) => {
-            if (!bossData) bossData = { hp: 7000000, killCount: 0, lastKillerUid: null };
-            if (isNaN(dmgToApply)) dmgToApply = 0; bossData.hp -= dmgToApply;
-            if (isNaN(bossData.hp)) bossData.hp = 7000000;
-            if (bossData.hp <= 0) { bossData.hp = 7000000; bossData.killCount = (bossData.killCount || 0) + 1; bossData.lastKillerUid = currentUserUid; }
-            return bossData;
-        }).then(({committed, snapshot}) => {
-            if(committed && snapshot.exists()) { let data = snapshot.val(); if (data.lastKillerUid === currentUserUid && !raidState.rewardClaimedForKills.includes(data.killCount)) { raidState.rewardClaimedForKills.push(data.killCount); raidState.gotLastHit = true; showBossToast("막타 달성! 챌린저 상자 확정!", true); } }
-        }).catch(e => { raidState.pendingDmg += dmgToApply; console.warn("데미지 전송 지연, 다음 틱에 재전송합니다."); });
-    }
-}, 1000);
 
 function raidLoop() {
     if (!raidState.active) return;
@@ -618,29 +612,49 @@ function raidLoop() {
     let cardMulti = 1 + (getTotalCardBonus() / 100); let rageMulti = 1 + ((skillLevels.common_rage || 0) * 0.01) + (equipStats.atk * 0.01); let sharpChance = ((skillLevels.common_sharp || 0) * 0.05) + (equipStats.crit * 0.01); let windReduc = 1 + ((skillLevels.common_wind || 0) * 0.2) + (equipStats.spd * 0.01);
     let bx = 250, by = 150;
 
-    raidState.units.forEach(u => {
+    raidState.units.forEach((u, idx) => {
         if(!u) return; 
+
         if (u.gradeIdx >= 5 && ((u.cls.type === '전사' && (skillLevels.war_death || 0) > 0) || (u.cls.type === '법사' && (skillLevels.mage_thunder || 0) > 0) || (u.cls.type === '도적' && (skillLevels.thief_fuma || 0) > 0))) {
             u.globalCooldown -= dt * 1000;
+            let rbar = document.getElementById(`raid-global-bar-${idx}`);
+            if (rbar) rbar.style.width = Math.max(0, Math.min(100, ((60000 - u.globalCooldown) / 60000) * 100)) + '%';
+
             if (u.globalCooldown <= 0) {
-                let baseDmg = (20 + equipStats.flatAtk) * u.grade.mult * cardMulti * rageMulti; let gdmg = 0;
-                if (u.cls.type === '전사' && (skillLevels.war_death || 0) > 0) gdmg = baseDmg * (1.5 + (skillLevels.war_death || 0) * 1.5);
-                else if (u.cls.type === '법사' && (skillLevels.mage_thunder || 0) > 0) gdmg = baseDmg * (1.5 + (skillLevels.mage_thunder || 0) * 1.5);
-                else if (u.cls.type === '도적' && (skillLevels.thief_fuma || 0) > 0) gdmg = baseDmg * (1.5 + (skillLevels.thief_fuma || 0) * 1.5);
+                let baseDmg = (20 + equipStats.flatAtk) * u.grade.mult * cardMulti * rageMulti;
+                let gdmg = 0;
+                
+                if (u.cls.type === '전사' && (skillLevels.war_death || 0) > 0) { gdmg = baseDmg * (1.5 + (skillLevels.war_death || 0) * 1.5); raidState.vfx.push({ type: 'death', timer: 1.2, dmg: gdmg }); }
+                else if (u.cls.type === '법사' && (skillLevels.mage_thunder || 0) > 0) { gdmg = baseDmg * (1.5 + (skillLevels.mage_thunder || 0) * 1.5); raidState.vfx.push({ type: 'thunder', timer: 0.5, dmg: gdmg }); }
+                else if (u.cls.type === '도적' && (skillLevels.thief_fuma || 0) > 0) { gdmg = baseDmg * (1.5 + (skillLevels.thief_fuma || 0) * 1.5); raidState.vfx.push({ type: 'fuma', timer: 0.5 }); }
+                
                 if (gdmg > 0 && !isNaN(gdmg)) {
-                    raidState.totalDmg += gdmg; raidState.pendingDmg += gdmg; document.getElementById('raid-total-dmg').innerText = Math.floor(raidState.totalDmg).toLocaleString();
-                    let ox = (Math.random() - 0.5) * 50; let oy = (Math.random() - 0.5) * 50; raidState.dmgTexts.push({ val: Math.floor(gdmg), x: bx + ox, y: by - 80 + oy, timer: 0.8, isCrit: true });
+                    raidState.totalDmg += gdmg; raidState.pendingDmg += gdmg;
+                    document.getElementById('raid-total-dmg').innerText = Math.floor(raidState.totalDmg).toLocaleString();
+                    let ox = (Math.random() - 0.5) * 50; let oy = (Math.random() - 0.5) * 50;
+                    raidState.dmgTexts.push({ val: Math.floor(gdmg), x: bx + ox, y: by - 80 + oy, timer: 0.8, isCrit: true });
                 }
                 u.globalCooldown += 60000;
             }
         }
 
-        u.lastAttack -= dt * 1000; let attackCd = (1000 * (u.grade.speedMul || 1)) / windReduc;
+        u.lastAttack -= dt * 1000;
+        let attackCd = (1000 * (u.grade.speedMul || 1)) / windReduc;
         while (u.lastAttack <= 0) {
-            let dmg = (20 + equipStats.flatAtk) * u.grade.mult * cardMulti * rageMulti; let isCrit = Math.random() < sharpChance; if (isCrit) dmg *= 1.2;
-            let isFinal = false; if (u.cls.type === '전사' && (skillLevels.war_final || 0) > 0 && Math.random() < ((skillLevels.war_final || 0) * 0.03)) { isFinal = true; dmg *= 2; }
+            let dmg = (20 + equipStats.flatAtk) * u.grade.mult * cardMulti * rageMulti; 
+            let isCrit = Math.random() < sharpChance; if (isCrit) dmg *= 1.2;
+            
+            let isFinal = false; 
+            if (u.cls.type === '전사' && (skillLevels.war_final || 0) > 0 && Math.random() < ((skillLevels.war_final || 0) * 0.03)) { 
+                isFinal = true; dmg *= 2; 
+            }
+
             raidState.projectiles.push({ type: u.cls.type, x: u.x, y: u.y, tx: bx, ty: by, dmg: dmg, color: u.cls.color, angle: 0, isCrit: isCrit, gradeIdx: u.gradeIdx, isFinal: isFinal }); 
-            if (u.cls.type === '도적' && (skillLevels.thief_shadow || 0) > 0 && Math.random() < ((skillLevels.thief_shadow || 0) * 0.03)) { raidState.projectiles.push({ type: u.cls.type, x: u.x, y: u.y, tx: bx, ty: by, dmg: dmg, color: u.cls.color, angle: 0, isCrit: isCrit, gradeIdx: u.gradeIdx, isShadow: true }); }
+            
+            if (u.cls.type === '도적' && (skillLevels.thief_shadow || 0) > 0 && Math.random() < ((skillLevels.thief_shadow || 0) * 0.03)) { 
+                raidState.projectiles.push({ type: u.cls.type, x: u.x, y: u.y, tx: bx, ty: by, dmg: dmg, color: u.cls.color, angle: 0, isCrit: isCrit, gradeIdx: u.gradeIdx, isShadow: true }); 
+            }
+
             u.lastAttack += attackCd;
         }
     });
@@ -653,26 +667,73 @@ function raidLoop() {
                 let ox = (Math.random() - 0.5) * 50; let oy = (Math.random() - 0.5) * 50; raidState.dmgTexts.push({ val: Math.floor(p.dmg), x: bx + ox, y: by + oy - 80, timer: 0.6, isCrit: p.isCrit });
             }
             raidState.projectiles.splice(i, 1);
-        } else { let moveAmt = speed; if (p.isShadow) moveAmt *= 0.85; p.x += (dx/dist)*moveAmt; p.y += (dy/dist)*moveAmt; }
+        } else { 
+            let moveAmt = speed; if (p.isShadow) moveAmt *= 0.85; 
+            p.x += (dx/dist)*moveAmt; p.y += (dy/dist)*moveAmt; 
+        }
     }
     for (let i = raidState.dmgTexts.length - 1; i >= 0; i--) { raidState.dmgTexts[i].timer -= dtReal; raidState.dmgTexts[i].y -= dtReal * 60; if (raidState.dmgTexts[i].timer <= 0) raidState.dmgTexts.splice(i, 1); }
+    for (let i = raidState.vfx.length - 1; i >= 0; i--) { raidState.vfx[i].timer -= dt; if (raidState.vfx[i].timer <= 0) { raidState.vfx.splice(i, 1); } }
     drawRaid(); raidReqId = requestAnimationFrame(raidLoop);
 }
 
 function drawRaid() {
     let canvas = document.getElementById('raidCanvas'); let ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    raidState.vfx.forEach(v => { 
+        if (v.type === 'fuma') { 
+            ctx.save(); ctx.translate(250, 150); ctx.rotate((0.5 - v.timer) * 30); if (fumaImg && fumaImg.complete) { let fsize = 80; ctx.drawImage(fumaImg, -fsize/2, -fsize/2, fsize, fsize); } ctx.restore(); 
+        } else {
+            ctx.save();
+            if (v.type === 'death') {
+                let progress = Math.min(1, (1.2 - v.timer) / 0.2); 
+                ctx.strokeStyle = "#ffeb3b"; ctx.lineWidth = 12; ctx.lineCap = "round"; ctx.shadowColor = "#f57f17"; ctx.shadowBlur = 15;
+                let currentX = -50 + (600) * progress; let currentY = 550 + (-600) * progress;
+                ctx.beginPath(); ctx.moveTo(-50, 550); ctx.lineTo(currentX, currentY); ctx.stroke();
+            } else if (v.type === 'thunder') {
+                ctx.fillStyle = `rgba(0, 229, 255, ${v.timer})`; ctx.fillRect(0,0,500,500);
+                ctx.strokeStyle = `rgba(255, 255, 255, ${v.timer * 2})`; ctx.lineWidth = 20;
+                ctx.beginPath(); ctx.moveTo(250,0); ctx.lineTo(150,250); ctx.lineTo(350,250); ctx.lineTo(250,500); ctx.stroke();
+            }
+            ctx.restore();
+        }
+    });
+
     raidState.projectiles.forEach(p => { 
-        ctx.save(); ctx.translate(p.x, p.y); let dir = Math.atan2(p.ty - p.y, p.tx - p.x); let scale = 1.0; if (p.isFinal) scale *= 1.3; ctx.scale(scale, scale); if (p.isShadow) ctx.globalAlpha = 0.5;
+        ctx.save(); ctx.translate(p.x, p.y); 
+        
+        let dir = Math.atan2(p.ty - p.y, p.tx - p.x);
+        let scale = 1.0; if (p.isFinal) scale *= 1.3; ctx.scale(scale, scale);
+        if (p.isShadow) ctx.globalAlpha = 0.5;
+
         let img = null; let psize = 20;
-        // 🔥 [버그수정] 5차 이상부터 고급 투사체 적용 (p.gradeIdx >= 5)
         if (p.type === '전사') { img = p.gradeIdx >= 5 ? projImages.warrior2 : projImages.warrior1; ctx.rotate(dir + Math.PI); psize = p.gradeIdx >= 5 ? 30 : 20; }
         else if (p.type === '법사') { img = p.gradeIdx >= 5 ? projImages.mage2 : projImages.mage1; ctx.rotate(dir + (15 * Math.PI / 180)); psize = p.gradeIdx >= 5 ? 30 : 20; }
         else if (p.type === '도적') { img = p.gradeIdx >= 5 ? projImages.rogue2 : projImages.rogue1; ctx.rotate(p.angle); }
-        if (img && img.complete) { ctx.drawImage(img, -psize/2, -psize/2, psize, psize); } else { ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(0, 0, p.gradeIdx >= 5 ? 8 : 5, 0, Math.PI*2); ctx.fill(); }
+
+        if (img && img.complete) { 
+            ctx.drawImage(img, -psize/2, -psize/2, psize, psize); 
+        } else { 
+            ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(0, 0, p.gradeIdx >= 5 ? 8 : 5, 0, Math.PI*2); ctx.fill(); 
+        }
         ctx.restore(); 
     });
-    if (raidState.units.some(u => u && u.cls.type === '전사')) { let hasStun = raidState.projectiles.some(p => p.type === '전사' && p.isFinal); if (hasStun) { ctx.font = "bold 18px Arial"; ctx.fillStyle = "yellow"; ctx.textAlign = "center"; ctx.fillText("💫", 250, 100); } }
-    raidState.dmgTexts.forEach(d => { ctx.save(); ctx.globalAlpha = Math.max(0, d.timer / 0.6); ctx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; ctx.font = d.isCrit ? "900 24px NanumSquare" : "bold 18px NanumSquare"; ctx.shadowColor = d.isCrit ? "#c62828" : "#000"; ctx.shadowBlur = 4; ctx.fillText(d.val, d.x - 20, d.y); ctx.restore(); });
+    
+    if (raidState.units.some(u => u && u.cls.type === '전사')) {
+        let hasStun = raidState.projectiles.some(p => p.type === '전사' && p.isFinal); 
+        if (hasStun) {
+            ctx.font = "bold 18px Arial"; ctx.fillStyle = "yellow"; ctx.textAlign = "center";
+            ctx.fillText("💫", 250, 100);
+        }
+    }
+
+    raidState.dmgTexts.forEach(d => { 
+        ctx.save(); ctx.globalAlpha = Math.max(0, d.timer / 0.6); 
+        ctx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; 
+        ctx.font = d.isCrit ? "900 24px NanumSquare" : "bold 18px NanumSquare"; 
+        ctx.shadowColor = d.isCrit ? "#c62828" : "#000"; ctx.shadowBlur = 4; 
+        ctx.fillText(d.val, d.x - 20, d.y); ctx.restore(); 
+    });
 }
 
 function endRaidGame() {
