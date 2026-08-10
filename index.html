@@ -93,7 +93,7 @@
 
     <div id="start-screen" style="display:none; flex-direction:column; justify-content:center; align-items:center; position:fixed; top:0; left:0; width:100%; height:100%; z-index:900; background: linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.5)), url('image/wallpaper.png') no-repeat center center; background-size: cover;">
         
-        <!-- 🔥 유저 닉네임 표시 및 닉네임 변경 ✏️ 버튼 추가 -->
+        <!-- 유저 닉네임 표시 및 닉네임 변경 ✏️ 버튼 추가 -->
         <div style="position:absolute; top: max(env(safe-area-inset-top, 15px), 15px); right: 15px; z-index: 100; background: rgba(15, 23, 42, 0.85); border: 1px solid #1e3a8a; border-radius: 20px; padding: 6px 15px; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.5); white-space: nowrap;">
             <span style="color:#e2e8f0; font-size: 14px; font-weight: bold; letter-spacing: -0.5px;">접속중: <span id="current-user-name" style="color:#fbbf24;">용사님</span></span>
             <button style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px 6px; transition: background 0.2s;" onclick="openNicknameChangeModal()" title="닉네임 변경">✏️</button>
@@ -169,27 +169,28 @@
             <button class="ingame-btn premium-dark" style="width:100%; padding: 10px;" onclick="closeRankMenu()">온라인 메뉴로 돌아가기</button>
         </div>
 
+        <!-- 랭크 전용 상점 -->
         <div id="rank-shop-modal" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 15vh; width: 85%; max-width: 320px;">
-    <h3 style="color:#6b21a8;">🛒 랭크 전용 상점</h3>
-    <div style="background:rgba(0,0,0,0.7); padding:15px; border-radius:8px; margin-bottom:15px; border: 1px solid #6d4c41;">
-        <div style="font-size:14px; font-weight:bold; display:flex; justify-content:space-between; margin-bottom:10px;">
-            <span style="color:#ddd;">보유 랭크 머니</span> <span id="ui-shop-rank-money" style="color:#ffe082;">0</span>
+            <h3 style="color:#6b21a8;">🛒 랭크 전용 상점</h3>
+            <div style="background:rgba(0,0,0,0.7); padding:15px; border-radius:8px; margin-bottom:15px; border: 1px solid #6d4c41;">
+                <div style="font-size:14px; font-weight:bold; display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <span style="color:#ddd;">보유 랭크 머니</span> <span id="ui-shop-rank-money" style="color:#ffe082;">0</span>
+                </div>
+                <div style="font-size:14px; font-weight:bold; display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <span style="color:#ddd;">보유 코인 조각</span> <span id="ui-shop-pieces" style="color:#81c784;">0</span>
+                </div>
+                <!-- 🔥 별의 기운 표기 -->
+                <div style="font-size:14px; font-weight:bold; display:flex; justify-content:space-between;">
+                    <span style="color:#ddd;">보유 별의 기운</span> <span id="ui-shop-star-pieces" style="color:#ffeb3b;">0</span>
+                </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;">
+                <button class="ingame-btn premium-orange" style="width:100%;" onclick="buyMonsterPiece()">조각 1개 구매 (100 머니)</button>
+                <!-- 🔥 별의 기운 구매 버튼 -->
+                <button class="ingame-btn premium-blue" style="width:100%;" onclick="buyStarPiece()">별의 기운 1개 구매 (50 머니)</button>
+            </div>
+            <button class="ingame-btn premium-dark" style="width:100%; padding: 10px;" onclick="closeRankShop()">랭크 로비로 돌아가기</button>
         </div>
-        <div style="font-size:14px; font-weight:bold; display:flex; justify-content:space-between; margin-bottom:10px;">
-            <span style="color:#ddd;">보유 코인 조각</span> <span id="ui-shop-pieces" style="color:#81c784;">0</span>
-        </div>
-        <!-- 🔥 새로 추가된 별의 기운 표기 -->
-        <div style="font-size:14px; font-weight:bold; display:flex; justify-content:space-between;">
-            <span style="color:#ddd;">보유 별의 기운</span> <span id="ui-shop-star-pieces" style="color:#ffeb3b;">0</span>
-        </div>
-    </div>
-    <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;">
-        <button class="ingame-btn premium-orange" style="width:100%;" onclick="buyMonsterPiece()">조각 1개 구매 (100 머니)</button>
-        <!-- 🔥 새로 추가된 별의 기운 구매 버튼 -->
-        <button class="ingame-btn premium-blue" style="width:100%;" onclick="buyStarPiece()">별의 기운 1개 구매 (50 머니)</button>
-    </div>
-    <button class="ingame-btn premium-dark" style="width:100%; padding: 10px;" onclick="closeRankShop()">랭크 로비로 돌아가기</button>
-</div>
 
         <div id="match-intro-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:4000; flex-direction:column; justify-content:center; align-items:center; opacity:0; transition: opacity 0.5s ease-in-out;">
             <h2 style="color:#ffeb3b; font-size:36px; margin-bottom: 30px; text-shadow: 2px 2px 5px #000;">⚔️ 매칭 성사! ⚔️</h2>
@@ -267,6 +268,10 @@
                 <div class="meso-box"><img src="image/meso.png" alt="Meso" style="height: 16px; vertical-align: middle; margin-right: 4px;">메소 <span id="ui-meso">25</span></div>
                 <div class="mp-box"><img src="image/mepo.png" alt="Mepo" style="height: 16px; vertical-align: middle; margin-right: 4px;">메포 <span id="ui-mp">0</span></div>
             </div>
+            <!-- 🔥 초반 가이드 -->
+            <div id="early-guide" style="display:none; background: rgba(0, 0, 0, 0.7); color: #69f0ae; font-size: 13px; font-weight: bold; text-align: center; padding: 8px; border-radius: 6px; margin-top: 10px; border: 1px dashed #69f0ae;">
+                💡 가이드: 하단 [소환]을 누르고 [✨일괄합성]으로 성장하세요!
+            </div>
         </div>
         
         <div id="board-area">
@@ -278,10 +283,12 @@
         </div>
         
         <div id="controls" class="maple-panel">
-            <div style="display: flex; gap: 5px; margin-bottom: 15px;">
-                <button id="btn-summon" class="ingame-btn premium-green" style="flex: 1.5; padding: 16px; font-size: 18px;" onclick="summonUnit()">소환 (10)</button>
-                <button id="btn-sell-single" class="ingame-btn premium-orange" style="flex: 1;" onclick="sellSelectedUnit()" disabled>판매</button>
-                <button class="ingame-btn premium-dark" style="flex: 1;" onclick="openBulkSellModal()">일괄판매</button>
+            <!-- 🔥 일괄합성 버튼 추가 -->
+            <div style="display: flex; gap: 4px; margin-bottom: 15px;">
+                <button id="btn-summon" class="ingame-btn premium-green" style="flex: 1.5; padding: 16px; font-size: 16px;" onclick="summonUnit()">소환 (10)</button>
+                <button class="ingame-btn premium-purple" style="flex: 1; font-size: 13px; padding: 0 5px;" onclick="autoMerge()">✨일괄합성</button>
+                <button id="btn-sell-single" class="ingame-btn premium-orange" style="flex: 0.8; font-size: 13px; padding: 0 5px;" onclick="sellSelectedUnit()" disabled>선택판매</button>
+                <button class="ingame-btn premium-dark" style="flex: 0.8; font-size: 13px; padding: 0 5px;" onclick="openBulkSellModal()">조건판매</button>
             </div>
             <div style="text-align:center; font-weight:bold; font-size:14px; color:#5a3c22; margin-bottom: 5px; border-top: 1px dashed #8b5a2b; padding-top: 5px;">
                 <img src="image/chaosscroll.png" style="height: 20px; vertical-align: middle;"> 혼돈의 주문서 강화 <img src="image/chaosscroll.png" style="height: 20px; vertical-align: middle;">
@@ -302,7 +309,7 @@
             </div>
             <div class="ticket-row" style="margin-top: 15px;">
                 <span>선택권: <span id="ui-tickets" class="highlight">0</span>장</span>
-                <button class="ingame-btn premium-purple" style="padding: 8px 15px;" onclick="openTicketModal()">사용하기</button>
+                <button class="ingame-btn premium-blue" style="padding: 8px 15px;" onclick="openTicketModal()">사용하기</button>
             </div>
         </div>
     </div>
@@ -356,24 +363,19 @@
             </div>
             <div id="raid-grid-container" style="position: absolute; bottom: 15%; left: 20%; width: 60%; height: 25%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; background-color: rgba(220, 190, 170, 0.85); border: 3px solid rgba(120, 80, 60, 0.9); z-index: 5; border-radius: 8px; padding: 5px;"></div>
             
-            <!-- 레이드 준비(소환) UI -->
-<div id="raid-prep-ui" style="display:none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: transparent; z-index: 50; flex-direction: column; justify-content: space-between; align-items: center; padding: 20px 0; box-sizing: border-box;">
-    
-    <!-- 상단: 타이머 안내 -->
-<div style="text-align:center; background: rgba(0,0,0,0.6); padding: 10px 25px; border-radius: 12px; border: 1px solid #777; margin-top: 10px;">
-    <h2 style="color: #ffeb3b; font-size: 24px; margin-top: 0; margin-bottom: 5px;">전투 준비</h2>
-    <p style="color: #fff; font-size: 14px; margin: 0;">남은 시간: <span id="raid-prep-time" style="color:#ff5252; font-weight:bold; font-size:20px;">5</span>초</p> <!-- 10을 5로 변경 -->
-</div>
-
-<div style="background: rgba(0,0,0,0.8); padding: 15px 20px; border-radius: 12px; border: 1px solid #777; text-align: center; margin-bottom: 10px;">
-        <div style="color: #eee; font-size: 14px; margin-bottom: 10px;">보유 메소: <span id="raid-meso" style="color: #ffeb3b; font-weight:bold; font-size: 18px;">30</span></div>
-        <button class="ingame-btn premium-green" style="padding: 12px 24px; font-size: 16px;" onclick="summonRaidUnit()">유닛 소환 (10 메소)</button>
-        <p style="color:#aaa; font-size:11px; margin-top: 10px; margin-bottom: 0;">※ 5초 뒤 <span style="color:#ffeb3b;">15배속</span>으로 자동 시작됩니다.</p> <!-- 10을 5로 변경 -->
-</div>
-
-    </div> <!-- raid-prep-ui 닫기 -->
-    </div> <!-- raid-board-area 닫기 -->
-</div> <!-- raid-game 닫기 -->
+            <!-- 🔥 레이드 준비 UI 위치 하단으로 이동 -->
+            <div id="raid-prep-ui" style="display:none; position: absolute; bottom: 2%; left: 50%; transform: translateX(-50%); width: 90%; background: transparent; z-index: 50; flex-direction: column; justify-content: space-between; align-items: center; box-sizing: border-box;">
+                <div style="text-align:center; background: rgba(0,0,0,0.85); padding: 10px 25px; border-radius: 12px; border: 1px solid #ff5252; margin-bottom: 10px; width: 100%; box-sizing:border-box;">
+                    <h2 style="color: #ffeb3b; font-size: 20px; margin-top: 0; margin-bottom: 5px;">전투 준비</h2>
+                    <p style="color: #fff; font-size: 14px; margin: 0;">남은 시간: <span id="raid-prep-time" style="color:#ff5252; font-weight:bold; font-size:20px;">5</span>초</p>
+                </div>
+                <div style="background: rgba(0,0,0,0.85); padding: 15px 20px; border-radius: 12px; border: 1px solid #777; text-align: center; width: 100%; box-sizing:border-box;">
+                    <div style="color: #eee; font-size: 14px; margin-bottom: 10px;">보유 메소: <span id="raid-meso" style="color: #ffeb3b; font-weight:bold; font-size: 18px;">30</span></div>
+                    <button class="ingame-btn premium-green" style="width: 100%; padding: 12px 24px; font-size: 16px;" onclick="summonRaidUnit()">유닛 소환 (10 메소)</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- 인벤토리 모달 -->
     <div id="inventory-modal" class="maple-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:3500; width:90%; max-width:340px; background: #eceff1; border-color: #546e7a;">
