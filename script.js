@@ -515,10 +515,11 @@ window.openRaidLobby = () => {
     let hpBar = document.getElementById('lobby-raid-boss-hp-bar');
     if(hpText) hpText.innerText = "불러오는 중...";
     
-    onValue(ref(database, 'worldBoss/hp'), (snap) => {
+    onValue(ref(database, 'worldBoss'), (snap) => {
         let maxHp = 7000000;
         if(snap.exists()) {
-            let hp = snap.val();
+            let val = snap.val();
+            let hp = typeof val === 'number' ? val : (val.hp !== undefined ? val.hp : maxHp);
             if(isNaN(hp)) hp = maxHp;
             let percent = (hp / maxHp) * 100;
             if(hpBar) hpBar.style.width = `${Math.max(0, percent)}%`;
@@ -550,9 +551,11 @@ window.startRaidGame = () => {
 
     document.getElementById('raid-prep-ui').style.display = 'flex'; document.getElementById('raid-prep-time').innerText = '5'; document.getElementById('raid-meso').innerText = '30'; renderRaidGrid();
 
-    onValue(ref(database, 'worldBoss/hp'), (snap) => {
+    onValue(ref(database, 'worldBoss'), (snap) => {
         if(snap.exists()) {
-            raidState.bossHp = snap.val(); if(isNaN(raidState.bossHp)) raidState.bossHp = 7000000;
+            let val = snap.val();
+            raidState.bossHp = typeof val === 'number' ? val : (val.hp !== undefined ? val.hp : 7000000);
+            if(isNaN(raidState.bossHp)) raidState.bossHp = 7000000;
             let percent = (raidState.bossHp / raidState.maxHp) * 100;
             document.getElementById('raid-boss-hp-bar').style.width = `${Math.max(0, percent)}%`; document.getElementById('raid-boss-hp-text').innerText = `${Math.max(0, Math.floor(raidState.bossHp)).toLocaleString()} / ${raidState.maxHp.toLocaleString()}`;
         }
@@ -603,17 +606,22 @@ function renderRaidGrid() {
     document.getElementById('raid-grid-container').innerHTML = gridHtml;
 }
 
-// 🔥 1초마다 실행되는 데미지 전송 (실시간 로컬 피통 감소 연동)
+// 🔥 데미지 전송 트랜잭션 완벽 보호 (DB 에러 자동 복구)
 setInterval(() => {
     if (raidState.active && raidState.pendingDmg > 0 && !isNaN(raidState.pendingDmg)) {
         let dmgToApply = raidState.pendingDmg; 
         raidState.pendingDmg = 0;
         
-        runTransaction(ref(database, 'worldBoss'), (bossData) => {
-            if (!bossData) bossData = { hp: 7000000, killCount: 0, lastKillerUid: null };
+        runTransaction(ref(database, 'worldBoss'), (data) => {
+            let bossData = data;
+            if (typeof bossData === 'number') bossData = { hp: bossData, killCount: 0, lastKillerUid: null };
+            if (!bossData || typeof bossData !== 'object') bossData = { hp: 7000000, killCount: 0, lastKillerUid: null };
+            
             if (typeof bossData.hp !== 'number' || isNaN(bossData.hp)) bossData.hp = 7000000;
             let dmg = (typeof dmgToApply === 'number' && !isNaN(dmgToApply)) ? dmgToApply : 0;
+            
             bossData.hp -= dmg;
+            
             if (bossData.hp <= 0) { 
                 bossData.hp = 7000000; 
                 bossData.killCount = (bossData.killCount || 0) + 1; 
@@ -661,7 +669,6 @@ function raidLoop() {
                     raidState.totalDmg += gdmg; raidState.pendingDmg += gdmg;
                     document.getElementById('raid-total-dmg').innerText = Math.floor(raidState.totalDmg).toLocaleString();
                     
-                    // 🔥 [실시간 반영] 유닛이 스킬 쓸 때 내 화면 보스 피통도 즉시 깎기
                     raidState.bossHp = Math.max(0, raidState.bossHp - gdmg);
                     let percent = (raidState.bossHp / raidState.maxHp) * 100;
                     document.getElementById('raid-boss-hp-bar').style.width = `${Math.max(0, percent)}%`;
@@ -702,7 +709,6 @@ function raidLoop() {
                 raidState.totalDmg += p.dmg; raidState.pendingDmg += p.dmg; 
                 document.getElementById('raid-total-dmg').innerText = Math.floor(raidState.totalDmg).toLocaleString();
                 
-                // 🔥 [실시간 반영] 평타 맞을 때 내 화면 보스 피통 즉시 깎기
                 raidState.bossHp = Math.max(0, raidState.bossHp - p.dmg);
                 let percent = (raidState.bossHp / raidState.maxHp) * 100;
                 document.getElementById('raid-boss-hp-bar').style.width = `${Math.max(0, percent)}%`;
@@ -806,42 +812,41 @@ function endRaidGame() {
         rewardMsg = `🎁 기여도 보상: ${rewardTier} 상자 1개 지급 완료!`; 
     }
 
-    // 🔥 [핵심 수정] 네트워크 통신 오류/지연과 상관없이 결과 팝업을 무조건 즉시 강제로 띄우기!
     document.getElementById('raid-result-dmg').innerText = Math.floor(raidState.totalDmg || 0).toLocaleString(); 
     document.getElementById('raid-result-percent').innerText = (percent || 0).toFixed(2) + "%"; 
     document.getElementById('raid-result-rewards').innerText = rewardMsg;
     document.getElementById('raid-result-overlay').style.display = 'block'; 
     document.getElementById('raid-result-modal').style.display = 'block';
 
-    // 백그라운드에서 안전하게 클라우드 및 랭킹 업데이트 수행
     window.syncToCloud();
+    
+    // 🔥 랭킹 저장 트랜잭션 추가 (안전한 기록 보장)
     if (currentUserUid) {
         let myRankRef = ref(database, `worldBoss_rankings/${currentUserUid}`);
-        get(myRankRef).then(snap => {
-            let accDmg = raidState.totalDmg; 
-            if (isNaN(accDmg)) accDmg = 0;
-            if(snap.exists()) {
-                let prevDmg = snap.val().damage;
-                if(typeof prevDmg === 'number' && !isNaN(prevDmg)) {
-                    accDmg += prevDmg;
-                }
+        runTransaction(myRankRef, (rankData) => {
+            let accDmg = (typeof raidState.totalDmg === 'number' && !isNaN(raidState.totalDmg)) ? raidState.totalDmg : 0;
+            if (rankData && typeof rankData.damage === 'number' && !isNaN(rankData.damage)) {
+                accDmg += rankData.damage;
             }
-            set(myRankRef, {
+            return {
                 nickname: currentUserName,
                 damage: accDmg,
                 date: new Date().toLocaleDateString()
-            });
-        }).catch(e => console.warn("랭킹 저장 비동기 오류:", e));
+            };
+        }).catch(e => console.warn("랭킹 저장 오류:", e));
     }
 
-    // 잔여 데미지 털어내기
     if (raidState.pendingDmg > 0 && !isNaN(raidState.pendingDmg)) {
         let dmgToApply = raidState.pendingDmg; 
         raidState.pendingDmg = 0;
-        runTransaction(ref(database, 'worldBoss'), (bossData) => {
-            if (!bossData) bossData = { hp: 7000000, killCount: 0, lastKillerUid: null };
+        runTransaction(ref(database, 'worldBoss'), (data) => {
+            let bossData = data;
+            if (typeof bossData === 'number') bossData = { hp: bossData, killCount: 0, lastKillerUid: null };
+            if (!bossData || typeof bossData !== 'object') bossData = { hp: 7000000, killCount: 0, lastKillerUid: null };
+            
             if (typeof bossData.hp !== 'number' || isNaN(bossData.hp)) bossData.hp = 7000000;
             let dmg = (typeof dmgToApply === 'number' && !isNaN(dmgToApply)) ? dmgToApply : 0;
+            
             bossData.hp -= dmg;
             if (bossData.hp <= 0) { 
                 bossData.hp = 7000000; 
