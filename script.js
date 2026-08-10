@@ -1,5 +1,5 @@
-// 🔥 1.0.61 버전 - 머지 시스템 추가, 광역기 너프, 데미지 텍스트 상향, 보스 먹통 해결
-const GAME_VERSION = "1.0.61"; 
+// 🔥 1.0.62 버전 - 월드보스 로비/랭킹 추가, 합성 문구 교정, 인벤토리 UI 겹침 최종 해결
+const GAME_VERSION = "1.0.62"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -133,7 +133,7 @@ const BOSS_WAVES = { 24: { hp: 10000, meso: 50, ticket: 3, name: "킹 슬라임"
 window.showMessage = (msg) => { 
     let ov = document.getElementById('msg-overlay'); 
     if(!ov) return; 
-    ov.innerText = msg; 
+    ov.innerHTML = msg; 
     ov.style.display = 'block'; 
     setTimeout(() => { ov.style.display = 'none'; }, 2000); 
 };
@@ -236,7 +236,7 @@ window.closeAllModals = () => {
         return;
     }
 
-    ['overlay', 'bulk-sell-modal', 'ticket-modal', 'book-modal', 'shop-modal', 'active-skills-modal', 'inventory-modal', 'equip-detail-modal', 'starforce-modal', 'loot-popup-modal'].forEach(id => { 
+    ['overlay', 'bulk-sell-modal', 'ticket-modal', 'book-modal', 'shop-modal', 'active-skills-modal', 'inventory-modal', 'equip-detail-modal', 'starforce-modal', 'loot-popup-modal', 'raid-lobby-overlay'].forEach(id => { 
         let el = document.getElementById(id); 
         if(el) el.style.display = 'none'; 
     }); 
@@ -387,11 +387,11 @@ window.summonUnit = () => {
     window.updateUI();
 };
 
-// 🔥 [신규] 스마트 일괄 합성 로직
+// 🔥 [수정] 스마트 일괄 합성 로직 - 유저 요청 포맷 텍스트 반영
 window.autoMerge = () => {
     if(state.status !== 'PREP' && state.status !== 'PLAY') return;
     let merged = true;
-    let mergeCount = 0;
+    let mergeLogs = {}; 
     
     while(merged) {
         merged = false;
@@ -409,7 +409,7 @@ window.autoMerge = () => {
             let type = parts[0];
             let gIdx = parseInt(parts[1]);
             
-            if (gIdx >= 8) continue; // 데스티니는 합성 불가
+            if (gIdx >= 8) continue; 
             
             let req = 5;
             if (gIdx >= 4 && gIdx <= 5) req = 4;
@@ -430,15 +430,27 @@ window.autoMerge = () => {
                 grid[targetIdx] = null;
                 window.addUnit(targetIdx, newGrade, type, true); 
                 
+                let logKey = `${type}_${gIdx}_${req}`;
+                mergeLogs[logKey] = (mergeLogs[logKey] || 0) + 1;
                 merged = true;
-                mergeCount++;
                 break; 
             }
         }
     }
     
-    if (mergeCount > 0) {
-        window.showMessage(`✨ ${mergeCount}번의 일괄 합성이 완료되었습니다!`);
+    // 🔥 포맷 변경: (직업) (등급) X유닛을 통해 (직업) (등급) 유닛으로 합성하였습니다.
+    if (Object.keys(mergeLogs).length > 0) {
+        let msg = "";
+        for (let k in mergeLogs) {
+            let parts = k.split('_');
+            let type = parts[0];
+            let gIdx = parseInt(parts[1]);
+            let req = parseInt(parts[2]);
+            let oldGrade = GRADES[gIdx].name;
+            let newGrade = GRADES[gIdx+1].name;
+            msg += `${type} ${oldGrade} ${req}유닛을 통해 ${type} ${newGrade} 유닛으로 합성하였습니다.<br>`;
+        }
+        window.showMessage(msg);
         renderGrid();
         window.updateUI();
     } else {
@@ -560,18 +572,36 @@ window.openActiveSkillsModal = () => {
 window.openInventoryModal = () => { document.getElementById('inventory-modal').style.display = 'block'; document.getElementById('overlay').style.display = 'block'; calculateEquipStats(); renderEquippedSlots(); renderInventoryTab('consumable'); };
 window.closeInventoryModal = () => { document.getElementById('inventory-modal').style.display = 'none'; document.getElementById('overlay').style.display = 'none'; };
 
+// 🔥 [완벽 픽스] 장착 슬롯 텍스트 하단, 이미지 상단 고정 (Flexbox column 방향 활용)
 function renderEquippedSlots() { 
     ['뱃지', '엠블럼', '링'].forEach(slot => { 
         let el = document.getElementById(`slot-${slot}`); 
+        el.style.position = 'relative';
+        el.style.display = 'flex';
+        el.style.flexDirection = 'column';
+        el.style.justifyContent = 'space-between';
+        el.style.alignItems = 'center';
+        el.style.height = '60px'; 
+        el.style.padding = '5px 0';
+        el.style.boxSizing = 'border-box';
+
         let item = userEquipped[slot]; 
         if (item) { 
             el.className = `equip-slot equip-${item.grade.toLowerCase()}`; 
-            let starStr = item.star > 0 ? `<div style="position:absolute; top:-10px; right:-10px; font-size:12px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${item.star}</div>` : '';
-            el.querySelector('.slot-item').innerHTML = `<div style="position:relative; display:flex; justify-content:center; align-items:center;">${starStr}${getEquipIcon(slot)}</div>`;
+            let starStr = item.star > 0 ? `<div style="position:absolute; top:-8px; right:-8px; font-size:12px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${item.star}</div>` : '';
+            el.innerHTML = `
+                <div class="slot-item" style="position:relative; transform:translateY(-2px);">
+                    ${starStr}${getEquipIcon(slot)}
+                </div>
+                <div class="slot-name" style="font-size:11px; font-weight:bold; color:#333; margin:0; line-height:1;">${slot}</div>
+            `;
             el.onclick = () => openEquipDetailModal(item, slot, true); 
         } else { 
             el.className = `equip-slot`; 
-            el.querySelector('.slot-item').innerHTML = ''; 
+            el.innerHTML = `
+                <div class="slot-item" style="flex:1;"></div>
+                <div class="slot-name" style="font-size:11px; font-weight:bold; color:#888; margin:0; line-height:1;">${slot}</div>
+            `;
             el.onclick = null;
         } 
     }); 
@@ -579,7 +609,7 @@ function renderEquippedSlots() {
 }
 
 function getEquipIcon(type) { 
-    let fileName = type === '뱃지' ? 'badge.png' : (type === '엠블럼' ? 'emblem.png' : 'ring.png'); 
+    let fileName = type === '뱃지' ? 'emblem.png' : (type === '엠블럼' ? 'badge.png' : 'ring.png'); 
     let size = type === '링' ? '30px' : '36px'; 
     return `<img src="image/${fileName}" style="width: ${size}; height: ${size}; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.4));">`; 
 }
@@ -615,8 +645,12 @@ window.renderInventoryTab = (tab) => {
         userEquips.forEach((eq, idx) => {
             let el = document.createElement('div'); el.className = `inv-item-box equip-${eq.grade.toLowerCase()}`; let statStr = "";
             if (eq.atk > 0) statStr = `공+${eq.atk}%`; else if (eq.spd > 0) statStr = `속+${eq.spd}%`; else if (eq.crit > 0) statStr = `크+${eq.crit}%`;
-            let starStr = eq.star > 0 ? `<div style="position:absolute; top:-10px; right:-10px; font-size:12px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${eq.star}</div>` : '';
-            el.innerHTML = `<div style="position:relative; display:flex; justify-content:center; align-items:center; height:36px; margin-top:4px;">${starStr}${getEquipIcon(eq.type)}</div><div style="font-size:10px; font-weight:bold; margin-top:2px; color:#37474f; text-align:center;">${statStr}</div>`; 
+            let starStr = eq.star > 0 ? `<div style="position:absolute; top:-10px; right:-10px; font-size:11px; color:#ffeb3b; font-weight:900; text-shadow:1px 1px 2px #000; z-index:10;">★${eq.star}</div>` : '';
+            // 🔥 인벤토리 내부 장비도 Flex로 강제 정렬하여 글씨 겹침 해결
+            el.innerHTML = `<div style="display:flex; flex-direction:column; justify-content:space-between; align-items:center; height:100%; width:100%;">
+                                <div style="position:relative; display:inline-block; margin-top:2px;">${starStr}${getEquipIcon(eq.type)}</div>
+                                <div style="font-size:10px; font-weight:bold; color:#37474f; text-align:center; line-height:1; margin-bottom:2px;">${statStr}</div>
+                            </div>`; 
             el.onclick = () => openEquipDetailModal(eq, idx, false); 
             list.appendChild(el);
         });
@@ -859,13 +893,37 @@ window.executeStarForce = () => {
 };
 
 // ==========================================
-// 7. 월드 보스 레이드 시스템
+// 7. 월드 보스 레이드 시스템 (🔥 로비 및 랭킹 추가)
 // ==========================================
-window.openRaidMenu = () => {
-    let today = new Date().toLocaleDateString(); let lastRaidDate = localStorage.getItem('mapleDefenseRaidDate');
-    if (lastRaidDate === today) { window.showMessage('오늘 이미 월드 보스 토벌에 참여하셨습니다.'); return; }
+window.openRaidLobby = () => {
     if (!currentUserUid) { window.showMessage("로그인이 필요한 서비스입니다."); return; }
+    document.getElementById('raid-lobby-overlay').style.display = 'flex';
+    document.getElementById('raid-lobby-modal').style.display = 'block';
+    document.getElementById('raid-ranking-modal').style.display = 'none';
+    document.getElementById('ui-raid-hp').innerText = "불러오는 중...";
+    
+    onValue(ref(database, 'worldBoss/hp'), (snap) => {
+        if(snap.exists()) {
+            let hp = snap.val();
+            document.getElementById('ui-raid-hp').innerText = Math.floor(hp).toLocaleString();
+        } else {
+            document.getElementById('ui-raid-hp').innerText = "7,000,000";
+        }
+    }, { onlyOnce: true });
+};
 
+window.openRaidMenu = window.openRaidLobby;
+
+window.closeRaidLobby = () => {
+    document.getElementById('raid-lobby-overlay').style.display = 'none';
+};
+
+window.startRaidGame = () => {
+    let today = new Date().toLocaleDateString(); 
+    let lastRaidDate = localStorage.getItem('mapleDefenseRaidDate');
+    if (lastRaidDate === today) { window.showMessage('오늘 이미 월드 보스 토벌에 참여하셨습니다.'); return; }
+
+    window.closeRaidLobby();
     localStorage.setItem('mapleDefenseRaidDate', today); window.syncToCloud();
     document.getElementById('start-screen').style.display = 'none'; document.getElementById('raid-game').style.display = 'flex';
     
@@ -882,6 +940,32 @@ window.openRaidMenu = () => {
         }
     });
     raidLoop();
+};
+
+window.showRaidRanking = async () => {
+    document.getElementById('raid-lobby-modal').style.display = 'none'; 
+    document.getElementById('raid-ranking-modal').style.display = 'flex';
+    let list = document.getElementById('raid-ranking-list'); 
+    list.innerHTML = '<div style="text-align:center; padding:20px; color:#fff;">순위를 불러오는 중...</div>';
+    try {
+        const snap = await get(child(ref(database), `worldBoss_rankings`));
+        if (snap.exists()) {
+            let ranks = []; 
+            snap.forEach(c => { let v = c.val(); if(typeof v.damage === 'number') ranks.push(v); }); 
+            ranks.sort((a, b) => b.damage - a.damage); 
+            ranks = ranks.slice(0, 50); 
+            list.innerHTML = '';
+            ranks.forEach((entry, idx) => { 
+                let color = idx === 0 ? '#ffd700' : (idx === 1 ? '#e0e0e0' : (idx === 2 ? '#cd7f32' : '#fff')); 
+                list.innerHTML += `<div style="display:flex; justify-content:space-between; background:rgba(255,255,255,0.1); padding:10px; border-radius:6px; color:${color}; font-weight:bold;"><span>${idx + 1}위 - ${entry.nickname}</span><span>${entry.damage.toLocaleString()} <span style="font-size:10px; color:#aaa;">(${entry.date})</span></span></div>`; 
+            });
+        } else list.innerHTML = '<div style="text-align:center; padding:20px; color:#fff;">아직 등록된 순위가 없습니다.</div>';
+    } catch(e) { list.innerHTML = '<div style="text-align:center; color:#ff5252;">서버 연결 실패.</div>'; }
+};
+
+window.closeRaidRanking = () => {
+    document.getElementById('raid-ranking-modal').style.display = 'none';
+    document.getElementById('raid-lobby-modal').style.display = 'block';
 };
 
 window.summonRaidUnit = () => {
@@ -1061,9 +1145,22 @@ function endRaidGame() {
             rewardMsg = `🎁 기여도 보상: ${rewardTier} 상자 1개 지급 완료!`; 
         }
         
-        window.syncToCloud();
-        document.getElementById('raid-result-dmg').innerText = Math.floor(raidState.totalDmg).toLocaleString(); document.getElementById('raid-result-percent').innerText = percent.toFixed(2) + "%"; document.getElementById('raid-result-rewards').innerText = rewardMsg;
-        document.getElementById('raid-result-overlay').style.display = 'block'; document.getElementById('raid-result-modal').style.display = 'block';
+        let myRankRef = ref(database, `worldBoss_rankings/${currentUserUid}`);
+        get(myRankRef).then(snap => {
+            let accDmg = raidState.totalDmg;
+            if(snap.exists() && snap.val().damage) {
+                accDmg += snap.val().damage;
+            }
+            set(myRankRef, {
+                nickname: currentUserName,
+                damage: accDmg,
+                date: new Date().toLocaleDateString()
+            });
+        }).then(() => {
+            window.syncToCloud();
+            document.getElementById('raid-result-dmg').innerText = Math.floor(raidState.totalDmg).toLocaleString(); document.getElementById('raid-result-percent').innerText = percent.toFixed(2) + "%"; document.getElementById('raid-result-rewards').innerText = rewardMsg;
+            document.getElementById('raid-result-overlay').style.display = 'block'; document.getElementById('raid-result-modal').style.display = 'block';
+        });
     };
     
     if (raidState.pendingDmg > 0) {
@@ -1221,7 +1318,7 @@ function processOpponentTick(dt) {
                         let baseDmg = (t.cls.baseDmg + oppEquipStats.flatAtk) * t.grade.mult * cardMulti * rageMulti;
                         if (t.cls.type === '전사' && oppSkillLevels.war_death > 0) { let gdmg = baseDmg * (1.5 + oppSkillLevels.war_death * 1.5); oppVisualEffects.push({ type: 'death', timer: 1.2, dmg: gdmg }); t.globalCooldown += 60000; }
                         else if (t.cls.type === '법사' && oppSkillLevels.mage_thunder > 0) { let gdmg = baseDmg * (1.5 + oppSkillLevels.mage_thunder * 1.5); oppVisualEffects.push({ type: 'thunder', timer: 0.5, dmg: gdmg }); t.globalCooldown += 60000; }
-                        else if (t.cls.type === '도적' && oppSkillLevels.thief_fuma > 0) { let gdmg = baseDmg * (1.5 + oppSkillLevels.thief_fuma * 1.5); oppFumaList.push({ x: t.x, y: t.y, targetNode: 0, nodesVisited: 0, dmg: gdmg, hitSet: new Set(), angle: 0 }); t.globalCooldown += 60000; }
+                        else if (t.cls.type === '도적' && oppSkillLevels.thief_fuma > 0) { let gdmg = baseDmg * (1.5 + skillLevels.thief_fuma * 1.5); oppFumaList.push({ x: t.x, y: t.y, targetNode: 0, nodesVisited: 0, dmg: gdmg, hitSet: new Set(), angle: 0 }); t.globalCooldown += 60000; }
                     } else {
                         t.globalCooldown = 0;
                     }
@@ -1699,7 +1796,6 @@ window.loop = () => {
                 if (t.globalCooldown <= 0) {
                     if (monsters.length > 0) {
                         let baseDmg = (t.cls.baseDmg + (state.upgrades[t.cls.type].val * 0.15) + equipStats.flatAtk) * t.grade.mult * cardMulti * rageMulti; 
-                        // 🔥 광역기 딜량 300% ~ 900% 정상화
                         if (t.cls.type === '전사' && skillLevels.war_death > 0) { let gdmg = baseDmg * (1.5 + skillLevels.war_death * 1.5); visualEffects.push({ type: 'death', timer: 1.2, dmg: gdmg }); t.globalCooldown += 60000; if(state.isRank && state.isBoss) rankState.myBossDamage += gdmg; }
                         else if (t.cls.type === '법사' && skillLevels.mage_thunder > 0) { let gdmg = baseDmg * (1.5 + skillLevels.mage_thunder * 1.5); visualEffects.push({ type: 'thunder', timer: 0.5, dmg: gdmg }); t.globalCooldown += 60000; if(state.isRank && state.isBoss) rankState.myBossDamage += gdmg; }
                         else if (t.cls.type === '도적' && skillLevels.thief_fuma > 0) { let gdmg = baseDmg * (1.5 + skillLevels.thief_fuma * 1.5); fumaList.push({ x: t.x, y: t.y, targetNode: 0, nodesVisited: 0, dmg: gdmg, hitSet: new Set(), angle: 0 }); t.globalCooldown += 60000; }
@@ -1739,7 +1835,6 @@ window.loop = () => {
             if (p.gradeIdx >= 6) { hitEffects.push({ x: p.tx, y: p.ty, timer: 0.2, color: p.color }); }
             if(monsters.includes(p.target)) {
                 let hitDmg = p.dmg; if (p.type === '전사' && p.target.isBoss) hitDmg *= 1.5; p.target.hp -= hitDmg; if(state.isRank && p.target.isBoss) rankState.myBossDamage += hitDmg;
-                // 🔥 데미지 텍스트 Y좌표 상향 (-35)
                 if (p.isCrit) damageTexts.push({ val: Math.floor(hitDmg), x: p.target.x, y: p.target.y - 35, timer: 0.8 });
                 if (p.type === '전사' && Math.random() < 0.2) p.target.stunTimer = 1;
                 if (p.type === '법사' && skillLevels.mage_freeze > 0 && Math.random() < ((10 + skillLevels.mage_freeze * 2) / 100)) { if (p.target.freezeTimer <= 0) { p.target.freezeTimer = 3; p.target.freezeTickTimer = 1; p.target.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][skillLevels.mage_freeze - 1]; } }
@@ -1748,7 +1843,6 @@ window.loop = () => {
                 monsters.forEach(m => {
                     if(m !== p.target && Math.hypot(m.x - p.tx, m.y - p.ty) <= p.splash) {
                         let splashDmg = p.dmg; if (p.type === '전사' && m.isBoss) splashDmg *= 1.5; m.hp -= splashDmg; if(state.isRank && m.isBoss) rankState.myBossDamage += splashDmg;
-                        // 🔥 스플래시 데미지 텍스트 Y좌표 상향 (-35)
                         if (p.isCrit) damageTexts.push({ val: Math.floor(splashDmg), x: m.x, y: m.y - 35, timer: 0.8 });
                         if (p.type === '전사' && Math.random() < 0.2) m.stunTimer = 1;
                         if (p.type === '법사' && skillLevels.mage_freeze > 0 && Math.random() < ((10 + skillLevels.mage_freeze * 2) / 100)) { if (m.freezeTimer <= 0) { m.freezeTimer = 3; m.freezeTickTimer = 1; m.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][skillLevels.mage_freeze - 1]; } }
