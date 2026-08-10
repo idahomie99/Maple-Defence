@@ -309,13 +309,13 @@ function getBossInfo(w) {
         
         if (w > 150) {
             let overN = (w - 150) / 5;
-            calculatedHp = calculatedHp * Math.pow(1.05, overN);
+            // 🔥 기존 1.05 (5%) 였던 복리 수치를 1.07 (7%) 로 상향!
+            calculatedHp = calculatedHp * Math.pow(1.07, overN);
         }
 
         let bName = BOSS_WAVES[w] ? BOSS_WAVES[w].name : (w % 10 === 5 ? "어둠의 늑대" : `심연의 보스 (${w}층)`); 
         let bMeso = BOSS_WAVES[w] ? BOSS_WAVES[w].meso : (w >= 160 ? 200 : 150); 
         
-        // 🔥 100층 이상의 심연의 보스들은 설정값이 없다면 기본적으로 5차 선택권 1장 지급!
         let bTier = BOSS_WAVES[w] ? BOSS_WAVES[w].tier : 5; 
         let bCount = BOSS_WAVES[w] ? BOSS_WAVES[w].count : 1; 
         
@@ -370,7 +370,11 @@ window.autoMerge = () => {
         for(let i = 0; i < grid.length; i++) { if(!grid[i]) continue; let key = grid[i].cls.type + '_' + grid[i].gradeIdx; if(!counts[key]) counts[key] = []; counts[key].push(i); }
         for(let key in counts) {
             let parts = key.split('_'); let type = parts[0]; let gIdx = parseInt(parts[1]); if (gIdx >= 8) continue; 
-            let req = 5; if (gIdx >= 4 && gIdx <= 5) req = 4; if (gIdx >= 6 && gIdx <= 7) req = 3;
+            
+            // 🔥 4차 이상부터는 무조건 4마리를 요구하도록 빡빡하게 변경! (기존 6,7차는 3마리였음)
+            let req = 5; 
+            if (gIdx >= 4) req = 4; 
+            
             if (counts[key].length >= req) {
                 let toMerge = counts[key].slice(0, req); let targetIdx = toMerge[0];
                 for(let j = 1; j < req; j++) { let idx = toMerge[j]; towers = towers.filter(t => t !== grid[idx]); grid[idx] = null; }
