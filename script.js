@@ -593,17 +593,19 @@ window.openRaidLobby = () => {
     if(hpText) hpText.innerText = "불러오는 중...";
     
     onValue(ref(database, 'worldBoss'), (snap) => {
-        let maxHp = 7000000;
+        let baseMaxHp = 7000000;
         if(snap.exists()) {
             let val = snap.val();
-            let hp = typeof val === 'number' ? val : (val.hp !== undefined ? val.hp : maxHp);
-            if(isNaN(hp)) hp = maxHp;
-            let percent = (hp / maxHp) * 100;
+            // 🔥 DB에 저장된 진화된 최대 체력 불러오기 (없으면 700만)
+            let currentMaxHp = (val && val.maxHp) ? val.maxHp : baseMaxHp;
+            let hp = typeof val === 'number' ? val : (val.hp !== undefined ? val.hp : currentMaxHp);
+            if(isNaN(hp)) hp = currentMaxHp;
+            let percent = (hp / currentMaxHp) * 100;
             if(hpBar) hpBar.style.width = `${Math.max(0, percent)}%`;
-            if(hpText) hpText.innerText = `${Math.round(hp).toLocaleString()} / ${maxHp.toLocaleString()}`;
+            if(hpText) hpText.innerText = `${Math.round(hp).toLocaleString()} / ${currentMaxHp.toLocaleString()}`;
         } else {
             if(hpBar) hpBar.style.width = `100%`;
-            if(hpText) hpText.innerText = `${maxHp.toLocaleString()} / ${maxHp.toLocaleString()}`;
+            if(hpText) hpText.innerText = `${baseMaxHp.toLocaleString()} / ${baseMaxHp.toLocaleString()}`;
         }
     });
 };
@@ -631,8 +633,12 @@ window.startRaidGame = () => {
     onValue(ref(database, 'worldBoss'), (snap) => {
         if(snap.exists()) {
             let val = snap.val();
-            raidState.bossHp = typeof val === 'number' ? val : (val.hp !== undefined ? val.hp : 7000000);
-            if(isNaN(raidState.bossHp)) raidState.bossHp = 7000000;
+            // 🔥 DB에서 현재 최대 체력을 불러와 로컬 상태(raidState)에 동기화
+            let currentMaxHp = (val && val.maxHp) ? val.maxHp : 7000000;
+            raidState.maxHp = currentMaxHp; 
+            raidState.bossHp = typeof val === 'number' ? val : (val.hp !== undefined ? val.hp : currentMaxHp);
+            if(isNaN(raidState.bossHp)) raidState.bossHp = currentMaxHp;
+            
             let percent = (raidState.bossHp / raidState.maxHp) * 100;
             document.getElementById('raid-boss-hp-bar').style.width = `${Math.max(0, percent)}%`; 
             document.getElementById('raid-boss-hp-text').innerText = `${Math.max(0, Math.round(raidState.bossHp)).toLocaleString()} / ${raidState.maxHp.toLocaleString()}`;
@@ -694,17 +700,21 @@ setInterval(() => {
         
         runTransaction(ref(database, 'worldBoss'), (data) => {
             let bossData = data;
-            if (typeof bossData === 'number') bossData = { hp: bossData, killCount: 0, lastKillerUid: null };
-            if (!bossData || typeof bossData !== 'object') bossData = { hp: 7000000, killCount: 0, lastKillerUid: null };
+            if (typeof bossData === 'number') bossData = { hp: bossData, maxHp: 7000000, killCount: 0, lastKillerUid: null };
+            if (!bossData || typeof bossData !== 'object') bossData = { hp: 7000000, maxHp: 7000000, killCount: 0, lastKillerUid: null };
             
-            if (typeof bossData.hp !== 'number' || isNaN(bossData.hp)) bossData.hp = 7000000;
+            let currentMax = bossData.maxHp || 7000000;
+            if (typeof bossData.hp !== 'number' || isNaN(bossData.hp)) bossData.hp = currentMax;
             let dmg = (typeof dmgToApply === 'number' && !isNaN(dmgToApply)) ? Math.round(dmgToApply) : 0;
             
             bossData.hp -= dmg;
             
             if (bossData.hp <= 0) { 
-                bossData.hp = 7000000; 
                 bossData.killCount = (bossData.killCount || 0) + 1; 
+                // 🔥 처치 수 비례 10% 복리 최대 체력 계산 및 갱신
+                let nextMaxHp = Math.floor(7000000 * Math.pow(1.1, bossData.killCount));
+                bossData.maxHp = nextMaxHp;
+                bossData.hp = nextMaxHp; 
                 bossData.lastKillerUid = currentUserUid; 
             }
             return bossData;
@@ -875,7 +885,8 @@ function endRaidGame() {
     raidState.active = false; 
     cancelAnimationFrame(raidReqId);
 
-    let percent = (raidState.totalDmg / 7000000) * 100; 
+    // 🔥 700만 고정값 대신 현재 진화된 보스의 최대 체력을 기준으로 기여도 계산!
+    let percent = (raidState.totalDmg / raidState.maxHp) * 100; 
     let rewardTier = '';
     if (percent <= 5) rewardTier = '브론즈'; 
     else if (percent <= 10) rewardTier = '실버'; 
@@ -923,16 +934,20 @@ function endRaidGame() {
         raidState.pendingDmg = 0;
         runTransaction(ref(database, 'worldBoss'), (data) => {
             let bossData = data;
-            if (typeof bossData === 'number') bossData = { hp: bossData, killCount: 0, lastKillerUid: null };
-            if (!bossData || typeof bossData !== 'object') bossData = { hp: 7000000, killCount: 0, lastKillerUid: null };
+            if (typeof bossData === 'number') bossData = { hp: bossData, maxHp: 7000000, killCount: 0, lastKillerUid: null };
+            if (!bossData || typeof bossData !== 'object') bossData = { hp: 7000000, maxHp: 7000000, killCount: 0, lastKillerUid: null };
             
-            if (typeof bossData.hp !== 'number' || isNaN(bossData.hp)) bossData.hp = 7000000;
+            let currentMax = bossData.maxHp || 7000000;
+            if (typeof bossData.hp !== 'number' || isNaN(bossData.hp)) bossData.hp = currentMax;
             let dmg = (typeof dmgToApply === 'number' && !isNaN(dmgToApply)) ? Math.round(dmgToApply) : 0;
             
             bossData.hp -= dmg;
             if (bossData.hp <= 0) { 
-                bossData.hp = 7000000; 
                 bossData.killCount = (bossData.killCount || 0) + 1; 
+                // 🔥 처치 수 비례 10% 복리 최대 체력 계산 및 갱신
+                let nextMaxHp = Math.floor(7000000 * Math.pow(1.1, bossData.killCount));
+                bossData.maxHp = nextMaxHp;
+                bossData.hp = nextMaxHp; 
                 bossData.lastKillerUid = currentUserUid; 
             }
             return bossData;
