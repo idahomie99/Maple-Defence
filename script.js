@@ -410,7 +410,12 @@ function renderGrid() {
 
 function renderOppGrid() { let oppGridContainer = document.getElementById('opp-grid-container'); if(!oppGridContainer) return; let cells = oppGridContainer.children; if(!cells || cells.length === 0) return; for(let i=0; i<oppGrid.length; i++) { let u = oppGrid[i]; cells[i].className = 'grid-cell'; if(u) { if (u.gradeIdx === 6) cells[i].classList.add('glow-6'); if (u.gradeIdx === 7) cells[i].classList.add('glow-7'); if (u.gradeIdx === 8) cells[i].classList.add('glow-8'); cells[i].innerHTML = `<div style="font-size:18px; text-shadow:1px 1px 2px rgba(0,0,0,0.5);">${u.cls.icon}</div><div style="color:${u.cls.color}; font-size:9px; margin-top:2px;">${u.grade.name}</div>`; } else { cells[i].innerHTML = ''; } } }
 function spawnMonster() { let bInfo = getBossInfo(state.wave); let hpBase = bInfo ? bInfo.hp : Math.floor(state.wave * 60 + Math.pow(state.wave, 1.5) * 12); monsters.push({ hp: hpBase, maxHp: hpBase, x: currentPath[0].x, y: currentPath[0].y, targetNode: 1, speed: bInfo ? 25 : 50, isBoss: !!bInfo, bindTimer: 0, stunTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0, name: bInfo ? bInfo.name : null, facingRight: true }); }
-window.skipBossRound = () => { waveTimer = 150; document.getElementById('boss-skip-wrapper').style.display = 'none'; };
+window.skipBossRound = () => { 
+    waveTimer = 150; 
+    // 🔥 랭크 게임일 경우 상대방 타이머도 같이 스킵 처리!
+    if (state.isRank) { oppWaveTimer = 150; } 
+    document.getElementById('boss-skip-wrapper').style.display = 'none'; 
+};
 function updateWave(dt) { waveTimer += dt; spawnTimer += dt; let limit = state.isBoss ? 150 : 60; if(waveTimer >= limit) { nextWave(); return; } if(!state.isBoss && spawnTimer >= 1.5) { spawnMonster(); spawnTimer = 0; } document.getElementById('ui-timer').innerText = Math.max(0, limit - Math.floor(waveTimer)); }
 function nextWave() { document.getElementById('boss-skip-wrapper').style.display = 'none'; if(state.isBoss && monsters.some(m => m.isBoss)) { if(state.isRank) return handleRankGameOver("보스 사냥 실패!"); else return gameOver("보스 처치 실패!"); } state.wave++; waveTimer = 0; spawnTimer = 0; let bInfo = getBossInfo(state.wave); state.isBoss = !!bInfo; if (!state.isRank && state.wave > bestWave) { bestWave = state.wave; localStorage.setItem('mapleDefenseBestWave', bestWave); document.getElementById('ui-best-wave').innerText = bestWave; if (currentUserUid) window.syncToCloud(); } if(state.isBoss) { spawnMonster(); } window.updateUI(); }
 function showUpgradeToast(idChar, amt) { let box = document.getElementById(`upg-${idChar}-box`); let floatEl = document.createElement('div'); floatEl.className = 'upgrade-toast'; floatEl.innerText = '+' + amt; box.appendChild(floatEl); setTimeout(() => floatEl.remove(), 1000); }
@@ -1216,7 +1221,15 @@ function drawPk() {
 }
 
 window.updateUI = () => {
-    let skipWrapper = document.getElementById('boss-skip-wrapper'); if (state.isBoss && monsters.length === 0 && waveTimer > 0 && !state.isRank) skipWrapper.style.display = 'flex'; else skipWrapper.style.display = 'none';
+    let skipWrapper = document.getElementById('boss-skip-wrapper'); 
+    
+    // 🔥 모험 모드거나, 랭크 게임인데 내 필드와 상대 필드 모두 몹이 0마리일 때 스킵 버튼 노출!
+    if (state.isBoss && monsters.length === 0 && waveTimer > 0 && (!state.isRank || (state.isRank && oppMonsters.length === 0))) {
+        skipWrapper.style.display = 'flex'; 
+    } else {
+        skipWrapper.style.display = 'none';
+    }
+    
     document.getElementById('ui-meso').innerText = state.meso; document.getElementById('ui-mp').innerText = state.mp; document.getElementById('ui-wave').innerText = state.wave; document.getElementById('ui-kills').innerText = state.kills.toLocaleString(); document.getElementById('ui-tickets').innerText = state.tickets.length; document.getElementById('btn-summon').disabled = (state.meso < 10);
     
     let guideEl = document.getElementById('early-guide'); if (guideEl) { if (state.wave <= 10 && !state.isRank) guideEl.style.display = 'block'; else guideEl.style.display = 'none'; }
