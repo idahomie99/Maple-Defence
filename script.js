@@ -258,7 +258,26 @@ onAuthStateChanged(auth, async (user) => {
             calculateEquipStats();
 
             if (cloud.skills) { localStorage.setItem('mapleDefenseSkills', cloud.skills); skillLevels = { ...DEFAULT_SKILLS, ...JSON.parse(cloud.skills) }; }
-            if (cloud.cards) { localStorage.setItem('mapleDefenseCards', cloud.cards); cardData = JSON.parse(cloud.cards); }
+            if (cloud.cards) { 
+                localStorage.setItem('mapleDefenseCards', cloud.cards); 
+                cardData = JSON.parse(cloud.cards); 
+                
+                // 🔥 과거 심연의 보스 카드를 신규 군단장으로 자동 변환 (마이그레이션)
+                const bossMigrationMap = { "심연의 보스 (160층)": "스우", "심연의 보스 (170층)": "데미안", "심연의 보스 (180층)": "루시드", "심연의 보스 (190층)": "윌", "심연의 보스 (200층)": "가디언엔젤슬라임" };
+                let migrated = false;
+                for (let oldName in bossMigrationMap) {
+                    if (cardData[oldName]) {
+                        let newName = bossMigrationMap[oldName];
+                        if (!cardData[newName]) { cardData[newName] = { ...cardData[oldName] }; } 
+                        else { 
+                            cardData[newName].owned += cardData[oldName].owned; 
+                            cardData[newName].grade = Math.max(cardData[newName].grade, cardData[oldName].grade); 
+                        }
+                        delete cardData[oldName]; migrated = true;
+                    }
+                }
+                if (migrated) { localStorage.setItem('mapleDefenseCards', JSON.stringify(cardData)); window.syncToCloud(); }
+            }
             if (cloud.coins) { localStorage.setItem('mapleDefenseSpentCoins', cloud.coins); spentCoins = parseInt(cloud.coins); }
             
             if (cloudBest >= localBest || !localStorage.getItem('mapleDefenseSave')) {

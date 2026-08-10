@@ -169,3 +169,31 @@ canvas { width: 100%; height: 100%; position: absolute; top: 0; left: 0; pointer
     text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 0 4px 8px rgba(0,0,0,0.5);
     z-index: 1200; pointer-events: none; text-align: center; width: 100%;
 }
+
+/* =========================================
+   인벤토리 아이템 및 장비 슬롯 디자인 
+   ========================================= */
+.equip-slot {
+    width: 65px; height: 65px; background: #fff; border: 2px dashed #90a4ae; border-radius: 8px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); transition: transform 0.1s;
+}
+.equip-slot:active { transform: scale(0.95); }
+.equip-slot.equip-rare { border: 2px solid #42a5f5; background: #e3f2fd; }
+.equip-slot.equip-epic { border: 2px solid #ab47bc; background: #f3e5f5; }
+.equip-slot.equip-unique { border: 2px solid #ffa726; background: #fff3e0; }
+.equip-slot.equip-legendary { border: 2px solid #ef5350; background: #ffebee; }
+
+.inv-item-box {
+    background: #fff; border: 2px solid #b0bec5; border-radius: 8px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 8px 4px; cursor: pointer; height: 75px;
+    box-shadow: 0 3px 0 #cfd8dc; transition: transform 0.1s, box-shadow 0.1s;
+}
+.inv-item-box:active { transform: translateY(3px); box-shadow: 0 0 0 #cfd8dc; }
+.inv-item-icon { font-size: 24px; margin-bottom: 2px; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.3)); }
+.inv-item-qty { font-size: 14px; font-weight: 800; color: #37474f; }
+.inv-item-box.equip-rare { border-color: #42a5f5; background: #e3f2fd; }
+.inv-item-box.equip-epic { border-color: #ab47bc; background: #f3e5f5; }
+.inv-item-box.equip-unique { border-color: #ffa726; background: #fff3e0; }
+.inv-item-box.equip-legendary { border-color: #ef5350; background: #ffebee; }
