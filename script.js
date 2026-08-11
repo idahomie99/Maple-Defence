@@ -1451,6 +1451,18 @@ window.draw = () => {
 
     if (selectedUnitIdx !== -1 && grid[selectedUnitIdx]) { let u = grid[selectedUnitIdx]; let attackRange = u.cls.range * u.grade.rangeMul; ctx.save(); ctx.beginPath(); ctx.arc(u.x, u.y, attackRange, 0, Math.PI * 2); ctx.fillStyle = "rgba(255, 255, 255, 0.15)"; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = "rgba(255, 235, 59, 0.6)"; ctx.stroke(); ctx.restore(); }
 
+    // 🔥 내 유닛 기절(레디투다이 페널티) 이펙트 표시
+    towers.forEach(t => {
+        if (t.unitStunTimer > 0) {
+            ctx.save();
+            ctx.font = "bold 20px Arial";
+            ctx.fillStyle = "yellow";
+            ctx.textAlign = "center";
+            ctx.fillText("💫", t.x, t.y - 25);
+            ctx.restore();
+        }
+    });
+
     monsters.forEach(m => {
         let size = m.isBoss ? 25 : 12; ctx.save(); ctx.translate(m.x, m.y); if (m.facingRight) ctx.scale(-1, 1);
         if (m.isBoss && bossImages[m.name] && bossImages[m.name].complete) { ctx.drawImage(bossImages[m.name], -size*1.5, -size*1.5, size*3, size*3); } 
@@ -1496,6 +1508,18 @@ window.drawOpp = () => {
     oppCtx.moveTo(currentPath[0].x, currentPath[0].y);
     for(let i=1; i<currentPath.length; i++) oppCtx.lineTo(currentPath[i].x, currentPath[i].y);
     oppCtx.closePath(); oppCtx.stroke();
+
+    // 🔥 상대 유닛 기절(레디투다이 페널티) 이펙트 표시
+    oppTowers.forEach(t => {
+        if (t.unitStunTimer > 0) {
+            oppCtx.save();
+            oppCtx.font = "bold 16px Arial";
+            oppCtx.fillStyle = "yellow";
+            oppCtx.textAlign = "center";
+            oppCtx.fillText("💫", t.x, t.y - 20);
+            oppCtx.restore();
+        }
+    });
 
     oppMonsters.forEach(m => {
         let size = m.isBoss ? 15 : 8; oppCtx.save(); oppCtx.translate(m.x, m.y); if (m.facingRight) oppCtx.scale(-1, 1);
