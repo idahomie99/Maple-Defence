@@ -1090,8 +1090,8 @@ window.startRankMatchmaking = async () => {
 
 function enterRankGameAI(oppName, oppRp) {
     document.getElementById('rank-overlay').style.display = 'none'; 
-    rankState = { active: true, wolfSentBlocks: {}, oppWolfSentBlocks: {} }; // 🔥 늑대 전송 기록 초기화
-    setGridMode('RANK'); 
+    rankState = { active: true, blockWinner: {} }; // 🔥 개별 기록 대신 '우승자 단일 기록'으로 변경
+    setGridMode('RANK');
     
     // 🔥 랭크 게임 자원 50메소 고정 (5마리)
     state = { status: 'PREP', meso: 50, mp: 0, mpTotal: 0, kills: 0, wave: 1, time: 5, speed: 15, isBoss: false, upgrades: { '전사': {val: 0, cost: 10}, '법사': {val: 0, cost: 10}, '도적': {val: 0, cost: 10} }, tickets: [], isRank: true };
@@ -1199,9 +1199,9 @@ function processOpponentTick(dt) {
     if (oppMonsters.length === 0) {
         let oppClearedBlock = Math.floor((oppState.wave - 1) / 10);
         if (oppClearedBlock > 0) {
-            if (!rankState.oppWolfSentBlocks) rankState.oppWolfSentBlocks = {};
-            if (!rankState.oppWolfSentBlocks[oppClearedBlock]) {
-                rankState.oppWolfSentBlocks[oppClearedBlock] = true;
+            if (!rankState.blockWinner) rankState.blockWinner = {};
+            if (!rankState.blockWinner[oppClearedBlock]) { // 🔥 아무도 아직 늑대를 안 보냈다면
+                rankState.blockWinner[oppClearedBlock] = 'opp'; // 상대방이 선점!
                 let wolfHp = Math.floor(100000 * Math.pow(1.5, oppClearedBlock)); 
                 monsters.push({ hp: wolfHp, maxHp: wolfHp, x: currentPath[0].x, y: currentPath[0].y, targetNode: 1, speed: 25, isBoss: true, bindTimer: 0, stunTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0, name: "어둠의 늑대", facingRight: true, threatTimer: 0, counterTimer: 5 });
                 window.showMessage(`☠️ 상대방이 ${oppClearedBlock * 10}웨이브를 먼저 클리어하여 늑대가 난입했습니다!`);
@@ -1652,9 +1652,9 @@ window.loop = () => {
     if (state.isRank && monsters.length === 0) {
         let clearedBlock = Math.floor((state.wave - 1) / 10);
         if (clearedBlock > 0) {
-            if (!rankState.wolfSentBlocks) rankState.wolfSentBlocks = {};
-            if (!rankState.wolfSentBlocks[clearedBlock]) {
-                rankState.wolfSentBlocks[clearedBlock] = true;
+            if (!rankState.blockWinner) rankState.blockWinner = {};
+            if (!rankState.blockWinner[clearedBlock]) { // 🔥 아무도 아직 늑대를 안 보냈다면
+                rankState.blockWinner[clearedBlock] = 'player'; // 내가 선점!
                 let wolfHp = Math.floor(100000 * Math.pow(1.5, clearedBlock)); 
                 oppMonsters.push({ hp: wolfHp, maxHp: wolfHp, x: currentPath[0].x, y: currentPath[0].y, targetNode: 1, speed: 25, isBoss: true, bindTimer: 0, stunTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0, name: "어둠의 늑대", facingRight: true, threatTimer: 0, counterTimer: 5 });
                 window.showMessage(`🔥 ${clearedBlock * 10}웨이브 클리어! 상대에게 어둠의 늑대를 보냈습니다!`);
