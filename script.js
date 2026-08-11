@@ -1197,10 +1197,17 @@ function processOpponentTick(dt) {
     }
     
     if (oppMonsters.length === 0) {
-        let oppClearedBlock = Math.floor((oppState.wave - 1) / 10);
+        let oppClearedBlock = 0;
+        // 🔥 10단위 웨이브의 마지막 몹(58.5초)이 나온 이후 다 잡았다면 즉시 클리어!
+        if (oppState.wave % 10 === 0 && oppWaveTimer >= 58.5) {
+            oppClearedBlock = oppState.wave / 10;
+        } else if (oppState.wave % 10 !== 0) {
+            oppClearedBlock = Math.floor((oppState.wave - 1) / 10);
+        }
+
         if (oppClearedBlock > 0) {
             if (!rankState.blockWinner) rankState.blockWinner = {};
-            if (!rankState.blockWinner[oppClearedBlock]) { // 🔥 아무도 아직 늑대를 안 보냈다면
+            if (!rankState.blockWinner[oppClearedBlock]) {
                 rankState.blockWinner[oppClearedBlock] = 'opp'; // 상대방이 선점!
                 let wolfHp = Math.floor(100000 * Math.pow(1.5, oppClearedBlock)); 
                 monsters.push({ hp: wolfHp, maxHp: wolfHp, x: currentPath[0].x, y: currentPath[0].y, targetNode: 1, speed: 25, isBoss: true, bindTimer: 0, stunTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0, name: "어둠의 늑대", facingRight: true, threatTimer: 0, counterTimer: 5 });
@@ -1648,12 +1655,45 @@ window.loop = () => {
         }
     }
 
-    // 🔥 랭크 게임: 1~10 단위 블록 몬스터 선클리어 시 늑대 전송 로직
+    // 🔥 상대 필드의 몹이 죽었을 때 핑퐁 로직
+    for(let i=oppMonsters.length-1; i>=0; i--) { 
+        if(oppMonsters[i].hp <= 0) {
+            oppMonsters.splice(i, 1); 
+        } 
+    }
+    
+    // 🔥 상대방 0마리 체크 (58.5초 적용)
+    if (oppMonsters.length === 0) {
+        let oppClearedBlock = 0;
+        if (oppState.wave % 10 === 0 && oppWaveTimer >= 58.5) {
+            oppClearedBlock = oppState.wave / 10;
+        } else if (oppState.wave % 10 !== 0) {
+            oppClearedBlock = Math.floor((oppState.wave - 1) / 10);
+        }
+
+        if (oppClearedBlock > 0) {
+            if (!rankState.blockWinner) rankState.blockWinner = {};
+            if (!rankState.blockWinner[oppClearedBlock]) {
+                rankState.blockWinner[oppClearedBlock] = 'opp'; // 상대방이 선점!
+                let wolfHp = Math.floor(100000 * Math.pow(1.5, oppClearedBlock)); 
+                monsters.push({ hp: wolfHp, maxHp: wolfHp, x: currentPath[0].x, y: currentPath[0].y, targetNode: 1, speed: 25, isBoss: true, bindTimer: 0, stunTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0, name: "어둠의 늑대", facingRight: true, threatTimer: 0, counterTimer: 5 });
+                window.showMessage(`☠️ 상대방이 ${oppClearedBlock * 10}웨이브를 먼저 클리어하여 늑대가 난입했습니다!`);
+            }
+        }
+    }
+
+    // 🔥 나의 필드 0마리 체크 (58.5초 적용)
     if (state.isRank && monsters.length === 0) {
-        let clearedBlock = Math.floor((state.wave - 1) / 10);
+        let clearedBlock = 0;
+        if (state.wave % 10 === 0 && waveTimer >= 58.5) {
+            clearedBlock = state.wave / 10;
+        } else if (state.wave % 10 !== 0) {
+            clearedBlock = Math.floor((state.wave - 1) / 10);
+        }
+
         if (clearedBlock > 0) {
             if (!rankState.blockWinner) rankState.blockWinner = {};
-            if (!rankState.blockWinner[clearedBlock]) { // 🔥 아무도 아직 늑대를 안 보냈다면
+            if (!rankState.blockWinner[clearedBlock]) { 
                 rankState.blockWinner[clearedBlock] = 'player'; // 내가 선점!
                 let wolfHp = Math.floor(100000 * Math.pow(1.5, clearedBlock)); 
                 oppMonsters.push({ hp: wolfHp, maxHp: wolfHp, x: currentPath[0].x, y: currentPath[0].y, targetNode: 1, speed: 25, isBoss: true, bindTimer: 0, stunTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0, name: "어둠의 늑대", facingRight: true, threatTimer: 0, counterTimer: 5 });
