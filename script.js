@@ -285,6 +285,25 @@ onAuthStateChanged(auth, async (user) => {
             } else { window.syncToCloud(); }
         } else { window.syncToCloud(); }
         window.switchScreen('start-screen');
+
+        // 🔥 월드 보스 랭킹 보상 실시간 수신 대기열 (여기서부터 추가)
+        const rewardRef = ref(database, `users/${currentUserUid}/pendingBossReward`);
+        onValue(rewardRef, (snap) => {
+            if (snap.exists()) {
+                let rewards = snap.val();
+                let earned = [];
+                for (let key in rewards) {
+                    let r = rewards[key];
+                    userInventory.boxes[r.tier] = (userInventory.boxes[r.tier] || 0) + 1;
+                    earned.push(`👑 ${r.rank}위: ${r.tier} 상자 1개`);
+                }
+                remove(rewardRef); // DB에서 수령 처리
+                window.syncToCloud();
+                window.showBossRewardPopup(earned);
+            }
+        });
+        // 🔥 (여기까지 추가)
+
     } else { currentUserUid = null; window.switchScreen('login-screen'); }
 });
 
@@ -294,6 +313,44 @@ window.closeNicknameChangeModal = () => { document.getElementById('nickname-chan
 window.submitNicknameChange = async () => { let input = document.getElementById('nickname-change-input').value.trim(); if (!input) { window.showMessage("새로운 닉네임을 입력해주세요."); return; } if (input.length > 10) { window.showMessage("닉네임은 10자 이하로 해주세요."); return; } if (input === currentUserName) { window.showMessage("기존 닉네임과 동일합니다."); return; } try { const now = Date.now(); await update(ref(database, `users/${currentUserUid}`), { nickname: input, lastNicknameChange: now }); update(ref(database, `pk_rankings/${currentUserUid}`), { nickname: input }).catch(e => {}); currentUserName = input; lastNicknameChange = now; document.getElementById('current-user-name').innerText = currentUserName; window.closeNicknameChangeModal(); window.showMessage("닉네임이 성공적으로 변경되었습니다!"); } catch (e) { window.showMessage("닉네임 변경 중 오류가 발생했습니다."); } };
 window.loginWithGoogle = () => { const provider = new GoogleAuthProvider(); signInWithPopup(auth, provider).catch(error => window.showMessage("로그인 실패: " + error.message)); };
 window.logout = () => { signOut(auth).then(() => { location.reload(); }); };
+
+window.showBossRewardPopup = (earned) => {
+    document.getElementById('overlay').style.display = 'block';
+    let modal = document.getElementById('boss-reward-modal');
+    if (!modal) {
+        let mDiv = document.createElement('div'); mDiv.id = 'boss-reward-modal'; mDiv.className = 'maple-modal';
+        mDiv.style.cssText = "display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:4600; width:85%; max-width:300px; background:#fff; border:2px solid #fbc02d; padding:15px; border-radius:8px; text-align:center;";
+        document.body.appendChild(mDiv); modal = mDiv;
+    }
+    let html = `<h3 style="color:#f57f17; margin-top:0;">🏆 월드 보스 랭킹 보상!</h3><p style="font-size:13px; color:#555; margin-bottom:15px;">이전 세대 보스 토벌 랭킹에 입성하여 보상이 지급되었습니다.</p>`;
+    earned.forEach(msg => { html += `<div style="background:#fff8e1; border:1px solid #ffe082; padding:10px; border-radius:8px; margin-bottom:10px; font-weight:bold; color:#e65100; font-size:14px;">${msg}</div>`; });
+    html += `<button class="ingame-btn premium-orange" style="width:100%; padding:12px; margin-top:10px;" onclick="closeBossRewardPopup()">보상 받기</button>`;
+    modal.innerHTML = html;
+    modal.style.display = 'block';
+};
+
+window.closeBossRewardPopup = () => {
+    let modal = document.getElementById('boss-reward-modal'); if(modal) modal.style.display = 'none';
+    document.getElementById('overlay').style.display = 'none';
+};
+
+window.distributeBossRankRewards = async () => {
+    try {
+        const snap = await get(child(ref(database), `worldBoss_rankings`));
+        if (snap.exists()) {
+            let ranks = []; 
+            snap.forEach(c => { let v = c.val(); if(typeof v.damage === 'number' && !isNaN(v.damage)) ranks.push({ uid: c.key, ...v }); });
+            ranks.sort((a, b) => b.damage - a.damage);
+            
+            for (let i = 0; i < Math.min(3, ranks.length); i++) {
+                let rTier = i === 0 ? '다이아몬드' : (i === 1 ? '플래티넘' : '골드');
+                await set(ref(database, `users/${ranks[i].uid}/pendingBossReward/${Date.now() + i}`), {
+                    rank: i + 1, tier: rTier
+                });
+            }
+        }
+    } catch(e) { console.warn("랭킹 보상 분배 오류:", e); }
+};
 
 // ==========================================
 // 5. 모험모드, 도감, 상점 기본 기능
@@ -1015,6 +1072,11 @@ function endRaidGame() {
                 damage: Math.round(accDmg),
                 date: new Date().toLocaleDateString()
             };
+        }).then(() => {
+            // 🔥 내 랭킹 데미지 저장이 끝난 후, 내가 막타를 쳤다면 1~3위에게 보상 전송!
+            if (raidState.gotLastHit) {
+                window.distributeBossRankRewards();
+            }
         }).catch(e => console.warn("랭킹 저장 오류:", e));
     }
 
