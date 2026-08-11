@@ -102,7 +102,7 @@ const SKILL_INFO = {
     mage_thunder: { name: "썬더 브레이크", max: 5, getDesc: (lv) => `60초마다 전역 피해 ${300 + lv * 150}% (법사 5차↑)`, img: "image/thunderbreak.png" },
     thief_shadow: { name: "섀도우 파트너", max: 5, getDesc: (lv) => `${lv * 3}%p 확률로 투사체 추가 (도적)`, img: "image/shadowpartner.png" },
     thief_fuma: { name: "풍마 수리검", max: 5, getDesc: (lv) => `60초마다 맵 순회 수리검 ${300 + lv * 150}% (도적 5차↑)`, img: "image/fumashuriken.png" },
-    war_threat: { name: "위협", max: 5, getDesc: (lv) => `30초마다 단일 적 위협. 최종 데미지 1.1배, ${lv * 2}초 유지 (제네시스↑)`, img: "image/rage.png" },
+    war_threat: { name: "위협", max: 5, getDesc: (lv) => `25초마다 단일 적 위협. 최종 데미지 ${1.05 + lv * 0.05}배, ${lv * 2}초 유지 (제네시스↑)`, img: "image/rage.png" },
     mage_heal: { name: "힐", max: 5, getDesc: (lv) => `${70 - lv*10}초마다 주위 1칸 아군 체력 2 회복 (제네시스↑)`, img: "image/freeze.png" },
     thief_overload: { name: "레디투다이", max: 5, getDesc: (lv) => `공속 2배 딜 후 기절. 버프 ${lv===5?15:6+lv*2}초/기절 ${lv===1?6:5}초 (제네시스↑)`, img: "image/shadowpartner.png" }
 };
@@ -1585,7 +1585,7 @@ window.loop = () => {
                 t.threatCooldown -= dt * 1000;
                 if (t.threatCooldown <= 0 && monsters.length > 0) {
                     monsters[0].threatTimer = skillLevels.war_threat * 2;
-                    t.threatCooldown += 30000;
+                    t.threatCooldown += 25000;
                 }
             }
             if (t.cls.type === '법사' && skillLevels.mage_heal > 0) {
@@ -1647,7 +1647,7 @@ window.loop = () => {
             for(let m of monsters) { let d = Math.hypot(m.x - t.x, m.y - t.y); if(d <= range) { target = m; break; } }
             if(target) {
                 let dmg = (t.cls.baseDmg + (state.upgrades[t.cls.type].val * 0.15) + equipStats.flatAtk) * t.grade.mult * cardMulti * rageMulti; 
-                if (target.threatTimer > 0) dmg *= 1.1; 
+                if (target.threatTimer > 0) dmg *= (1.05 + (skillLevels.war_threat * 0.05)); 
 
                 let isCrit = Math.random() < sharpChance; if (isCrit) dmg *= 1.2; let isFinal = false; if (t.cls.type === '전사' && (skillLevels.war_final||0) > 0 && Math.random() < ((skillLevels.war_final||0) * 0.03)) { isFinal = true; dmg *= 2; }
                 projectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: isFinal, baseDmgToPass: dmg, sourceTower: t });
