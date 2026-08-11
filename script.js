@@ -38,10 +38,10 @@ let equipStats = { atk: 0, spd: 0, crit: 0, cdmg: 0, pen: 0, flatAtk: 0, unpenet
 const STARFORCE_BONUS = { 'Rare': 2, 'Epic': 4, 'Unique': 6, 'Legendary': 8 };
 
 const OPTION_RANGES = {
-    'Rare': { atk: [1, 3], spd: [1, 1], crit: [1, 1], pen: [2, 5], cdmg: [1, 3] },
-    'Epic': { atk: [4, 8], spd: [1, 2], crit: [1, 2], pen: [6, 12], cdmg: [3, 6] },
-    'Unique': { atk: [9, 15], spd: [2, 3], crit: [2, 3], pen: [13, 20], cdmg: [6, 10] },
-    'Legendary': { atk: [16, 25], spd: [3, 5], crit: [3, 5], pen: [21, 30], cdmg: [10, 15] }
+    'Rare': { atk: [1, 3], spd: [1, 3], crit: [1, 3], pen: [2, 5], cdmg: [1, 3] },
+    'Epic': { atk: [4, 8], spd: [4, 8], crit: [4, 8], pen: [6, 12], cdmg: [3, 6] },
+    'Unique': { atk: [9, 15], spd: [9, 15], crit: [9, 15], pen: [13, 20], cdmg: [6, 10] },
+    'Legendary': { atk: [16, 25], spd: [16, 25], crit: [16, 25], pen: [21, 30], cdmg: [10, 15] }
 };
 const OPTION_TYPES = ['atk', 'spd', 'crit', 'pen', 'cdmg'];
 
@@ -1892,24 +1892,69 @@ window.draw = () => {
     if(!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
+    // 1. 트랙 길 그리기
     ctx.setLineDash([]); ctx.strokeStyle = "rgba(188, 170, 164, 0.4)"; ctx.lineWidth = 35; ctx.lineJoin = "round"; ctx.beginPath();
     ctx.moveTo(currentPath[0].x, currentPath[0].y);
     for(let i=1; i<currentPath.length; i++) ctx.lineTo(currentPath[i].x, currentPath[i].y);
     ctx.closePath(); ctx.stroke();
 
+    // 2. 사거리 표시
     if (selectedUnitIdx !== -1 && grid[selectedUnitIdx]) { let u = grid[selectedUnitIdx]; let attackRange = u.cls.range * u.grade.rangeMul; ctx.save(); ctx.beginPath(); ctx.arc(u.x, u.y, attackRange, 0, Math.PI * 2); ctx.fillStyle = "rgba(255, 255, 255, 0.15)"; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = "rgba(255, 235, 59, 0.6)"; ctx.stroke(); ctx.restore(); }
 
+    // 3. 타워 및 기절 표시
     towers.forEach(t => {
         if (t.unitStunTimer > 0) {
-            ctx.save();
-            ctx.font = "bold 20px Arial";
-            ctx.fillStyle = "yellow";
-            ctx.textAlign = "center";
-            ctx.fillText("💫", t.x, t.y - 25);
-            ctx.restore();
+            ctx.save(); ctx.font = "bold 20px Arial"; ctx.fillStyle = "yellow"; ctx.textAlign = "center"; ctx.fillText("💫", t.x, t.y - 25); ctx.restore();
         }
     });
 
+    // 4. 🔥 시각 이펙트들을 몬스터보다 먼저 그립니다 (레이어 하단 배치)
+    visualEffects.forEach(v => {
+        ctx.save();
+        if (v.type === 'death') { 
+            let progress = Math.min(1, (1.2 - v.timer) / 0.2); 
+            ctx.globalAlpha = 0.5; // 🔥 데스폴트 연하게
+            ctx.strokeStyle = "#ffeb3b"; ctx.lineWidth = 12; ctx.lineCap = "round"; ctx.shadowColor = "#f57f17"; ctx.shadowBlur = 15; 
+            let currentX = -50 + (600) * progress; let currentY = 550 + (-600) * progress; ctx.beginPath(); ctx.moveTo(-50, 550); ctx.lineTo(currentX, currentY); ctx.stroke(); 
+        } 
+        else if (v.type === 'thunder') { 
+            ctx.fillStyle = `rgba(0, 229, 255, ${v.timer * 0.3})`; // 🔥 썬더브레이크 연하게
+            ctx.fillRect(0,0,500,500); 
+            ctx.strokeStyle = `rgba(255, 255, 255, ${v.timer * 1.5})`; ctx.lineWidth = 20; 
+            ctx.beginPath(); ctx.moveTo(250,0); ctx.lineTo(150,250); ctx.lineTo(350,250); ctx.lineTo(250,500); ctx.stroke(); 
+        }
+        else if (v.type === 'heal' && healEffectImg.complete) {
+            ctx.translate(v.x, v.y); let hSize = 50; let progress = 1 - (v.timer / 1.0); ctx.beginPath();
+            if (progress < 0.5) { let p2 = progress * 2; ctx.rect(-hSize/2, hSize/2 - hSize*p2 - 25, hSize, hSize*p2); } 
+            else { let p2 = (progress - 0.5) * 2; ctx.rect(-hSize/2, -hSize/2 + hSize*p2 - 25, hSize, hSize*(1-p2)); }
+            ctx.clip(); ctx.drawImage(healEffectImg, -hSize/2, -hSize/2 - 25, hSize, hSize);
+        }
+        else if (v.type === 'threat1' && threatEffect1Img.complete) {
+            ctx.translate(v.x, v.y); ctx.globalAlpha = Math.sin((1 - (v.timer / 1.0)) * Math.PI); ctx.drawImage(threatEffect1Img, -25, -60, 50, 50);
+        }
+        else if (v.type === 'rtd' && rtdEffectImg.complete) {
+            ctx.translate(v.x, v.y); ctx.globalAlpha = Math.sin((1 - (v.timer / 1.0)) * Math.PI); ctx.drawImage(rtdEffectImg, -30, -70, 60, 60);
+        }
+        ctx.restore();
+    });
+
+    // 5. 수리검 및 투사체 그리기
+    fumaList.forEach(f => { ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.angle); if (fumaImg && fumaImg.complete) { let fsize = 60; ctx.drawImage(fumaImg, -fsize/2, -fsize/2, fsize, fsize); } ctx.restore(); });
+
+    projectiles.forEach(p => {
+        ctx.save(); ctx.translate(p.x, p.y); let dir = Math.atan2(p.ty - p.y, p.tx - p.x); let scale = 1.0; if (p.isFinal) scale *= 1.3; ctx.scale(scale, scale); if (p.isShadow) ctx.globalAlpha = 0.5;
+        let img = null; let psize = 20;
+        if (p.type === '전사') { img = p.gradeIdx >= 5 ? projImages.warrior2 : projImages.warrior1; ctx.rotate(dir + Math.PI); psize = p.gradeIdx >= 5 ? 30 : 20; }
+        else if (p.type === '법사') { img = p.gradeIdx >= 5 ? projImages.mage2 : projImages.mage1; ctx.rotate(dir + (15 * Math.PI / 180)); psize = p.gradeIdx >= 5 ? 30 : 20; }
+        else if (p.type === '도적') { img = p.gradeIdx >= 5 ? projImages.rogue2 : projImages.rogue1; ctx.rotate(p.angle); }
+        if (img && img.complete) { ctx.drawImage(img, -psize/2, -psize/2, psize, psize); } else { ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI*2); ctx.fill(); }
+        ctx.restore();
+    });
+
+    // 6. 🔥 타격 동그라미 이펙트 연하게 변경
+    hitEffects.forEach(h => { ctx.save(); ctx.globalAlpha = (h.timer / 0.2) * 0.4; ctx.fillStyle = h.color; ctx.beginPath(); ctx.arc(h.x, h.y, 15, 0, Math.PI*2); ctx.fill(); ctx.restore(); });
+
+    // 7. 🔥 몬스터 & 보스 체력바를 가장 마지막에 그립니다 (최상단 레이어)
     monsters.forEach(m => {
         let size = m.isBoss ? 25 : 12; ctx.save(); ctx.translate(m.x, m.y); if (m.facingRight) ctx.scale(-1, 1);
         if (m.isBoss && bossImages[m.name] && bossImages[m.name].complete) { ctx.drawImage(bossImages[m.name], -size*1.5, -size*1.5, size*3, size*3); } 
@@ -1931,39 +1976,7 @@ window.draw = () => {
         ctx.fillStyle = m.isBoss ? "#ff5252" : "#4caf50"; ctx.fillRect(m.x - size, m.y - size - 10, (size * 2) * (m.hp / m.maxHp), 4);
     });
 
-    visualEffects.forEach(v => {
-        ctx.save();
-        if (v.type === 'death') { let progress = Math.min(1, (1.2 - v.timer) / 0.2); ctx.strokeStyle = "#ffeb3b"; ctx.lineWidth = 12; ctx.lineCap = "round"; ctx.shadowColor = "#f57f17"; ctx.shadowBlur = 15; let currentX = -50 + (600) * progress; let currentY = 550 + (-600) * progress; ctx.beginPath(); ctx.moveTo(-50, 550); ctx.lineTo(currentX, currentY); ctx.stroke(); } 
-        else if (v.type === 'thunder') { ctx.fillStyle = `rgba(0, 229, 255, ${v.timer})`; ctx.fillRect(0,0,500,500); ctx.strokeStyle = `rgba(255, 255, 255, ${v.timer * 2})`; ctx.lineWidth = 20; ctx.beginPath(); ctx.moveTo(250,0); ctx.lineTo(150,250); ctx.lineTo(350,250); ctx.lineTo(250,500); ctx.stroke(); }
-        else if (v.type === 'heal' && healEffectImg.complete) {
-            ctx.translate(v.x, v.y); let hSize = 50; let progress = 1 - (v.timer / 1.0); ctx.beginPath();
-            if (progress < 0.5) { let p2 = progress * 2; ctx.rect(-hSize/2, hSize/2 - hSize*p2 - 25, hSize, hSize*p2); } 
-            else { let p2 = (progress - 0.5) * 2; ctx.rect(-hSize/2, -hSize/2 + hSize*p2 - 25, hSize, hSize*(1-p2)); }
-            ctx.clip(); ctx.drawImage(healEffectImg, -hSize/2, -hSize/2 - 25, hSize, hSize);
-        }
-        else if (v.type === 'threat1' && threatEffect1Img.complete) {
-            ctx.translate(v.x, v.y); ctx.globalAlpha = Math.sin((1 - (v.timer / 1.0)) * Math.PI); ctx.drawImage(threatEffect1Img, -25, -60, 50, 50);
-        }
-        else if (v.type === 'rtd' && rtdEffectImg.complete) {
-            ctx.translate(v.x, v.y); ctx.globalAlpha = Math.sin((1 - (v.timer / 1.0)) * Math.PI); ctx.drawImage(rtdEffectImg, -30, -70, 60, 60);
-        }
-        ctx.restore();
-    });
-
-    fumaList.forEach(f => { ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.angle); if (fumaImg && fumaImg.complete) { let fsize = 60; ctx.drawImage(fumaImg, -fsize/2, -fsize/2, fsize, fsize); } ctx.restore(); });
-
-    projectiles.forEach(p => {
-        ctx.save(); ctx.translate(p.x, p.y); let dir = Math.atan2(p.ty - p.y, p.tx - p.x); let scale = 1.0; if (p.isFinal) scale *= 1.3; ctx.scale(scale, scale); if (p.isShadow) ctx.globalAlpha = 0.5;
-        let img = null; let psize = 20;
-        if (p.type === '전사') { img = p.gradeIdx >= 5 ? projImages.warrior2 : projImages.warrior1; ctx.rotate(dir + Math.PI); psize = p.gradeIdx >= 5 ? 30 : 20; }
-        else if (p.type === '법사') { img = p.gradeIdx >= 5 ? projImages.mage2 : projImages.mage1; ctx.rotate(dir + (15 * Math.PI / 180)); psize = p.gradeIdx >= 5 ? 30 : 20; }
-        else if (p.type === '도적') { img = p.gradeIdx >= 5 ? projImages.rogue2 : projImages.rogue1; ctx.rotate(p.angle); }
-
-        if (img && img.complete) { ctx.drawImage(img, -psize/2, -psize/2, psize, psize); } else { ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI*2); ctx.fill(); }
-        ctx.restore();
-    });
-
-    hitEffects.forEach(h => { ctx.save(); ctx.globalAlpha = h.timer / 0.5; ctx.fillStyle = h.color; ctx.beginPath(); ctx.arc(h.x, h.y, 15, 0, Math.PI*2); ctx.fill(); ctx.restore(); });
+    // 8. 데미지 텍스트 출력
     damageTexts.forEach(d => { ctx.save(); ctx.globalAlpha = Math.max(0, d.timer / 0.8); ctx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; ctx.font = d.isCrit ? "800 16px NanumSquare" : "bold 12px NanumSquare"; ctx.shadowColor = d.isCrit ? "#c62828" : "#000"; ctx.shadowBlur = 3; ctx.fillText(d.val, d.x, d.y); ctx.restore(); });
 };
 
@@ -1978,12 +1991,7 @@ window.drawOpp = () => {
 
     oppTowers.forEach(t => {
         if (t.unitStunTimer > 0) {
-            oppCtx.save();
-            oppCtx.font = "bold 16px Arial";
-            oppCtx.fillStyle = "yellow";
-            oppCtx.textAlign = "center";
-            oppCtx.fillText("💫", t.x, t.y - 20);
-            oppCtx.restore();
+            oppCtx.save(); oppCtx.font = "bold 16px Arial"; oppCtx.fillStyle = "yellow"; oppCtx.textAlign = "center"; oppCtx.fillText("💫", t.x, t.y - 20); oppCtx.restore();
         }
     });
 
@@ -2008,8 +2016,18 @@ window.drawOpp = () => {
 
     oppVisualEffects.forEach(v => {
         oppCtx.save();
-        if (v.type === 'death') { let progress = Math.min(1, (1.2 - v.timer) / 0.2); oppCtx.strokeStyle = "#ffeb3b"; oppCtx.lineWidth = 8; oppCtx.lineCap = "round"; oppCtx.shadowColor = "#f57f17"; oppCtx.shadowBlur = 10; let currentX = -50 + (600) * progress; let currentY = 450 + (-400) * progress; oppCtx.beginPath(); oppCtx.moveTo(-50, 450); oppCtx.lineTo(currentX, currentY); oppCtx.stroke(); } 
-        else if (v.type === 'thunder') { oppCtx.fillStyle = `rgba(0, 229, 255, ${v.timer})`; oppCtx.fillRect(0,0,500,500); oppCtx.strokeStyle = `rgba(255, 255, 255, ${v.timer * 2})`; oppCtx.lineWidth = 15; oppCtx.beginPath(); oppCtx.moveTo(250,0); oppCtx.lineTo(200,250); oppCtx.lineTo(300,250); oppCtx.lineTo(250,500); oppCtx.stroke(); }
+        if (v.type === 'death') { 
+            let progress = Math.min(1, (1.2 - v.timer) / 0.2); 
+            oppCtx.globalAlpha = 0.5; // 🔥 투명도 적용
+            oppCtx.strokeStyle = "#ffeb3b"; oppCtx.lineWidth = 8; oppCtx.lineCap = "round"; oppCtx.shadowColor = "#f57f17"; oppCtx.shadowBlur = 10; 
+            let currentX = -50 + (600) * progress; let currentY = 450 + (-400) * progress; oppCtx.beginPath(); oppCtx.moveTo(-50, 450); oppCtx.lineTo(currentX, currentY); oppCtx.stroke(); 
+        } 
+        else if (v.type === 'thunder') { 
+            oppCtx.fillStyle = `rgba(0, 229, 255, ${v.timer * 0.3})`; // 🔥 썬더 연하게
+            oppCtx.fillRect(0,0,500,500); 
+            oppCtx.strokeStyle = `rgba(255, 255, 255, ${v.timer * 1.5})`; oppCtx.lineWidth = 15; 
+            oppCtx.beginPath(); oppCtx.moveTo(250,0); oppCtx.lineTo(200,250); oppCtx.lineTo(300,250); oppCtx.lineTo(250,500); oppCtx.stroke(); 
+        }
         else if (v.type === 'heal' && healEffectImg.complete) {
             oppCtx.translate(v.x, v.y); let hSize = 30; let progress = 1 - (v.timer / 1.0); oppCtx.beginPath();
             if (progress < 0.5) { let p2 = progress * 2; oppCtx.rect(-hSize/2, hSize/2 - hSize*p2 - 15, hSize, hSize*p2); } 
