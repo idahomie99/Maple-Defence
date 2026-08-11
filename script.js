@@ -1,5 +1,5 @@
-// 🔥 1.0.68 버전 - 신규 군단장 보스 5종 추가 (160~200층 10% 체력 보정) 및 도감 완벽 연동
-const GAME_VERSION = "1.0.69"; 
+// 🔥 1.0.70 버전 - 대규모 패치 (보스 반격, 제네시스 스킬, 랭겜 개편, 레이드 개편, 선택권 UI 분리)
+const GAME_VERSION = "1.0.70"; 
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -38,7 +38,7 @@ let equipStats = { atk: 0, spd: 0, crit: 0, flatAtk: 0 };
 let raidState = {
     status: 'TITLE', active: false, time: 60, prepTime: 5, meso: 30,
     totalDmg: 0, pendingDmg: 0, lastTime: 0,
-    bossHp: 7000000, maxHp: 7000000,
+    bossHp: 15000000, maxHp: 15000000,
     gotLastHit: false, rewardClaimedForKills: [],
     units: [null, null, null], projectiles: [], vfx: [], dmgTexts: []
 };
@@ -88,7 +88,8 @@ let cardData = JSON.parse(localStorage.getItem('mapleDefenseCards')) || {};
 const CARD_REQ = [1, 2, 4, 8, 12, 16, 20, 24, 28, 32]; 
 let spentCoins = parseInt(localStorage.getItem('mapleDefenseSpentCoins')) || 0;
 
-const DEFAULT_SKILLS = { common_wind: 0, common_sharp: 0, common_rage: 0, war_final: 0, war_death: 0, mage_freeze: 0, mage_thunder: 0, thief_shadow: 0, thief_fuma: 0 };
+// 🔥 신규 직업 스킬 추가
+const DEFAULT_SKILLS = { common_wind: 0, common_sharp: 0, common_rage: 0, war_final: 0, war_death: 0, mage_freeze: 0, mage_thunder: 0, thief_shadow: 0, thief_fuma: 0, war_threat: 0, mage_heal: 0, thief_overload: 0 };
 let skillLevels = JSON.parse(localStorage.getItem('mapleDefenseSkills')) || {};
 skillLevels = { ...DEFAULT_SKILLS, ...skillLevels };
 
@@ -101,10 +102,13 @@ const SKILL_INFO = {
     mage_freeze: { name: "프리즈", max: 5, getDesc: (lv) => `적 빙결 및 도트 피해 (${lv}단계)`, img: "image/freeze.png" },
     mage_thunder: { name: "썬더 브레이크", max: 5, getDesc: (lv) => `60초마다 전역 피해 ${300 + lv * 150}% (법사 5차↑)`, img: "image/thunderbreak.png" },
     thief_shadow: { name: "섀도우 파트너", max: 5, getDesc: (lv) => `${lv * 3}%p 확률로 투사체 추가 (도적)`, img: "image/shadowpartner.png" },
-    thief_fuma: { name: "풍마 수리검", max: 5, getDesc: (lv) => `60초마다 맵 순회 수리검 ${300 + lv * 150}% (도적 5차↑)`, img: "image/fumashuriken.png" }
+    thief_fuma: { name: "풍마 수리검", max: 5, getDesc: (lv) => `60초마다 맵 순회 수리검 ${300 + lv * 150}% (도적 5차↑)`, img: "image/fumashuriken.png" },
+    // 🔥 제네시스/데스티니 전용 신규 스킬 3종
+    war_threat: { name: "위협", max: 5, getDesc: (lv) => `30초마다 단일 적 위협. 최종 데미지 1.1배, ${lv * 2}초 유지 (제네시스↑)`, img: "image/rage.png" },
+    mage_heal: { name: "힐", max: 5, getDesc: (lv) => `${70 - lv*10}초마다 주위 1칸 아군 체력 2 회복 (제네시스↑)`, img: "image/freeze.png" },
+    thief_overload: { name: "과부하", max: 5, getDesc: (lv) => `공속 2배 딜 후 기절. 버프 ${lv===5?15:6+lv*2}초/기절 ${lv===1?6:5}초 (제네시스↑)`, img: "image/shadowpartner.png" }
 };
 
-// 🔥 신규 군단장 보스 이미지 추가
 const bossImages = { "킹 슬라임": new Image(), "알리샤르": new Image(), "파풀라투스": new Image(), "피아누스": new Image(), "자쿰": new Image(), "혼테일": new Image(), "시그너스": new Image(), "반반": new Image(), "피에르": new Image(), "블러드퀸": new Image(), "벨룸": new Image(), "어둠의 늑대": new Image(), "스우": new Image(), "데미안": new Image(), "루시드": new Image(), "윌": new Image(), "가디언엔젤슬라임": new Image() };
 bossImages["킹 슬라임"].src = "image/kingslime.png"; bossImages["알리샤르"].src = "image/alishar.png"; bossImages["파풀라투스"].src = "image/papulatus.png"; bossImages["피아누스"].src = "image/pianus.png"; bossImages["자쿰"].src = "image/zakum.png"; bossImages["혼테일"].src = "image/horntail.png"; bossImages["시그너스"].src = "image/signus.png"; bossImages["반반"].src = "image/banban.png"; bossImages["피에르"].src = "image/pierr.png"; bossImages["블러드퀸"].src = "image/bloodqueen.png"; bossImages["벨룸"].src = "image/velroom.png"; bossImages["어둠의 늑대"].src = "image/darkwolf.png";
 bossImages["스우"].src = "image/swoo.png"; bossImages["데미안"].src = "image/demian.png"; bossImages["루시드"].src = "image/lucid.png"; bossImages["윌"].src = "image/will.png"; bossImages["가디언엔젤슬라임"].src = "image/guardianangelslime.png";
@@ -129,7 +133,6 @@ const CLASSES = {
     '도적': { type: '도적', icon: '✦', color: '#6a1b9a', baseDmg: 18, range: 200, cd: 800, splash: 0 }
 };
 
-// 🔥 160~200층 신규 보스 및 보상 추가
 const BOSS_WAVES = { 
     24: { hp: 10000, meso: 50, tier: 3, count: 1, name: "킹 슬라임" }, 
     37: { hp: 30000, meso: 50, tier: 4, count: 1, name: "알리샤르" }, 
@@ -146,7 +149,7 @@ const BOSS_WAVES = {
     170: { name: "데미안", meso: 180, tier: 5, count: 1 }, 
     180: { name: "루시드", meso: 200, tier: 5, count: 1 }, 
     190: { name: "윌", meso: 200, tier: 5, count: 1 }, 
-    200: { name: "가디언엔젤슬라임", meso: 250, tier: 5, count: 2 } // 200층만 특별히 2장
+    200: { name: "가디언엔젤슬라임", meso: 250, tier: 5, count: 2 } 
 };
 
 // ==========================================
@@ -261,8 +264,6 @@ onAuthStateChanged(auth, async (user) => {
             if (cloud.cards) { 
                 localStorage.setItem('mapleDefenseCards', cloud.cards); 
                 cardData = JSON.parse(cloud.cards); 
-                
-                // 🔥 과거 심연의 보스 카드를 신규 군단장으로 자동 변환 (마이그레이션)
                 const bossMigrationMap = { "심연의 보스 (160층)": "스우", "심연의 보스 (170층)": "데미안", "심연의 보스 (180층)": "루시드", "심연의 보스 (190층)": "윌", "심연의 보스 (200층)": "가디언엔젤슬라임" };
                 let migrated = false;
                 for (let oldName in bossMigrationMap) {
@@ -299,23 +300,17 @@ window.logout = () => { signOut(auth).then(() => { location.reload(); }); };
 // ==========================================
 // 5. 모험모드, 도감, 상점 기본 기능
 // ==========================================
-// 🔥 160층 이상 10% 추가 보정된 몬스터 HP
 function getBossInfo(w) {
     if (w < 100 && BOSS_WAVES[w]) return BOSS_WAVES[w];
     if (w >= 100 && w % 5 === 0) { 
         let n = (w - 100) / 5; 
-        
         let calculatedHp = 1200000 + (n * 300000) + (Math.pow(n, 2) * 55000); 
-        
         if (w > 150) {
             let overN = (w - 150) / 5;
-            // 🔥 기존 1.05 (5%) 였던 복리 수치를 1.07 (7%) 로 상향!
-            calculatedHp = calculatedHp * Math.pow(1.07, overN);
+            calculatedHp = calculatedHp * Math.pow(1.07, overN); // 7% 스케일링
         }
-
         let bName = BOSS_WAVES[w] ? BOSS_WAVES[w].name : (w % 10 === 5 ? "어둠의 늑대" : `심연의 보스 (${w}층)`); 
         let bMeso = BOSS_WAVES[w] ? BOSS_WAVES[w].meso : (w >= 160 ? 200 : 150); 
-        
         let bTier = BOSS_WAVES[w] ? BOSS_WAVES[w].tier : 5; 
         let bCount = BOSS_WAVES[w] ? BOSS_WAVES[w].count : 1; 
         
@@ -324,13 +319,31 @@ function getBossInfo(w) {
     return null;
 }
 
+// 🔥 랭크 게임 칸 축소 반영
 function setGridMode(mode) {
-    let isRankGrid = (mode === 'RANK'); let canvasHeight = isRankGrid ? 290 : 500; let gridSize = isRankGrid ? 10 : 25;
-    if(canvas) canvas.height = canvasHeight; document.getElementById('board-area').style.aspectRatio = isRankGrid ? "500/290" : "1/1";
-    gridContainer.style.gridTemplateRows = isRankGrid ? "repeat(2, 1fr)" : "repeat(5, 1fr)"; gridContainer.style.top = isRankGrid ? "25.86%" : "15%"; gridContainer.style.height = isRankGrid ? "48.27%" : "70%";
+    let isRankGrid = (mode === 'RANK'); 
+    let canvasHeight = isRankGrid ? 290 : 500; 
+    let gridSize = isRankGrid ? 5 : 25; // 랭크 5칸
+    if(canvas) canvas.height = canvasHeight; 
+    document.getElementById('board-area').style.aspectRatio = isRankGrid ? "500/290" : "1/1";
+    
+    gridContainer.style.gridTemplateRows = isRankGrid ? "repeat(1, 1fr)" : "repeat(5, 1fr)"; 
+    gridContainer.style.top = isRankGrid ? "25.86%" : "15%"; 
+    gridContainer.style.height = isRankGrid ? "48.27%" : "70%";
+    
     currentPath = isRankGrid ? [ {x:25,y:25}, {x:475,y:25}, {x:475,y:265}, {x:25,y:265} ] : [ {x:25,y:25}, {x:475,y:25}, {x:475,y:475}, {x:25,y:475} ];
-    grid = new Array(gridSize).fill(null); oppGrid = new Array(gridSize).fill(null); gridContainer.innerHTML = ''; let oppGridContainer = document.getElementById('opp-grid-container'); if(oppGridContainer) oppGridContainer.innerHTML = '';
-    for(let i=0; i<gridSize; i++) { let cell = document.createElement('div'); cell.className = 'grid-cell'; cell.onclick = () => window.onCellClick(i); gridContainer.appendChild(cell); if (oppGridContainer) { let oppCell = document.createElement('div'); oppCell.className = 'grid-cell'; oppGridContainer.appendChild(oppCell); } }
+    grid = new Array(gridSize).fill(null); oppGrid = new Array(gridSize).fill(null); 
+    gridContainer.innerHTML = ''; 
+    let oppGridContainer = document.getElementById('opp-grid-container'); 
+    if(oppGridContainer) {
+        oppGridContainer.innerHTML = '';
+        oppGridContainer.style.gridTemplateRows = isRankGrid ? "repeat(1, 1fr)" : "repeat(5, 1fr)";
+    }
+    for(let i=0; i<gridSize; i++) { 
+        let cell = document.createElement('div'); cell.className = 'grid-cell'; cell.onclick = () => window.onCellClick(i); 
+        gridContainer.appendChild(cell); 
+        if (oppGridContainer) { let oppCell = document.createElement('div'); oppCell.className = 'grid-cell'; oppGridContainer.appendChild(oppCell); } 
+    }
 }
 
 window.saveGameData = () => { if (state.status === 'GAMEOVER' || state.status === 'TITLE' || state.isRank) return; let saveObj = { wave: state.wave, meso: state.meso, mp: state.mp, mpTotal: state.mpTotal, kills: state.kills, upgrades: state.upgrades, tickets: state.tickets, gridData: grid.map(u => u ? { idx: u.idx, gradeIdx: u.gradeIdx, clsName: u.cls.type } : null) }; localStorage.setItem('mapleDefenseSave', JSON.stringify(saveObj)); if (currentUserUid) window.syncToCloud(); };
@@ -371,9 +384,8 @@ window.autoMerge = () => {
         for(let key in counts) {
             let parts = key.split('_'); let type = parts[0]; let gIdx = parseInt(parts[1]); if (gIdx >= 8) continue; 
             
-            // 🔥 4차 이상부터는 무조건 4마리를 요구하도록 빡빡하게 변경! (기존 6,7차는 3마리였음)
             let req = 5; 
-            if (gIdx >= 4) req = 4; 
+            if (gIdx >= 4) req = 4; // 4차 이상부터 4마리 요구 (너프 반영)
             
             if (counts[key].length >= req) {
                 let toMerge = counts[key].slice(0, req); let targetIdx = toMerge[0];
@@ -392,8 +404,20 @@ window.autoMerge = () => {
 };
 
 function showSummonToast(gradeName, gradeIdx, clsName, color) { let toast = document.getElementById('summon-toast'); let fontSize = 16 + (gradeIdx * 2); toast.innerHTML = `<span style="color:${color}">${gradeName}</span> ${clsName}!`; toast.style.fontSize = fontSize + 'px'; toast.style.color = '#fff'; toast.className = 'toast-show'; setTimeout(() => { toast.className = ''; }, 1500); if (gradeIdx >= 5) { let container = document.getElementById('game-container'); container.classList.add('shake-active'); setTimeout(() => container.classList.remove('shake-active'), 400); } }
-window.addUnit = (idx, gradeIdx, clsName, isLoad = false) => { let grade = GRADES[gradeIdx]; let cls = CLASSES[clsName]; let unit = { idx: idx, gradeIdx: gradeIdx, grade: grade, cls: cls, x: 75 + (idx % 5) * 70 + 35, y: 75 + Math.floor(idx / 5) * 70 + 35, lastAttack: 0, bindCooldown: 0, globalCooldown: 0 }; grid[idx] = unit; towers.push(unit); if(!isLoad) showSummonToast(grade.name, gradeIdx, clsName, cls.color); renderGrid(); };
+
+// 🔥 유닛 체력 및 신규 스킬 변수 추가
+window.addUnit = (idx, gradeIdx, clsName, isLoad = false) => { 
+    let grade = GRADES[gradeIdx]; let cls = CLASSES[clsName]; 
+    let unit = { 
+        idx: idx, gradeIdx: gradeIdx, grade: grade, cls: cls, x: 75 + (idx % 5) * 70 + 35, y: 75 + Math.floor(idx / 5) * 70 + 35, 
+        lastAttack: 0, bindCooldown: 0, globalCooldown: 0,
+        hp: 5, maxHp: 5, damageDealt: 0, threatCooldown: 0, healCooldown: 0, overloadTimer: 0, unitStunTimer: 0
+    }; 
+    grid[idx] = unit; towers.push(unit); 
+    if(!isLoad) showSummonToast(grade.name, gradeIdx, clsName, cls.color); renderGrid(); 
+};
 function addUnitOpp(idx, gradeIdx, clsName) { let grade = GRADES[gradeIdx]; let cls = CLASSES[clsName]; let unit = { idx: idx, gradeIdx: gradeIdx, grade: grade, cls: cls, x: 75 + (idx % 5) * 70 + 35, y: 75 + Math.floor(idx / 5) * 70 + 35, lastAttack: 0, bindCooldown: 0, globalCooldown: 0 }; oppGrid[idx] = unit; oppTowers.push(unit); renderOppGrid(); }
+
 window.onCellClick = (idx) => { if(state.status !== 'PREP' && state.status !== 'PLAY') return; if (selectedUnitIdx !== -1) { if (selectedUnitIdx === idx) { selectedUnitIdx = -1; } else { let target = grid[idx]; grid[idx] = grid[selectedUnitIdx]; if (grid[idx]) { grid[idx].idx = idx; grid[idx].x = 75 + (idx % 5) * 70 + 35; grid[idx].y = 75 + Math.floor(idx / 5) * 70 + 35; } grid[selectedUnitIdx] = target; if(target) { target.idx = selectedUnitIdx; target.x = 75 + (selectedUnitIdx % 5) * 70 + 35; target.y = 75 + Math.floor(selectedUnitIdx / 5) * 70 + 35; } selectedUnitIdx = -1; } } else { if (grid[idx]) selectedUnitIdx = idx; } renderGrid(); window.updateUI(); };
 window.sellSelectedUnit = () => { if(selectedUnitIdx === -1) return; let u = grid[selectedUnitIdx]; if(u && u.grade.sell > 0) { state.meso += u.grade.sell; towers = towers.filter(t => t !== u); grid[selectedUnitIdx] = null; selectedUnitIdx = -1; renderGrid(); window.updateUI(); } };
 window.openBulkSellModal = () => { document.getElementById('overlay').style.display = 'block'; document.getElementById('bulk-sell-modal').style.display = 'block'; };
@@ -407,7 +431,15 @@ function renderGrid() {
             if (u.gradeIdx === 6) cells[i].classList.add('glow-6'); if (u.gradeIdx === 7) cells[i].classList.add('glow-7'); if (u.gradeIdx === 8) cells[i].classList.add('glow-8'); let barsHtml = '';
             if (u.gradeIdx === 6) { barsHtml += `<div style="width: 80%; height: 3px; background: #333; margin-top: 2px; border-radius: 1.5px; overflow: hidden; border: 1px solid #111;"><div id="bind-bar-${u.idx}" style="width: 0%; height: 100%; background: #00e5ff;"></div></div>`; }
             if (u.gradeIdx >= 5) { if ((u.cls.type === '전사' && (skillLevels.war_death||0) > 0) || (u.cls.type === '법사' && (skillLevels.mage_thunder||0) > 0) || (u.cls.type === '도적' && (skillLevels.thief_fuma||0) > 0)) { let color = u.cls.type === '전사' ? '#ffeb3b' : (u.cls.type === '법사' ? '#00e5ff' : '#ab47bc'); barsHtml += `<div style="width: 80%; height: 3px; background: #333; margin-top: 2px; border-radius: 1.5px; overflow: hidden; border: 1px solid #111;"><div id="global-bar-${u.idx}" style="width: 0%; height: 100%; background: ${color};"></div></div>`; } }
-            cells[i].innerHTML = `<div style="font-size:20px; text-shadow:1px 1px 2px rgba(0,0,0,0.5);">${u.cls.icon}</div><div style="color:${u.cls.color}; font-size:10px; margin-top:2px;">${u.grade.name}</div>${barsHtml}`;
+            
+            // 🔥 피격 당한 유닛 체력바 표시
+            let hpBarHtml = '';
+            if (u.hp < u.maxHp) {
+                let hpPercent = Math.max(0, (u.hp / u.maxHp) * 100);
+                hpBarHtml = `<div style="width: 80%; height: 3px; background: #333; margin-top: 2px; border-radius:1.5px; border: 1px solid #111; overflow:hidden;"><div style="width: ${hpPercent}%; height: 100%; background: #00e676;"></div></div>`;
+            }
+
+            cells[i].innerHTML = `<div style="font-size:20px; text-shadow:1px 1px 2px rgba(0,0,0,0.5);">${u.cls.icon}</div><div style="color:${u.cls.color}; font-size:10px; margin-top:2px;">${u.grade.name}</div>${barsHtml}${hpBarHtml}`;
         } else { cells[i].innerHTML = ''; }
     }
     let pkBarContainer = document.getElementById('pk-global-bar-container');
@@ -415,25 +447,75 @@ function renderGrid() {
 }
 
 function renderOppGrid() { let oppGridContainer = document.getElementById('opp-grid-container'); if(!oppGridContainer) return; let cells = oppGridContainer.children; if(!cells || cells.length === 0) return; for(let i=0; i<oppGrid.length; i++) { let u = oppGrid[i]; cells[i].className = 'grid-cell'; if(u) { if (u.gradeIdx === 6) cells[i].classList.add('glow-6'); if (u.gradeIdx === 7) cells[i].classList.add('glow-7'); if (u.gradeIdx === 8) cells[i].classList.add('glow-8'); cells[i].innerHTML = `<div style="font-size:18px; text-shadow:1px 1px 2px rgba(0,0,0,0.5);">${u.cls.icon}</div><div style="color:${u.cls.color}; font-size:9px; margin-top:2px;">${u.grade.name}</div>`; } else { cells[i].innerHTML = ''; } } }
-function spawnMonster() { let bInfo = getBossInfo(state.wave); let hpBase = bInfo ? bInfo.hp : Math.floor(state.wave * 60 + Math.pow(state.wave, 1.5) * 12); monsters.push({ hp: hpBase, maxHp: hpBase, x: currentPath[0].x, y: currentPath[0].y, targetNode: 1, speed: bInfo ? 25 : 50, isBoss: !!bInfo, bindTimer: 0, stunTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0, name: bInfo ? bInfo.name : null, facingRight: true }); }
-window.skipBossRound = () => { 
-    waveTimer = 150; 
-    // 🔥 랭크 게임일 경우 상대방 타이머도 같이 스킵 처리!
-    if (state.isRank) { oppWaveTimer = 150; } 
-    document.getElementById('boss-skip-wrapper').style.display = 'none'; 
-};
+function spawnMonster() { let bInfo = getBossInfo(state.wave); let hpBase = bInfo ? bInfo.hp : Math.floor(state.wave * 60 + Math.pow(state.wave, 1.5) * 12); monsters.push({ hp: hpBase, maxHp: hpBase, x: currentPath[0].x, y: currentPath[0].y, targetNode: 1, speed: bInfo ? 25 : 50, isBoss: !!bInfo, bindTimer: 0, stunTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0, name: bInfo ? bInfo.name : null, facingRight: true, threatTimer: 0, counterTimer: 5 }); }
+window.skipBossRound = () => { waveTimer = 150; if (state.isRank) { oppWaveTimer = 150; } document.getElementById('boss-skip-wrapper').style.display = 'none'; };
 function updateWave(dt) { waveTimer += dt; spawnTimer += dt; let limit = state.isBoss ? 150 : 60; if(waveTimer >= limit) { nextWave(); return; } if(!state.isBoss && spawnTimer >= 1.5) { spawnMonster(); spawnTimer = 0; } document.getElementById('ui-timer').innerText = Math.max(0, limit - Math.floor(waveTimer)); }
 function nextWave() { document.getElementById('boss-skip-wrapper').style.display = 'none'; if(state.isBoss && monsters.some(m => m.isBoss)) { if(state.isRank) return handleRankGameOver("보스 사냥 실패!"); else return gameOver("보스 처치 실패!"); } state.wave++; waveTimer = 0; spawnTimer = 0; let bInfo = getBossInfo(state.wave); state.isBoss = !!bInfo; if (!state.isRank && state.wave > bestWave) { bestWave = state.wave; localStorage.setItem('mapleDefenseBestWave', bestWave); document.getElementById('ui-best-wave').innerText = bestWave; if (currentUserUid) window.syncToCloud(); } if(state.isBoss) { spawnMonster(); } window.updateUI(); }
 function showUpgradeToast(idChar, amt) { let box = document.getElementById(`upg-${idChar}-box`); let floatEl = document.createElement('div'); floatEl.className = 'upgrade-toast'; floatEl.innerText = '+' + amt; box.appendChild(floatEl); setTimeout(() => floatEl.remove(), 1000); }
 window.upgrade = (type) => { if(state.status !== 'PREP' && state.status !== 'PLAY') return; let u = state.upgrades[type]; if(state.mp >= u.cost) { state.mp -= u.cost; let amt = Math.floor(Math.random() * 6) + 1; u.val += amt; u.cost += Math.floor(u.cost * 0.2) + 3; let idChar = type === '전사' ? 'w' : (type === '법사' ? 'm' : 't'); showUpgradeToast(idChar, amt); document.getElementById(`upg-${idChar}-val`).innerText = u.val; document.getElementById(`upg-${idChar}-cost`).innerText = u.cost; window.updateUI(); } else { window.showMessage("메포가 부족합니다."); } };
-let currentTicketTier = 0;
-window.openTicketModal = () => { if(state.tickets.length === 0) { window.showMessage("보유한 선택권이 없습니다."); return; } currentTicketTier = state.tickets[0]; document.getElementById('ticket-tier').innerText = currentTicketTier; document.getElementById('overlay').style.display = 'block'; document.getElementById('ticket-modal').style.display = 'block'; window.updateUI(); };
-window.useTicket = (choice) => { let emptyIdx = grid.findIndex(v => v === null); if(emptyIdx === -1) { window.showMessage("공간 부족!"); return; } state.tickets.shift(); let tier = currentTicketTier; let cls = choice === '랜덤' ? Object.keys(CLASSES)[Math.floor(Math.random()*3)] : choice; if(choice === '랜덤' && Math.random() < 0.2) tier++; window.addUnit(emptyIdx, tier, cls); window.closeAllModals(); window.updateUI(); };
+
+// 🔥 선택권 UI 완전 개편
+window.openTicketModal = () => { 
+    if(state.tickets.length === 0) { window.showMessage("보유한 선택권이 없습니다."); return; } 
+    
+    let counts = { 1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0, 8:0 };
+    state.tickets.forEach(t => counts[t] = (counts[t] || 0) + 1);
+    
+    let modal = document.getElementById('ticket-modal');
+    if(!modal) return;
+    
+    let html = `<h3 style="color:#263238; margin-top:0; text-align:center;">🎫 선택권 사용</h3>`;
+    html += `<div style="max-height: 350px; overflow-y: auto;">`; 
+    
+    let hasTickets = false;
+    for(let tier=1; tier<=8; tier++) {
+        if(counts[tier] > 0) {
+            hasTickets = true;
+            html += `
+            <div style="margin-bottom: 10px; padding: 10px; border: 1px solid #cfd8dc; border-radius: 6px; background: #f8fdff;">
+                <div style="font-weight: bold; margin-bottom: 8px; color: #0277bd; font-size: 14px;">${tier}차 선택권 <span style="font-size:12px; color:#555;">(보유: <b style="color:#d32f2f">${counts[tier]}</b>개)</span></div>
+                <div style="display:flex; gap:5px;">
+                    <button class="ingame-btn" style="flex:1; padding:8px 0; font-size:13px;" onclick="useTicketTier(${tier}, '전사')">전사</button>
+                    <button class="ingame-btn" style="flex:1; padding:8px 0; font-size:13px;" onclick="useTicketTier(${tier}, '법사')">법사</button>
+                    <button class="ingame-btn" style="flex:1; padding:8px 0; font-size:13px;" onclick="useTicketTier(${tier}, '도적')">도적</button>
+                    <button class="ingame-btn premium-blue" style="flex:1.2; padding:8px 0; font-size:13px;" onclick="useTicketTier(${tier}, '랜덤')">🎲 랜덤</button>
+                </div>
+            </div>`;
+        }
+    }
+    html += `</div>`;
+    if(!hasTickets) { html = `<h3 style="color:#263238; margin-top:0;">🎫 선택권 사용</h3><p style="color:#666; font-size:13px;">보유한 선택권이 없습니다.</p>`; }
+    
+    html += `<button class="ingame-btn premium-white" style="width:100%; padding:12px; margin-top:10px;" onclick="closeAllModals()">닫기</button>`;
+    
+    modal.innerHTML = html;
+    document.getElementById('overlay').style.display = 'block'; 
+    modal.style.display = 'block'; 
+};
+
+window.useTicketTier = (tier, choice) => { 
+    let emptyIdx = grid.findIndex(v => v === null); 
+    if(emptyIdx === -1) { window.showMessage("공간 부족!"); return; } 
+    
+    let tIdx = state.tickets.indexOf(tier);
+    if(tIdx !== -1) state.tickets.splice(tIdx, 1);
+    else return; 
+    
+    let finalTier = tier; 
+    let cls = choice === '랜덤' ? Object.keys(CLASSES)[Math.floor(Math.random()*3)] : choice; 
+    if(choice === '랜덤' && Math.random() < 0.2) finalTier++; 
+    
+    window.addUnit(emptyIdx, finalTier, cls); 
+    
+    if(state.tickets.length > 0) { window.openTicketModal(); } 
+    else { window.closeAllModals(); }
+    window.updateUI(); 
+};
+
 function getTotalGrade() { let tg = 0; for(let k in cardData) tg += cardData[k].grade; return tg; }
 function getTotalCardBonus() { let bonus = 0; for(let k in cardData) { if(cardData[k].grade > 0) bonus += 1 + (cardData[k].grade - 1) * 0.5; } return bonus; }
 function getAvailableCoins() { return getTotalGrade() + userRankData.bonusCoins - spentCoins; }
 
-// 🔥 도감 신규 보스들 배열 추가
 window.openBookModal = () => { document.getElementById('overlay').style.display = 'block'; document.getElementById('book-modal').style.display = 'block'; window.renderBook(); };
 window.renderBook = () => { 
     let list = document.getElementById('book-list'); list.innerHTML = ''; 
@@ -584,7 +666,7 @@ window.executeStarForce = () => {
 };
 
 // ==========================================
-// 7. 월드 보스 레이드 시스템
+// 7. 월드 보스 레이드 시스템 (개편)
 // ==========================================
 window.openRaidLobby = () => {
     if (!currentUserUid) { window.showMessage("로그인이 필요한 서비스입니다."); return; }
@@ -597,10 +679,9 @@ window.openRaidLobby = () => {
     if(hpText) hpText.innerText = "불러오는 중...";
     
     onValue(ref(database, 'worldBoss'), (snap) => {
-        let baseMaxHp = 7000000;
+        let baseMaxHp = 15000000; // 🔥 1500만 시작
         if(snap.exists()) {
             let val = snap.val();
-            // 🔥 DB에 저장된 진화된 최대 체력 불러오기 (없으면 700만)
             let currentMaxHp = (val && val.maxHp) ? val.maxHp : baseMaxHp;
             let hp = typeof val === 'number' ? val : (val.hp !== undefined ? val.hp : currentMaxHp);
             if(isNaN(hp)) hp = currentMaxHp;
@@ -635,10 +716,10 @@ window.startRaidGame = () => {
     document.getElementById('raid-prep-ui').style.display = 'flex'; document.getElementById('raid-prep-time').innerText = '5'; document.getElementById('raid-meso').innerText = '30'; renderRaidGrid();
 
     onValue(ref(database, 'worldBoss'), (snap) => {
+        let baseMaxHp = 15000000;
         if(snap.exists()) {
             let val = snap.val();
-            // 🔥 DB에서 현재 최대 체력을 불러와 로컬 상태(raidState)에 동기화
-            let currentMaxHp = (val && val.maxHp) ? val.maxHp : 7000000;
+            let currentMaxHp = (val && val.maxHp) ? val.maxHp : baseMaxHp;
             raidState.maxHp = currentMaxHp; 
             raidState.bossHp = typeof val === 'number' ? val : (val.hp !== undefined ? val.hp : currentMaxHp);
             if(isNaN(raidState.bossHp)) raidState.bossHp = currentMaxHp;
@@ -646,6 +727,8 @@ window.startRaidGame = () => {
             let percent = (raidState.bossHp / raidState.maxHp) * 100;
             document.getElementById('raid-boss-hp-bar').style.width = `${Math.max(0, percent)}%`; 
             document.getElementById('raid-boss-hp-text').innerText = `${Math.max(0, Math.round(raidState.bossHp)).toLocaleString()} / ${raidState.maxHp.toLocaleString()}`;
+        } else {
+            raidState.maxHp = baseMaxHp; raidState.bossHp = baseMaxHp;
         }
     });
     raidLoop();
@@ -704,10 +787,10 @@ setInterval(() => {
         
         runTransaction(ref(database, 'worldBoss'), (data) => {
             let bossData = data;
-            if (typeof bossData === 'number') bossData = { hp: bossData, maxHp: 7000000, killCount: 0, lastKillerUid: null };
-            if (!bossData || typeof bossData !== 'object') bossData = { hp: 7000000, maxHp: 7000000, killCount: 0, lastKillerUid: null };
+            if (typeof bossData === 'number') bossData = { hp: bossData, maxHp: 15000000, killCount: 0, lastKillerUid: null };
+            if (!bossData || typeof bossData !== 'object') bossData = { hp: 15000000, maxHp: 15000000, killCount: 0, lastKillerUid: null };
             
-            let currentMax = bossData.maxHp || 7000000;
+            let currentMax = bossData.maxHp || 15000000;
             if (typeof bossData.hp !== 'number' || isNaN(bossData.hp)) bossData.hp = currentMax;
             let dmg = (typeof dmgToApply === 'number' && !isNaN(dmgToApply)) ? Math.round(dmgToApply) : 0;
             
@@ -715,8 +798,7 @@ setInterval(() => {
             
             if (bossData.hp <= 0) { 
                 bossData.killCount = (bossData.killCount || 0) + 1; 
-                // 🔥 처치 수 비례 10% 복리 최대 체력 계산 및 갱신
-                let nextMaxHp = Math.floor(7000000 * Math.pow(1.1, bossData.killCount));
+                let nextMaxHp = Math.floor(15000000 * Math.pow(1.1, bossData.killCount));
                 bossData.maxHp = nextMaxHp;
                 bossData.hp = nextMaxHp; 
                 bossData.lastKillerUid = currentUserUid; 
@@ -741,7 +823,13 @@ function raidLoop() {
     }
     let dt = dtReal * 4; if (dt > 0.4) dt = 0.4;
     raidState.time -= dt; document.getElementById('raid-time').innerText = Math.ceil(Math.max(0, raidState.time));
-    if (raidState.time <= 0) { endRaidGame(); return; }
+    
+    // 🔥 보스 즉시 처치 시 게임 종료 로직 반영
+    if (raidState.time <= 0 || raidState.bossHp <= 0) { 
+        if(raidState.bossHp <= 0) raidState.gotLastHit = true;
+        endRaidGame(); 
+        return; 
+    }
 
     let cardMulti = 1 + (getTotalCardBonus() / 100); let rageMulti = 1 + ((skillLevels.common_rage || 0) * 0.01) + (equipStats.atk * 0.01); let sharpChance = ((skillLevels.common_sharp || 0) * 0.05) + (equipStats.crit * 0.01); let windReduc = 1 + ((skillLevels.common_wind || 0) * 0.2) + (equipStats.spd * 0.01);
     let bx = 250, by = 150;
@@ -889,7 +977,6 @@ function endRaidGame() {
     raidState.active = false; 
     cancelAnimationFrame(raidReqId);
 
-    // 🔥 700만 고정값 대신 현재 진화된 보스의 최대 체력을 기준으로 기여도 계산!
     let percent = (raidState.totalDmg / raidState.maxHp) * 100; 
     let rewardTier = '';
     if (percent <= 5) rewardTier = '브론즈'; 
@@ -938,18 +1025,17 @@ function endRaidGame() {
         raidState.pendingDmg = 0;
         runTransaction(ref(database, 'worldBoss'), (data) => {
             let bossData = data;
-            if (typeof bossData === 'number') bossData = { hp: bossData, maxHp: 7000000, killCount: 0, lastKillerUid: null };
-            if (!bossData || typeof bossData !== 'object') bossData = { hp: 7000000, maxHp: 7000000, killCount: 0, lastKillerUid: null };
+            if (typeof bossData === 'number') bossData = { hp: bossData, maxHp: 15000000, killCount: 0, lastKillerUid: null };
+            if (!bossData || typeof bossData !== 'object') bossData = { hp: 15000000, maxHp: 15000000, killCount: 0, lastKillerUid: null };
             
-            let currentMax = bossData.maxHp || 7000000;
+            let currentMax = bossData.maxHp || 15000000;
             if (typeof bossData.hp !== 'number' || isNaN(bossData.hp)) bossData.hp = currentMax;
             let dmg = (typeof dmgToApply === 'number' && !isNaN(dmgToApply)) ? Math.round(dmgToApply) : 0;
             
             bossData.hp -= dmg;
             if (bossData.hp <= 0) { 
                 bossData.killCount = (bossData.killCount || 0) + 1; 
-                // 🔥 처치 수 비례 10% 복리 최대 체력 계산 및 갱신
-                let nextMaxHp = Math.floor(7000000 * Math.pow(1.1, bossData.killCount));
+                let nextMaxHp = Math.floor(15000000 * Math.pow(1.1, bossData.killCount));
                 bossData.maxHp = nextMaxHp;
                 bossData.hp = nextMaxHp; 
                 bossData.lastKillerUid = currentUserUid; 
@@ -1019,9 +1105,9 @@ function processOpponentTick(dt) {
     if(oppWaveTimer >= limit) { 
         if(oppState.isBoss && oppMonsters.some(m => m.isBoss)) { oppState.isDead = true; state.status = 'GAMEOVER'; processRankResult('WIN', '상대방이 보스 사냥에 실패했습니다!'); return; }
         oppState.wave++; oppWaveTimer = 0; oppSpawnTimer = 0; let bInfo = getBossInfo(oppState.wave); oppState.isBoss = !!bInfo;
-        if(oppState.isBoss) { let hpBase = bInfo.hp; oppMonsters.push({ hp: hpBase, maxHp: hpBase, x: currentPath[0].x, y: currentPath[0].y, targetNode: 1, speed: 25, isBoss: true, bindTimer: 0, stunTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0, name: bInfo.name, facingRight: true }); }
+        if(oppState.isBoss) { let hpBase = bInfo.hp; oppMonsters.push({ hp: hpBase, maxHp: hpBase, x: currentPath[0].x, y: currentPath[0].y, targetNode: 1, speed: 25, isBoss: true, bindTimer: 0, stunTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0, name: bInfo.name, facingRight: true, threatTimer: 0, counterTimer: 5 }); }
     } else if(!oppState.isBoss && oppSpawnTimer >= 1.5) { 
-        let hpBase = Math.floor(oppState.wave * 60 + Math.pow(oppState.wave, 1.5) * 12); oppMonsters.push({ hp: hpBase, maxHp: hpBase, x: currentPath[0].x, y: currentPath[0].y, targetNode: 1, speed: 50, isBoss: false, bindTimer: 0, stunTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0, name: null, facingRight: true }); oppSpawnTimer = 0; 
+        let hpBase = Math.floor(oppState.wave * 60 + Math.pow(oppState.wave, 1.5) * 12); oppMonsters.push({ hp: hpBase, maxHp: hpBase, x: currentPath[0].x, y: currentPath[0].y, targetNode: 1, speed: 50, isBoss: false, bindTimer: 0, stunTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0, name: null, facingRight: true, threatTimer: 0, counterTimer: 5 }); oppSpawnTimer = 0; 
     }
     for (let i = oppVisualEffects.length - 1; i >= 0; i--) { oppVisualEffects[i].timer -= dt; if (oppVisualEffects[i].timer <= 0) { let v = oppVisualEffects[i]; if (v.type === 'death' || v.type === 'thunder') oppMonsters.forEach(m => m.hp -= v.dmg); oppVisualEffects.splice(i, 1); } }
     for (let i = oppDamageTexts.length - 1; i >= 0; i--) { oppDamageTexts[i].timer -= dt; oppDamageTexts[i].y -= dt * 30; if (oppDamageTexts[i].timer <= 0) oppDamageTexts.splice(i, 1); }
@@ -1097,7 +1183,13 @@ function processOpponentTick(dt) {
             oppProjectiles.splice(i, 1);
         } else { let moveAmt = speed; if (p.isShadow) moveAmt *= 0.85; p.x += (dx/dist)*moveAmt; p.y += (dy/dist)*moveAmt; }
     }
-    for(let i=oppMonsters.length-1; i>=0; i--) { if(oppMonsters[i].hp <= 0) oppMonsters.splice(i, 1); }
+    for(let i=oppMonsters.length-1; i>=0; i--) { 
+        if(oppMonsters[i].hp <= 0) {
+            // 🔥 랭크 게임: 상대 몹이 죽으면 내 필드로 핑퐁 스폰!
+            monsters.push({ hp: oppMonsters[i].maxHp, maxHp: oppMonsters[i].maxHp, x: currentPath[0].x, y: currentPath[0].y, targetNode: 1, speed: 50, isBoss: false, bindTimer: 0, stunTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0, name: null, facingRight: true, threatTimer: 0, counterTimer: 5 });
+            oppMonsters.splice(i, 1); 
+        } 
+    }
 }
 
 function handleRankGameOver(msg) { state.status = 'GAMEOVER'; processRankResult('LOSE', msg); }
@@ -1244,14 +1336,15 @@ function drawPk() {
 window.updateUI = () => {
     let skipWrapper = document.getElementById('boss-skip-wrapper'); 
     
-    // 🔥 모험 모드거나, 랭크 게임인데 내 필드와 상대 필드 모두 몹이 0마리일 때 스킵 버튼 노출!
     if (state.isBoss && monsters.length === 0 && waveTimer > 0 && (!state.isRank || (state.isRank && oppMonsters.length === 0))) {
         skipWrapper.style.display = 'flex'; 
     } else {
         skipWrapper.style.display = 'none';
     }
     
-    document.getElementById('ui-meso').innerText = state.meso; document.getElementById('ui-mp').innerText = state.mp; document.getElementById('ui-wave').innerText = state.wave; document.getElementById('ui-kills').innerText = state.kills.toLocaleString(); document.getElementById('ui-tickets').innerText = state.tickets.length; document.getElementById('btn-summon').disabled = (state.meso < 10);
+    document.getElementById('ui-meso').innerText = state.meso; document.getElementById('ui-mp').innerText = state.mp; document.getElementById('ui-wave').innerText = state.wave; document.getElementById('ui-kills').innerText = state.kills.toLocaleString(); 
+    document.getElementById('ui-tickets').innerText = state.tickets.length; 
+    document.getElementById('btn-summon').disabled = (state.meso < 10);
     
     let guideEl = document.getElementById('early-guide'); if (guideEl) { if (state.wave <= 10 && !state.isRank) guideEl.style.display = 'block'; else guideEl.style.display = 'none'; }
     document.getElementById('ui-mobs').innerText = `${monsters.length} / ${state.isRank ? 25 : 50}`; 
@@ -1278,6 +1371,7 @@ window.draw = () => {
         else { ctx.fillStyle = m.isBoss ? "#ef5350" : "#ffca28"; ctx.beginPath(); ctx.arc(0, 0, size, 0, Math.PI*2); ctx.fill(); }
         if (m.freezeTimer > 0) { ctx.fillStyle = "rgba(0, 200, 255, 0.4)"; ctx.beginPath(); ctx.arc(0, 0, size * 1.5, 0, Math.PI * 2); ctx.fill(); }
         if (m.stunTimer > 0) { ctx.font = "bold 16px Arial"; ctx.fillStyle = "yellow"; ctx.textAlign = "center"; ctx.fillText("💫", 0, -size - 10); }
+        if (m.threatTimer > 0) { ctx.fillStyle = "rgba(255, 0, 0, 0.3)"; ctx.beginPath(); ctx.arc(0, 0, size * 1.8, 0, Math.PI * 2); ctx.fill(); } // 🔥 위협 디버프 표시
         ctx.restore();
         ctx.fillStyle = "#333"; ctx.fillRect(m.x - size, m.y - size - 10, size * 2, 4);
         ctx.fillStyle = m.isBoss ? "#ff5252" : "#4caf50"; ctx.fillRect(m.x - size, m.y - size - 10, (size * 2) * (m.hp / m.maxHp), 4);
@@ -1303,7 +1397,7 @@ window.draw = () => {
         ctx.restore();
     });
 
-    hitEffects.forEach(h => { ctx.save(); ctx.globalAlpha = h.timer / 0.2; ctx.fillStyle = h.color; ctx.beginPath(); ctx.arc(h.x, h.y, 15, 0, Math.PI*2); ctx.fill(); ctx.restore(); });
+    hitEffects.forEach(h => { ctx.save(); ctx.globalAlpha = h.timer / 0.5; ctx.fillStyle = h.color; ctx.beginPath(); ctx.arc(h.x, h.y, 15, 0, Math.PI*2); ctx.fill(); ctx.restore(); });
     damageTexts.forEach(d => { ctx.save(); ctx.globalAlpha = Math.max(0, d.timer / 0.8); ctx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; ctx.font = d.isCrit ? "800 16px NanumSquare" : "bold 12px NanumSquare"; ctx.shadowColor = d.isCrit ? "#c62828" : "#000"; ctx.shadowBlur = 3; ctx.fillText(d.val, d.x, d.y); ctx.restore(); });
 };
 
@@ -1362,7 +1456,31 @@ window.loop = () => {
     for(let i=monsters.length-1; i>=0; i--) {
         let m = monsters[i];
         if (m.freezeTimer > 0) { m.freezeTimer -= dt; m.freezeTickTimer -= dt; if (m.freezeTickTimer <= 0) { m.hp -= m.freezeDmgVal; m.freezeTickTimer = 1; } }
-        if (m.bindTimer > 0) { m.bindTimer -= dt; continue; } if (m.stunTimer > 0) { m.stunTimer -= dt; continue; }
+        if (m.bindTimer > 0) { m.bindTimer -= dt; continue; } 
+        if (m.stunTimer > 0) { m.stunTimer -= dt; continue; }
+        if (m.threatTimer > 0) { m.threatTimer -= dt; } // 🔥 위협 디버프 타이머
+
+        // 🔥 160층 이상 보스 반격 기믹
+        if (state.wave >= 160 && m.isBoss && m.name !== "어둠의 늑대" && !state.isRank) {
+            if (m.counterTimer === undefined) m.counterTimer = 5; 
+            m.counterTimer -= dt;
+            if (m.counterTimer <= 0) {
+                let targetTower = null; let maxDmg = -1;
+                towers.forEach(t => { if (t.hp > 0 && t.damageDealt > maxDmg) { maxDmg = t.damageDealt; targetTower = t; } });
+                if (targetTower) {
+                    let dmgTaken = (targetTower.overloadTimer > 0) ? 2 : 1; 
+                    targetTower.hp -= dmgTaken;
+                    hitEffects.push({ x: targetTower.x, y: targetTower.y, timer: 0.5, color: '#ff0000' });
+                    if (targetTower.hp <= 0) {
+                        towers = towers.filter(tw => tw !== targetTower);
+                        grid[targetTower.idx] = null;
+                        window.showMessage("보스의 공격으로 유닛이 파괴되었습니다!");
+                    }
+                }
+                m.counterTimer = 10; 
+            }
+        }
+
         let t = currentPath[m.targetNode]; let dx = t.x - m.x, dy = t.y - m.y; let dist = Math.hypot(dx, dy); let currentSpeed = m.speed; if (m.freezeTimer > 0) currentSpeed *= 0.5; let move = currentSpeed * dt;
         if (dx > 0) m.facingRight = true; else if (dx < 0) m.facingRight = false;
         if(dist <= move) { m.x = t.x; m.y = t.y; m.targetNode = (m.targetNode + 1) % currentPath.length; } else { m.x += (dx/dist)*move; m.y += (dy/dist)*move; }
@@ -1374,6 +1492,53 @@ window.loop = () => {
     let cardMulti = 1 + (getTotalCardBonus() / 100); let rageMulti = 1 + ((skillLevels.common_rage||0) * 0.01) + (equipStats.atk * 0.01); let sharpChance = ((skillLevels.common_sharp||0) * 0.05) + (equipStats.crit * 0.01); let windReduc = 1 + ((skillLevels.common_wind||0) * 0.2) + (equipStats.spd * 0.01);
 
     towers.forEach(t => {
+        if (t.unitStunTimer > 0) { t.unitStunTimer -= dt; return; } // 🔥 도적 과부하 후 기절 처리
+
+        // 🔥 제네시스 이상 전용 신규 스킬 발동 로직
+        if (t.gradeIdx >= 7) {
+            if (t.cls.type === '전사' && skillLevels.war_threat > 0) {
+                t.threatCooldown -= dt * 1000;
+                if (t.threatCooldown <= 0 && monsters.length > 0) {
+                    monsters[0].threatTimer = skillLevels.war_threat * 2;
+                    t.threatCooldown += 30000;
+                }
+            }
+            if (t.cls.type === '법사' && skillLevels.mage_heal > 0) {
+                t.healCooldown -= dt * 1000;
+                if (t.healCooldown <= 0) {
+                    let gridWidth = state.isRank ? 5 : 5;
+                    let tCol = t.idx % gridWidth; let tRow = Math.floor(t.idx / gridWidth);
+                    let injured = towers.filter(u => {
+                        if (u.hp >= u.maxHp) return false;
+                        let uCol = u.idx % gridWidth; let uRow = Math.floor(u.idx / gridWidth);
+                        return Math.abs(uCol - tCol) <= 1 && Math.abs(uRow - tRow) <= 1;
+                    });
+                    if (injured.length > 0) {
+                        injured.forEach(u => u.hp = Math.min(u.maxHp, u.hp + 2));
+                        t.healCooldown += (70 - skillLevels.mage_heal * 10) * 1000;
+                        hitEffects.push({ x: t.x, y: t.y, timer: 0.5, color: '#00e5ff' });
+                    } else {
+                        t.healCooldown = 0;
+                    }
+                }
+            }
+            if (t.cls.type === '도적' && skillLevels.thief_overload > 0) {
+                if (t.overloadTimer <= 0 && t.unitStunTimer <= 0) {
+                    t.overloadTimer = skillLevels.thief_overload === 5 ? 15 : 6 + (skillLevels.thief_overload * 2);
+                }
+            }
+        }
+
+        // 🔥 도적 과부하 버프 체크 (공속 2배)
+        let overloadMult = 1;
+        if (t.overloadTimer > 0) {
+            t.overloadTimer -= dt;
+            overloadMult = 2;
+            if (t.overloadTimer <= 0) {
+                t.unitStunTimer = skillLevels.thief_overload === 1 ? 6 : 5;
+            }
+        }
+
         if (t.gradeIdx === 6) {
             t.bindCooldown -= dt * 1000; let bar = document.getElementById(`bind-bar-${t.idx}`); if (bar) bar.style.width = Math.max(0, Math.min(100, ((75000 - t.bindCooldown) / 75000) * 100)) + '%';
             if (t.bindCooldown <= 0) { if (monsters.length > 0) { let target = null; for (let m of monsters) { if (m.bindTimer <= 0) { target = m; break; } } if (!target) target = monsters[0]; if (target) { target.bindTimer = 10; t.bindCooldown += 75000; } } else { t.bindCooldown = 0; } }
@@ -1392,15 +1557,18 @@ window.loop = () => {
             }
         }
         
-        t.lastAttack -= dt * 1000; let attackCd = (t.cls.cd * (t.grade.speedMul || 1)) / windReduc;
+        t.lastAttack -= dt * 1000; let attackCd = (t.cls.cd * (t.grade.speedMul || 1)) / (windReduc * overloadMult); // 🔥 과부하 공속 반영
         while(t.lastAttack <= 0) {
             let range = t.cls.range * t.grade.rangeMul; let target = null;
             for(let m of monsters) { let d = Math.hypot(m.x - t.x, m.y - t.y); if(d <= range) { target = m; break; } }
             if(target) {
                 let dmg = (t.cls.baseDmg + (state.upgrades[t.cls.type].val * 0.15) + equipStats.flatAtk) * t.grade.mult * cardMulti * rageMulti; 
+                if (target.threatTimer > 0) dmg *= 1.1; // 🔥 위협 디버프 최종 데미지 1.1배 증폭
+
                 let isCrit = Math.random() < sharpChance; if (isCrit) dmg *= 1.2; let isFinal = false; if (t.cls.type === '전사' && (skillLevels.war_final||0) > 0 && Math.random() < ((skillLevels.war_final||0) * 0.03)) { isFinal = true; dmg *= 2; }
-                projectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: isFinal, baseDmgToPass: dmg });
-                if (t.cls.type === '도적' && (skillLevels.thief_shadow||0) > 0 && Math.random() < ((skillLevels.thief_shadow||0) * 0.03)) { projectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: false, isShadow: true }); }
+                projectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: isFinal, baseDmgToPass: dmg, sourceTower: t });
+                if (t.cls.type === '도적' && (skillLevels.thief_shadow||0) > 0 && Math.random() < ((skillLevels.thief_shadow||0) * 0.03)) { projectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: false, isShadow: true, sourceTower: t }); }
+                
                 t.lastAttack += attackCd;
             } else { t.lastAttack = 0; break; }
         }
@@ -1418,7 +1586,9 @@ window.loop = () => {
         if(dist <= speed) {
             if (p.gradeIdx >= 6) { hitEffects.push({ x: p.tx, y: p.ty, timer: 0.2, color: p.color }); }
             if(monsters.includes(p.target)) {
-                let hitDmg = p.dmg; if (p.type === '전사' && p.target.isBoss) hitDmg *= 1.5; p.target.hp -= hitDmg; if(state.isRank && p.target.isBoss) rankState.myBossDamage += hitDmg;
+                let hitDmg = p.dmg; if (p.type === '전사' && p.target.isBoss) hitDmg *= 1.5; 
+                p.target.hp -= hitDmg; p.sourceTower.damageDealt += hitDmg; // 🔥 누적 딜량 기록
+                if(state.isRank && p.target.isBoss) rankState.myBossDamage += hitDmg;
                 if (p.isCrit) damageTexts.push({ val: Math.floor(hitDmg), x: p.target.x, y: p.target.y - 35, timer: 0.8 });
                 if (p.type === '전사' && Math.random() < 0.2) p.target.stunTimer = 1;
                 if (p.type === '법사' && (skillLevels.mage_freeze||0) > 0 && Math.random() < ((10 + (skillLevels.mage_freeze||0) * 2) / 100)) { if (p.target.freezeTimer <= 0) { p.target.freezeTimer = 3; p.target.freezeTickTimer = 1; p.target.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][(skillLevels.mage_freeze||0) - 1]; } }
@@ -1426,7 +1596,9 @@ window.loop = () => {
             if(p.splash > 0) {
                 monsters.forEach(m => {
                     if(m !== p.target && Math.hypot(m.x - p.tx, m.y - p.ty) <= p.splash) {
-                        let splashDmg = p.dmg; if (p.type === '전사' && m.isBoss) splashDmg *= 1.5; m.hp -= splashDmg; if(state.isRank && m.isBoss) rankState.myBossDamage += splashDmg;
+                        let splashDmg = p.dmg; if (p.type === '전사' && m.isBoss) splashDmg *= 1.5; 
+                        m.hp -= splashDmg; p.sourceTower.damageDealt += splashDmg;
+                        if(state.isRank && m.isBoss) rankState.myBossDamage += splashDmg;
                         if (p.isCrit) damageTexts.push({ val: Math.floor(splashDmg), x: m.x, y: m.y - 35, timer: 0.8 });
                         if (p.type === '전사' && Math.random() < 0.2) m.stunTimer = 1;
                         if (p.type === '법사' && (skillLevels.mage_freeze||0) > 0 && Math.random() < ((10 + (skillLevels.mage_freeze||0) * 2) / 100)) { if (m.freezeTimer <= 0) { m.freezeTimer = 3; m.freezeTickTimer = 1; m.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][(skillLevels.mage_freeze||0) - 1]; } }
@@ -1439,13 +1611,15 @@ window.loop = () => {
     for(let i=monsters.length-1; i>=0; i--) {
         if(monsters[i].hp <= 0) {
             state.kills++;
-            if (!state.isRank) {
+            if (state.isRank) {
+                // 🔥 랭크 게임: 내가 몹을 잡으면 상대 필드로 핑퐁 스폰!
+                oppMonsters.push({ hp: monsters[i].maxHp, maxHp: monsters[i].maxHp, x: currentPath[0].x, y: currentPath[0].y, targetNode: 1, speed: 50, isBoss: false, bindTimer: 0, stunTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0, name: null, facingRight: true });
+            } else {
                 state.mp++; state.mpTotal++; if(state.mpTotal >= 10) { state.meso += 5; state.mpTotal -= 10; }
                 if(monsters[i].isBoss) {
                     let bInfo = getBossInfo(state.wave); 
                     state.meso += bInfo.meso; 
                     
-                    // 🔥 설정된 장수(count)만큼 해당 등급(tier)의 선택권을 반복해서 지급!
                     let tCount = bInfo.count || 1;
                     let tTier = bInfo.tier || 5; 
                     for (let t = 0; t < tCount; t++) {
@@ -1453,7 +1627,8 @@ window.loop = () => {
                     }
                     
                     let drops = [];
-                    if (Math.random() * 100 <= 15) { userInventory.equipBoxes = (userInventory.equipBoxes || 0) + 1; drops.push({ type: 'equip' }); }
+                    // 🔥 장비 상자 확률 5%로 너프
+                    if (Math.random() * 100 <= 5) { userInventory.equipBoxes = (userInventory.equipBoxes || 0) + 1; drops.push({ type: 'equip' }); }
                     if (Math.random() * 100 <= 20) { cardData[bInfo.name] = cardData[bInfo.name] || { owned: 0, grade: 0 }; cardData[bInfo.name].owned++; localStorage.setItem('mapleDefenseCards', JSON.stringify(cardData)); if (currentUserUid) window.syncToCloud(); drops.push({ type: 'card', name: bInfo.name }); }
                     if (drops.length > 0) { window.showLootPopup(drops); } else { window.showMessage(`${state.wave}라운드 보스 처치!`); }
                 }
