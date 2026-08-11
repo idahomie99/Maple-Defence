@@ -680,7 +680,7 @@ window.openRaidLobby = () => {
             let currentMaxHp = dbMax < baseMaxHp ? baseMaxHp : dbMax;
             
             let hp = typeof val === 'number' ? val : (val.hp !== undefined ? val.hp : currentMaxHp);
-            if(isNaN(hp) || hp < baseMaxHp) hp = currentMaxHp;
+            if(isNaN(hp)) hp = currentMaxHp; // 🔥 버그 원인(hp < baseMaxHp) 삭제 완료!
             
             let percent = (hp / currentMaxHp) * 100;
             if(hpBar) hpBar.style.width = `${Math.max(0, percent)}%`;
@@ -721,7 +721,7 @@ window.startRaidGame = () => {
             
             raidState.maxHp = currentMaxHp; 
             raidState.bossHp = typeof val === 'number' ? val : (val.hp !== undefined ? val.hp : currentMaxHp);
-            if(isNaN(raidState.bossHp) || raidState.bossHp < baseMaxHp) raidState.bossHp = currentMaxHp;
+            if(isNaN(raidState.bossHp)) raidState.bossHp = currentMaxHp; // 🔥 버그 원인 삭제 완료!
             
             let percent = (raidState.bossHp / raidState.maxHp) * 100;
             document.getElementById('raid-boss-hp-bar').style.width = `${Math.max(0, percent)}%`; 
