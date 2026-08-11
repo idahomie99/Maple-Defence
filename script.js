@@ -106,7 +106,7 @@ const SKILL_INFO = {
     // 🔥 제네시스/데스티니 전용 신규 스킬 3종
     war_threat: { name: "위협", max: 5, getDesc: (lv) => `30초마다 단일 적 위협. 최종 데미지 1.1배, ${lv * 2}초 유지 (제네시스↑)`, img: "image/rage.png" },
     mage_heal: { name: "힐", max: 5, getDesc: (lv) => `${70 - lv*10}초마다 주위 1칸 아군 체력 2 회복 (제네시스↑)`, img: "image/freeze.png" },
-    thief_overload: { name: "과부하", max: 5, getDesc: (lv) => `공속 2배 딜 후 기절. 버프 ${lv===5?15:6+lv*2}초/기절 ${lv===1?6:5}초 (제네시스↑)`, img: "image/shadowpartner.png" }
+    thief_overload: { name: "레디투다이", max: 5, getDesc: (lv) => `공속 2배 딜 후 기절. 버프 ${lv===5?15:6+lv*2}초/기절 ${lv===1?6:5}초 (제네시스↑)`, img: "image/shadowpartner.png" }
 };
 
 const bossImages = { "킹 슬라임": new Image(), "알리샤르": new Image(), "파풀라투스": new Image(), "피아누스": new Image(), "자쿰": new Image(), "혼테일": new Image(), "시그너스": new Image(), "반반": new Image(), "피에르": new Image(), "블러드퀸": new Image(), "벨룸": new Image(), "어둠의 늑대": new Image(), "스우": new Image(), "데미안": new Image(), "루시드": new Image(), "윌": new Image(), "가디언엔젤슬라임": new Image() };
@@ -1492,7 +1492,7 @@ window.loop = () => {
     let cardMulti = 1 + (getTotalCardBonus() / 100); let rageMulti = 1 + ((skillLevels.common_rage||0) * 0.01) + (equipStats.atk * 0.01); let sharpChance = ((skillLevels.common_sharp||0) * 0.05) + (equipStats.crit * 0.01); let windReduc = 1 + ((skillLevels.common_wind||0) * 0.2) + (equipStats.spd * 0.01);
 
     towers.forEach(t => {
-        if (t.unitStunTimer > 0) { t.unitStunTimer -= dt; return; } // 🔥 도적 과부하 후 기절 처리
+        if (t.unitStunTimer > 0) { t.unitStunTimer -= dt; return; } // 🔥 도적 레디투다이 후 기절 처리
 
         // 🔥 제네시스 이상 전용 신규 스킬 발동 로직
         if (t.gradeIdx >= 7) {
@@ -1529,7 +1529,7 @@ window.loop = () => {
             }
         }
 
-        // 🔥 도적 과부하 버프 체크 (공속 2배)
+        // 🔥 도적 레디투다이 버프 체크 (공속 2배)
         let overloadMult = 1;
         if (t.overloadTimer > 0) {
             t.overloadTimer -= dt;
@@ -1557,7 +1557,7 @@ window.loop = () => {
             }
         }
         
-        t.lastAttack -= dt * 1000; let attackCd = (t.cls.cd * (t.grade.speedMul || 1)) / (windReduc * overloadMult); // 🔥 과부하 공속 반영
+        t.lastAttack -= dt * 1000; let attackCd = (t.cls.cd * (t.grade.speedMul || 1)) / (windReduc * overloadMult); // 🔥 레디투다이 공속 반영
         while(t.lastAttack <= 0) {
             let range = t.cls.range * t.grade.rangeMul; let target = null;
             for(let m of monsters) { let d = Math.hypot(m.x - t.x, m.y - t.y); if(d <= range) { target = m; break; } }
