@@ -3112,8 +3112,8 @@ function drawMulung() {
     mulungState.dmgTexts.forEach(d => { ctx.save(); ctx.globalAlpha = Math.max(0, d.timer / 0.6); ctx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; ctx.font = d.isCrit ? "800 20px NanumSquare" : "bold 14px NanumSquare"; ctx.shadowColor = d.isCrit ? "#c62828" : "#000"; ctx.shadowBlur = 4; ctx.fillText(d.val, d.x, d.y); ctx.restore(); });
 }
 
-// 🔥 무릉도장 종료 및 보상 정산
-function endMulungGame() {
+// 🔥 무릉도장 종료 및 보상 정산 (랭킹 저장 로직 추가)
+async function endMulungGame() {
     mulungState.active = false;
     cancelAnimationFrame(mulungReqId);
     
@@ -3121,6 +3121,24 @@ function endMulungGame() {
     let reward = clearedWave * 2;
     userRankData.mulungCoins += reward;
     window.syncToCloud();
+
+    // 🏆 파이어베이스 랭킹 기록 저장 로직
+    if (currentUserUid) {
+        try {
+            const snap = await get(child(ref(database), `mulung_rankings/${currentUserUid}`));
+            let bestFloor = 0;
+            if (snap.exists()) { bestFloor = snap.val().floor || 0; }
+            
+            // 기존 최고 기록보다 높으면 서버 업데이트
+            if (clearedWave > bestFloor) {
+                await set(ref(database, `mulung_rankings/${currentUserUid}`), {
+                    nickname: currentUserName,
+                    floor: clearedWave,
+                    date: new Date().toLocaleDateString()
+                });
+            }
+        } catch(e) { console.warn("무릉 랭킹 저장 실패", e); }
+    }
     
     document.getElementById('mulung-ui').style.display = 'none';
     document.getElementById('grid-container').style.display = 'grid'; // 기존 그리드 복구
@@ -3128,3 +3146,50 @@ function endMulungGame() {
     alert(`☠️ 무릉도장 도전 종료!\n도달 층수: ${clearedWave}층\n획득 무릉 코인: ${reward}개`);
     window.switchScreen('start-screen');
 }
+
+// ==========================================
+// 🔥 무릉도장 전용 로비 및 랭킹 UI 제어 함수
+// ==========================================
+window.openMulungLobby = () => {
+    document.getElementById('online-menu-modal').style.display = 'none';
+    document.getElementById('mulung-lobby-modal').style.display = 'block';
+    window.loadMulungRanking(); // 로비 열 때 랭킹 동기화
+};
+
+window.closeMulungLobby = () => {
+    document.getElementById('mulung-lobby-modal').style.display = 'none';
+    document.getElementById('online-menu-modal').style.display = 'block';
+};
+
+window.openMulungShopFromLobby = () => {
+    document.getElementById('online-overlay').style.display = 'none'; 
+    window.openMulungShop();
+};
+
+window.loadMulungRanking = async () => {
+    let list = document.getElementById('mulung-live-ranking-list');
+    if(!list) return;
+    try {
+        const snap = await get(child(ref(database), `mulung_rankings`));
+        if (snap.exists()) {
+            let ranks = []; 
+            snap.forEach(c => { 
+                let v = c.val(); 
+                if(typeof v.floor === 'number') ranks.push(v); 
+            }); 
+            // 층수 내림차순 정렬 후 Top 10 추출
+            ranks.sort((a, b) => b.floor - a.floor); 
+            ranks = ranks.slice(0, 10); 
+            list.innerHTML = '';
+            
+            ranks.forEach((entry, idx) => { 
+                let color = idx === 0 ? '#ffd700' : (idx === 1 ? '#e0e0e0' : (idx === 2 ? '#cd7f32' : '#fff')); 
+                list.innerHTML += `<div style="display:flex; justify-content:space-between; background:rgba(255,255,255,0.1); padding:6px 10px; border-radius:4px; color:${color}; font-weight:bold;"><span>${idx + 1}. ${entry.nickname}</span><span>${entry.floor}층</span></div>`; 
+            });
+        } else { 
+            list.innerHTML = '<div style="text-align:center; color:#ccc;">아직 등록된 랭킹이 없습니다.</div>'; 
+        }
+    } catch(e) { 
+        list.innerHTML = '<div style="text-align:center; color:#ff5252;">서버 연결 실패.</div>'; 
+    }
+};
