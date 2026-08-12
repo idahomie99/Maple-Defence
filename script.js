@@ -445,7 +445,60 @@ window.loadAndStartGame = () => {
     window.switchScreen('game-container'); state.status = 'PREP'; state.time = 5; lastTime = performance.now(); state.isBoss = !!getBossInfo(state.wave); cancelAnimationFrame(mainReqId); window.updateUI(); mainReqId = requestAnimationFrame(window.loop);
 };
 
-window.goToLobby = () => { if(!state.isRank) window.saveGameData(); state.status = 'TITLE'; cancelAnimationFrame(mainReqId); let gameOverModal = document.getElementById('gameover-modal'); if(gameOverModal) gameOverModal.style.display = 'none'; window.closeAllModals(); document.getElementById('ui-best-wave').innerText = bestWave; window.switchScreen('start-screen'); if (currentUserUid) window.syncToCloud(); };
+window.goToLobby = () => { 
+    if(!state.isRank) window.saveGameData(); 
+    state.status = 'TITLE'; 
+    cancelAnimationFrame(mainReqId); 
+    cancelAnimationFrame(mulungReqId); // 무릉 루프도 확실하게 정지
+    
+    // 🔥 무릉도장용으로 변형되었던 상단/하단 UI를 원래대로 원복
+    let resourceRow = document.querySelector('.resource-row');
+    if (resourceRow) {
+        resourceRow.innerHTML = `
+            <div class="meso-box"><img src="image/meso.png" alt="Meso" style="height: 16px; vertical-align: middle; margin-right: 4px;">메소 <span id="ui-meso">25</span></div>
+            <div class="mp-box"><img src="image/mepo.png" alt="Mepo" style="height: 16px; vertical-align: middle; margin-right: 4px;">메포 <span id="ui-mp">0</span></div>
+        `;
+    }
+    
+    let controlsPanel = document.getElementById('controls');
+    if (controlsPanel) {
+        controlsPanel.innerHTML = `
+            <div style="display: flex; gap: 4px; margin-bottom: 15px;">
+                <button id="btn-summon" class="ingame-btn premium-green" style="flex: 1.5; padding: 16px; font-size: 16px;" onclick="summonUnit()">소환 (10)</button>
+                <button class="ingame-btn premium-purple" style="flex: 1; font-size: 13px; padding: 0 5px;" onclick="autoMerge()">✨일괄합성</button>
+                <button id="btn-sell-single" class="ingame-btn premium-orange" style="flex: 0.8; font-size: 13px; padding: 0 5px;" onclick="sellSelectedUnit()" disabled>선택판매</button>
+                <button class="ingame-btn premium-dark" style="flex: 0.8; font-size: 13px; padding: 0 5px;" onclick="openBulkSellModal()">조건판매</button>
+            </div>
+            <div style="text-align:center; font-weight:bold; font-size:14px; color:#5a3c22; margin-bottom: 5px; border-top: 1px dashed #8b5a2b; padding-top: 5px;">
+                <img src="image/chaosscroll.png" style="height: 20px; vertical-align: middle;"> 혼돈의 주문서 강화 <img src="image/chaosscroll.png" style="height: 20px; vertical-align: middle;">
+            </div>
+            <div class="upgrade-container">
+                <div class="upgrade-box" id="upg-w-box" onclick="upgrade('전사')">
+                    <div class="job-title warrior">전사 (+<span id="upg-w-val">0</span>)</div>
+                    <div class="cost"><span id="upg-w-cost">10</span> 메포</div>
+                </div>
+                <div class="upgrade-box" id="upg-m-box" onclick="upgrade('법사')">
+                    <div class="job-title mage">법사 (+<span id="upg-m-val">0</span>)</div>
+                    <div class="cost"><span id="upg-m-cost">10</span> 메포</div>
+                </div>
+                <div class="upgrade-box" id="upg-t-box" onclick="upgrade('도적')">
+                    <div class="job-title thief">도적 (+<span id="upg-t-val">0</span>)</div>
+                    <div class="cost"><span id="upg-t-cost">10</span> 메포</div>
+                </div>
+            </div>
+            <div class="ticket-row" style="margin-top: 15px;">
+                <span>선택권: <span id="ui-tickets" class="highlight">0</span>장</span>
+                <button class="ingame-btn premium-blue" style="padding: 8px 15px;" onclick="openTicketModal()">사용하기</button>
+            </div>
+        `;
+    }
+
+    let gameOverModal = document.getElementById('gameover-modal'); if(gameOverModal) gameOverModal.style.display = 'none'; 
+    window.closeAllModals(); 
+    document.getElementById('ui-best-wave').innerText = bestWave; 
+    window.switchScreen('start-screen'); 
+    if (currentUserUid) window.syncToCloud(); 
+};
 window.toggleSpeed = () => { if(state.isRank) return; if (state.speed === 1) state.speed = 10; else if (state.speed === 10) state.speed = 15; else state.speed = 1; document.getElementById('btn-speed').innerText = state.speed + "배속"; };
 function getGradeByProb() { let rand = Math.random() * 100; let acc = 0; for(let i=0; i<GRADES.length; i++) { acc += GRADES[i].prob; if(rand <= acc) return i; } return 0; }
 
@@ -1363,7 +1416,25 @@ window.closeRankShop = () => { document.getElementById('rank-shop-modal').style.
 window.buyMonsterPiece = () => { if (userRankData.rankMoney >= 100) { userRankData.rankMoney -= 100; userInventory.coinPieces += 1; document.getElementById('ui-shop-rank-money').innerText = userRankData.rankMoney; document.getElementById('ui-shop-pieces').innerText = userInventory.coinPieces; document.getElementById('ui-rank-money').innerText = userRankData.rankMoney + " 원"; if (currentUserUid) window.syncToCloud(); window.showMessage("코인 조각 1개 구매 완료!"); } else { window.showMessage("랭크 머니가 부족합니다."); } };
 window.buyStarPiece = () => { if (userRankData.rankMoney >= 50) { userRankData.rankMoney -= 50; userInventory.starPieces = (userInventory.starPieces || 0) + 1; document.getElementById('ui-shop-rank-money').innerText = userRankData.rankMoney; let starUi = document.getElementById('ui-shop-star-pieces'); if (starUi) starUi.innerText = userInventory.starPieces; document.getElementById('ui-rank-money').innerText = userRankData.rankMoney + " 원"; if (currentUserUid) window.syncToCloud(); window.showMessage("별의 기운 1개 구매 완료!"); } else { window.showMessage("랭크 머니가 부족합니다. (50원 필요)"); } };
 
-function showMatchIntro(oppName, oppRp, callback) { let intro = document.getElementById('match-intro-overlay'); document.getElementById('intro-player').innerText = `${currentUserName} (${userRankData.rp} RP)`; document.getElementById('intro-opp').innerText = `${oppName} (${oppRp} RP)`; intro.style.display = 'flex'; void intro.offsetWidth; intro.style.opacity = '1'; setTimeout(() => { intro.style.opacity = '0'; setTimeout(() => { intro.style.display = 'none'; callback(); }, 500); }, 2000);  }
+function showMatchIntro(oppName, oppRp, callback) { 
+    let intro = document.getElementById('match-intro-overlay'); 
+    document.getElementById('intro-player').innerText = `${currentUserName} (${userRankData.rp} RP)`; 
+    document.getElementById('intro-opp').innerText = `${oppName} (${oppRp} RP)`; 
+    
+    // 🔥 화면을 띄우고 서서히 나타나게 함 (Fade-in)
+    intro.style.display = 'flex'; 
+    void intro.offsetWidth; 
+    intro.style.opacity = '1'; 
+    
+    // 🔥 5초(5000ms) 대기 후 Fade-out
+    setTimeout(() => { 
+        intro.style.opacity = '0'; 
+        setTimeout(() => { 
+            intro.style.display = 'none'; 
+            callback(); 
+        }, 500); 
+    }, 5000);  
+}
 
 window.startRankMatchmaking = async () => {
     let playCount = parseInt(localStorage.getItem('mapleDefenseRankCount')) || 0; if (playCount >= 10) { window.showMessage("오늘의 랭크 게임 제한 횟수를 모두 소진했습니다!"); return; }
@@ -2440,7 +2511,6 @@ let cubeTargetIndex = -1;
 let cubeIsEquipped = false;
 
 // 🔥 무릉도장 상점 열기
-// 🔥 무릉도장 상점 열기
 window.openMulungShop = () => {
     document.getElementById('overlay').style.display = 'block';
     let modal = document.getElementById('mulung-shop-modal');
@@ -2456,22 +2526,21 @@ window.openMulungShop = () => {
                 <div style="display:flex; flex-direction:column; gap:8px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; background:#e0f2f1; padding:10px; border-radius:6px; border:1px solid #b2dfdb;">
                         <span style="font-weight:bold; font-size:14px;">🧩 코인 조각</span>
-                        <button class="ingame-btn" style="padding:6px 12px; font-size:12px;" onclick="buyMulungItem('piece')">10 코인</button>
+                        <button class="ingame-btn premium-dark" style="width:80px; padding:6px 0; font-size:12px;" onclick="buyMulungItem('piece')">10 코인</button>
                     </div>
                     <div style="display:flex; justify-content:space-between; align-items:center; background:#e0f2f1; padding:10px; border-radius:6px; border:1px solid #b2dfdb;">
                         <span style="font-weight:bold; font-size:14px;">🌟 별의 기운</span>
-                        <button class="ingame-btn" style="padding:6px 12px; font-size:12px;" onclick="buyMulungItem('star')">5 코인</button>
+                        <button class="ingame-btn premium-dark" style="width:80px; padding:6px 0; font-size:12px;" onclick="buyMulungItem('star')">5 코인</button>
                     </div>
                     <div style="display:flex; justify-content:space-between; align-items:center; background:#e0f2f1; padding:10px; border-radius:6px; border:1px solid #b2dfdb;">
                         <span style="font-weight:bold; font-size:14px;">🎁 장비 상자</span>
-                        <button class="ingame-btn" style="padding:6px 12px; font-size:12px;" onclick="buyMulungItem('equipBox')">50 코인</button>
+                        <button class="ingame-btn premium-dark" style="width:80px; padding:6px 0; font-size:12px;" onclick="buyMulungItem('equipBox')">50 코인</button>
                     </div>
                     <div style="display:flex; justify-content:space-between; align-items:center; background:#e0f2f1; padding:10px; border-radius:6px; border:1px solid #b2dfdb;">
                         <span style="font-weight:bold; font-size:14px;">⬛ 블랙 큐브</span>
-                        <button class="ingame-btn premium-dark" style="padding:6px 12px; font-size:12px;" onclick="buyMulungItem('cube')">150 코인</button>
+                        <button class="ingame-btn premium-dark" style="width:80px; padding:6px 0; font-size:12px;" onclick="buyMulungItem('cube')">150 코인</button>
                     </div>
                 </div>
-                <!-- 🔥 닫기 버튼이 메인 로비가 아닌 '무릉 로비'로 가도록 함수 변경 -->
                 <button class="ingame-btn premium-white" style="width:100%; padding:10px; margin-top:10px;" onclick="closeMulungShop()">닫기</button>`;
     modal.innerHTML = html;
     modal.style.display = 'block';
@@ -2698,16 +2767,23 @@ window.startMulungMatchmaking = async () => {
     intro.style.display = 'flex';
     intro.style.opacity = '1';
 
-    // 2.5초 대기 후 본격적인 무릉도장 진입
+    // 5초(5000ms) 대기 후 본격적인 무릉도장 진입
     setTimeout(() => { 
         intro.style.opacity = '0'; 
         setTimeout(() => { 
             intro.style.display = 'none'; 
+            
+            // 🔥 무릉도장 로비 팝업창 강제로 닫기 추가!
+            let mlLobby = document.getElementById('mulung-lobby-modal');
+            if (mlLobby) mlLobby.style.display = 'none';
+            let onlineOv = document.getElementById('online-overlay');
+            if (onlineOv) onlineOv.style.display = 'none';
+
             playCount++; localStorage.setItem('mapleDefenseMulungCount', playCount);
             window.startMulungGame(oppName, oppEquipData);
             window.showMessage("무릉도장 진입 완료!");
         }, 500); 
-    }, 2500);
+    }, 5000);
 };
 
 // 🔥 무릉도장 시작 및 UI 세팅
@@ -2723,19 +2799,37 @@ window.startMulungGame = (oppName, oppEquipData) => {
     document.getElementById('btn-speed').style.display = 'none';
     document.getElementById('btn-summon').style.display = 'none';
     
-    // 상단 파티 정보창 세팅
-    document.getElementById('ui-wave').innerText = "1";
-    document.getElementById('ui-kills').innerText = "무릉도장";
+    // 🔥 상단 헤더 텍스트 무릉도장 전용으로 변경 (메소, 메포 숨기고 무릉 코인 표시)
+    document.getElementById('ui-wave').innerText = "1층 (1/5)";
+    document.getElementById('ui-kills').innerText = "무릉도장 동료: " + oppName;
+    document.getElementById('ui-timer').innerText = "진행중";
     
-    // 하단 승급 UI 컨테이너 생성
-    let mUI = document.getElementById('mulung-ui');
-    if(!mUI) {
-        mUI = document.createElement('div'); mDiv = mUI;
-        mUI.id = 'mulung-ui';
-        mUI.style.cssText = "position:absolute; bottom:15px; left:50%; transform:translateX(-50%); width:95%; display:flex; justify-content:space-around; background:rgba(0,0,0,0.8); padding:15px 10px; border-radius:10px; z-index:100; border:2px solid #b2dfdb;";
-        document.getElementById('game-container').appendChild(mUI);
+    // 메소 / 메포 박스를 숨기고 '무릉 코인' 전용 박스로 교체
+    let resourceRow = document.querySelector('.resource-row');
+    if (resourceRow) {
+        resourceRow.innerHTML = `
+            <div class="meso-box" style="width: 100%; color: #e65100;">
+                🪙 무릉 코인 <span id="ui-mulung-coins">0</span>개
+            </div>
+        `;
     }
-    mUI.style.display = 'flex';
+
+    // 🔥 하단 업그레이드(혼돈의 주문서) 영역을 무릉도장 성장 시스템으로 변경
+    let controlsPanel = document.getElementById('controls');
+    if (controlsPanel) {
+        controlsPanel.innerHTML = `
+            <div style="display: flex; gap: 4px; margin-bottom: 10px;">
+                <button class="ingame-btn premium-purple" style="flex: 1;" onclick="autoMerge()">✨일괄합성</button>
+                <button class="ingame-btn premium-dark" style="flex: 1;" onclick="openMulungShop()">🐼 무릉 상점</button>
+            </div>
+            <div style="text-align:center; font-weight:bold; font-size:14px; color:#004d40; margin-bottom: 5px; border-top: 1px dashed #00796b; padding-top: 5px;">
+                🐼 무릉도장 유닛 승급 🐼
+            </div>
+            <div class="upgrade-container" id="mulung-upgrade-buttons">
+                <!-- 동적으로 채워짐 -->
+            </div>
+        `;
+    }
 
     // 무릉도장 상태 초기화
     let baseUnits = [
@@ -2758,13 +2852,11 @@ window.startMulungGame = (oppName, oppEquipData) => {
         projectiles: [], vfx: [], dmgTexts: []
     };
 
-    // 인트로 함수 덮어쓰기 (주석 해제 효과)
-    window.startMulungMatchmaking = async () => { /* 기존 로직 우회 방지용 */ };
+    window.startMulungMatchmaking = async () => {};
 
     spawnMulungBoss();
     updateMulungUI();
     
-    // 기존 루프 멈추고 무릉 루프 시작
     cancelAnimationFrame(mainReqId);
     mulungReqId = requestAnimationFrame(mulungLoop);
 };
@@ -2798,21 +2890,25 @@ function spawnMulungBoss() {
 
 // 🔥 무릉도장 하단 승급 UI 갱신
 function updateMulungUI() {
-    let mUI = document.getElementById('mulung-ui');
-    if(!mUI) return;
+    // 상단 무릉 코인 텍스트 실시간 갱신
+    let coinSpan = document.getElementById('ui-mulung-coins');
+    if (coinSpan) coinSpan.innerText = mulungState.coins;
+
+    // 하단 승급 버튼 렌더링
+    let upgradeContainer = document.getElementById('mulung-upgrade-buttons');
+    if(!upgradeContainer) return;
     
-    mUI.innerHTML = `
-        <div style="position:absolute; top:-35px; left:0; width:100%; text-align:center; color:#ffeb3b; font-size:18px; font-weight:bold; text-shadow:2px 2px 4px #000;">💰 보유 코인: ${mulungState.coins}개</div>
-        ${mulungState.myUnits.map((u, i) => {
-            let cost = u.gradeIdx >= 8 ? 'MAX' : (u.gradeIdx + 2);
-            let btnClass = u.gradeIdx >= 8 ? 'premium-dark' : (mulungState.coins >= cost ? 'premium-orange' : 'premium-white');
-            return `<div style="text-align:center; color:#fff; width:30%;">
-                <div style="font-size:24px; text-shadow:1px 1px 2px #000;">${CLASSES[u.type].icon}</div>
-                <div style="font-size:11px; margin-bottom:5px; color:${CLASSES[u.type].color}; font-weight:bold;">${GRADES[u.gradeIdx].name}</div>
-                <button class="ingame-btn ${btnClass}" style="width:100%; padding:8px 0; font-size:12px;" onclick="upgradeMulungUnit(${i})" ${u.gradeIdx>=8?'disabled':''}>승급 (${cost}코인)</button>
-            </div>`
-        }).join('')}
-    `;
+    upgradeContainer.innerHTML = mulungState.myUnits.map((u, i) => {
+        let cost = u.gradeIdx >= 8 ? 'MAX' : (u.gradeIdx + 2);
+        let btnClass = u.gradeIdx >= 8 ? 'premium-dark' : (mulungState.coins >= cost ? 'premium-orange' : 'premium-white');
+        let actionLabel = u.gradeIdx === 0 ? "초보자 유닛 생성" : `${GRADES[u.gradeIdx].name} 레벨업`;
+        
+        return `<div class="upgrade-box" onclick="upgradeMulungUnit(${i})" style="cursor:pointer;">
+            <div class="job-title" style="color:${CLASSES[u.type].color};">${u.type}</div>
+            <div style="font-size:11px; font-weight:bold; color:#333; margin:2px 0;">${actionLabel}</div>
+            <div class="cost" style="color:#d32f2f;">${cost} 무릉코인</div>
+        </div>`;
+    }).join('');
 }
 
 window.upgradeMulungUnit = (idx) => {
