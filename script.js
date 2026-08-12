@@ -1052,6 +1052,18 @@ function raidLoop() {
     raidState.units.forEach((u, idx) => {
         if(!u) return; 
 
+        let overloadMult = 1;
+        let unitBox = document.getElementById(`raid-unit-box-${idx}`);
+        if (u.overloadTimer > 0) {
+            u.overloadTimer -= dt; overloadMult = 2;
+            if (unitBox) { unitBox.style.border = "2px solid #ff1744"; unitBox.style.boxShadow = "0 0 8px #ff1744"; }
+            if (u.overloadTimer <= 0) u.unitStunTimer = skillLevels.thief_overload === 1 ? 6 : 5;
+        } else {
+            if (unitBox) { unitBox.style.border = ""; unitBox.style.boxShadow = ""; }
+        }
+        if (u.unitStunTimer > 0) u.unitStunTimer -= dt;
+        let isStunned = (u.unitStunTimer > 0);
+
         if (u.gradeIdx >= 6) {
             if (u.cls.type === '법사' && skillLevels.mage_heal > 0) {
                 if (u.healCooldown === undefined) u.healCooldown = 0;
@@ -1060,7 +1072,7 @@ function raidLoop() {
                 let maxHealCd = (70 - skillLevels.mage_heal * 10) * 1000;
                 if (hbar) hbar.style.width = Math.max(0, Math.min(100, ((maxHealCd - u.healCooldown) / maxHealCd) * 100)) + '%';
                 
-                if (u.healCooldown <= 0) {
+                if (u.healCooldown <= 0 && !isStunned) {
                     u.healCooldown += maxHealCd;
                     raidState.vfx.push({ type: 'heal', x: 150 + (idx * 100), y: 360, timer: 1.0 });
                 }
@@ -1074,7 +1086,7 @@ function raidLoop() {
                 let tbar = document.getElementById(`raid-threat-bar-${idx}`);
                 if (tbar) tbar.style.width = Math.max(0, Math.min(100, ((25000 - u.threatCooldown) / 25000) * 100)) + '%';
                 
-                if (u.threatCooldown <= 0) {
+                if (u.threatCooldown <= 0 && !isStunned) {
                     raidState.bossThreatTimer = skillLevels.war_threat * 2;
                     u.threatCooldown += 25000;
                     raidState.vfx.push({ type: 'threat1', x: 150 + (idx * 100), y: 360, timer: 1.0 });
@@ -1086,7 +1098,7 @@ function raidLoop() {
                 let rtdBar = document.getElementById(`raid-rtd-bar-${idx}`);
                 if (rtdBar) rtdBar.style.width = Math.max(0, Math.min(100, ((45000 - u.rtdCooldown) / 45000) * 100)) + '%';
 
-                if (u.rtdCooldown <= 0 && (u.overloadTimer || 0) <= 0 && (u.unitStunTimer || 0) <= 0) {
+                if (u.rtdCooldown <= 0 && (u.overloadTimer||0) <= 0 && !isStunned) {
                     u.overloadTimer = skillLevels.thief_overload === 5 ? 15 : 6 + (skillLevels.thief_overload * 2);
                     u.rtdCooldown += 45000;
                     raidState.vfx.push({ type: 'rtd', x: 150 + (idx * 100), y: 360, timer: 1.0 });
@@ -1094,28 +1106,12 @@ function raidLoop() {
             }
         }
 
-        let overloadMult = 1;
-        let unitBox = document.getElementById(`raid-unit-box-${idx}`);
-        if (u.overloadTimer > 0) {
-            u.overloadTimer -= dt;
-            overloadMult = 2;
-            if (unitBox) { unitBox.style.border = "2px solid #ff1744"; unitBox.style.boxShadow = "0 0 8px #ff1744"; }
-            if (u.overloadTimer <= 0) u.unitStunTimer = skillLevels.thief_overload === 1 ? 6 : 5;
-        } else {
-            if (unitBox) { unitBox.style.border = ""; unitBox.style.boxShadow = ""; }
-        }
-
-        if (u.unitStunTimer > 0) {
-            u.unitStunTimer -= dt;
-            return;
-        }
-
         if (u.gradeIdx >= 5 && ((u.cls.type === '전사' && (skillLevels.war_death || 0) > 0) || (u.cls.type === '법사' && (skillLevels.mage_thunder || 0) > 0) || (u.cls.type === '도적' && (skillLevels.thief_fuma || 0) > 0))) {
             u.globalCooldown -= dt * 1000;
             let rbar = document.getElementById(`raid-global-bar-${idx}`);
             if (rbar) rbar.style.width = Math.max(0, Math.min(100, ((60000 - u.globalCooldown) / 60000) * 100)) + '%';
 
-            if (u.globalCooldown <= 0) {
+            if (u.globalCooldown <= 0 && !isStunned) {
                 let baseDmg = (20 + equipStats.flatAtk) * u.grade.mult * cardMulti * rageMulti;
                 baseDmg *= (1 - appliedArmor); 
                 if (raidState.bossThreatTimer > 0) baseDmg *= 1.3; 
@@ -1144,26 +1140,17 @@ function raidLoop() {
         u.lastAttack -= dt * 1000;
         let attackCd = (1000 * (u.grade.speedMul || 1)) / (windReduc * overloadMult);
         while (u.lastAttack <= 0) {
+            if (isStunned) { u.lastAttack = 0; break; }
             let dmg = (20 + equipStats.flatAtk) * u.grade.mult * cardMulti * rageMulti; 
-            
             if (raidState.bossThreatTimer > 0) dmg *= 1.3;
-
-            let isCrit = Math.random() < sharpChance; 
-            if (isCrit) dmg *= (1.2 + (equipStats.cdmg / 100));
-            
+            let isCrit = Math.random() < sharpChance; if (isCrit) dmg *= (1.2 + (equipStats.cdmg / 100));
             dmg *= (1 - appliedArmor);
 
             let isFinal = false; 
-            if (u.cls.type === '전사' && (skillLevels.war_final || 0) > 0 && Math.random() < ((skillLevels.war_final || 0) * 0.03)) { 
-                isFinal = true; dmg *= 2; 
-            }
+            if (u.cls.type === '전사' && (skillLevels.war_final || 0) > 0 && Math.random() < ((skillLevels.war_final || 0) * 0.03)) { isFinal = true; dmg *= 2; }
 
             raidState.projectiles.push({ type: u.cls.type, x: 150 + (idx * 100), y: 360, tx: bx, ty: by, dmg: dmg, color: u.cls.color, angle: 0, isCrit: isCrit, gradeIdx: u.gradeIdx, isFinal: isFinal }); 
-            
-            if (u.cls.type === '도적' && (skillLevels.thief_shadow || 0) > 0 && Math.random() < ((skillLevels.thief_shadow || 0) * 0.03)) { 
-                raidState.projectiles.push({ type: u.cls.type, x: 150 + (idx * 100), y: 360, tx: bx, ty: by, dmg: dmg, color: u.cls.color, angle: 0, isCrit: isCrit, gradeIdx: u.gradeIdx, isShadow: true }); 
-            }
-
+            if (u.cls.type === '도적' && (skillLevels.thief_shadow || 0) > 0 && Math.random() < ((skillLevels.thief_shadow || 0) * 0.03)) { raidState.projectiles.push({ type: u.cls.type, x: 150 + (idx * 100), y: 360, tx: bx, ty: by, dmg: dmg, color: u.cls.color, angle: 0, isCrit: isCrit, gradeIdx: u.gradeIdx, isShadow: true }); }
             u.lastAttack += attackCd;
         }
     });
@@ -1747,17 +1734,23 @@ function pkLoop() {
     if (target.threatTimer > 0) target.threatTimer -= dt;
     if (target.freezeTimer > 0) { target.freezeTimer -= dt; target.freezeTickTimer -= dt; if (target.freezeTickTimer <= 0) { pkApplyDmg(target.freezeDmgVal, false); target.freezeTickTimer = 1; } }
     
+    let overloadMult = 1;
+    if (u.overloadTimer > 0) {
+        u.overloadTimer -= dt; overloadMult = 2;
+        if (u.overloadTimer <= 0) u.unitStunTimer = skillLevels.thief_overload === 1 ? 6 : 5;
+    }
+    if (u.unitStunTimer > 0) u.unitStunTimer -= dt;
+    let isStunned = (u.unitStunTimer > 0);
+
     if (u.gradeIdx >= 6) {
         if (u.cls.type === '법사' && skillLevels.mage_heal > 0) {
             if (u.healCooldown === undefined) u.healCooldown = 0;
             u.healCooldown -= dt * 1000;
             let maxHealCd = (70 - skillLevels.mage_heal * 10) * 1000;
-            
-            // 🔥 펀치킹 힐 게이지 바 적용
             let hbar = document.getElementById('pk-heal-bar');
             if (hbar) hbar.style.width = Math.max(0, Math.min(100, ((maxHealCd - u.healCooldown) / maxHealCd) * 100)) + '%';
             
-            if (u.healCooldown <= 0) {
+            if (u.healCooldown <= 0 && !isStunned) {
                 u.healCooldown += maxHealCd;
                 pkState.vfx.push({ type: 'heal', x: u.x, y: u.y, timer: 1.0 });
             }
@@ -1768,12 +1761,10 @@ function pkLoop() {
         if (u.cls.type === '전사' && skillLevels.war_threat > 0) {
             if (u.threatCooldown === undefined) u.threatCooldown = 0;
             u.threatCooldown -= dt * 1000;
-            
-            // 🔥 펀치킹 위협 게이지 바 적용
             let tbar = document.getElementById('pk-threat-bar');
             if (tbar) tbar.style.width = Math.max(0, Math.min(100, ((25000 - u.threatCooldown) / 25000) * 100)) + '%';
             
-            if (u.threatCooldown <= 0) {
+            if (u.threatCooldown <= 0 && !isStunned) {
                 target.threatTimer = skillLevels.war_threat * 2;
                 u.threatCooldown += 25000;
                 pkState.vfx.push({ type: 'threat1', x: u.x, y: u.y, timer: 1.0 });
@@ -1782,12 +1773,10 @@ function pkLoop() {
         if (u.cls.type === '도적' && skillLevels.thief_overload > 0) {
             if (u.rtdCooldown === undefined) u.rtdCooldown = 0;
             u.rtdCooldown -= dt * 1000;
-            
-            // 🔥 펀치킹 레투다 게이지 바 적용
             let rbar = document.getElementById('pk-rtd-bar');
             if (rbar) rbar.style.width = Math.max(0, Math.min(100, ((45000 - u.rtdCooldown) / 45000) * 100)) + '%';
 
-            if (u.rtdCooldown <= 0 && (u.overloadTimer || 0) <= 0 && (u.unitStunTimer || 0) <= 0) {
+            if (u.rtdCooldown <= 0 && (u.overloadTimer||0) <= 0 && !isStunned) {
                 u.overloadTimer = skillLevels.thief_overload === 5 ? 15 : 6 + (skillLevels.thief_overload * 2);
                 u.rtdCooldown += 45000;
                 pkState.vfx.push({ type: 'rtd', x: u.x, y: u.y, timer: 1.0 });
@@ -1795,40 +1784,31 @@ function pkLoop() {
         }
     }
 
-    let overloadMult = 1;
-    if (u.overloadTimer > 0) {
-        u.overloadTimer -= dt; overloadMult = 2;
-        if (u.overloadTimer <= 0) u.unitStunTimer = skillLevels.thief_overload === 1 ? 6 : 5;
+    let cardMulti = 1 + (getTotalCardBonus() / 100); let rageMulti = 1 + (skillLevels.common_rage * 0.01) + (equipStats.atk * 0.01); let sharpChance = (skillLevels.common_sharp * 0.05) + (equipStats.crit * 0.01); let windReduc = 1 + (skillLevels.common_wind * 0.2) + (equipStats.spd * 0.01);
+    let pkBaseDmg = 20; let pkBaseCd = 1000;
+    
+    if (u.gradeIdx >= 5 && ((u.cls.type === '전사' && skillLevels.war_death > 0) || (u.cls.type === '법사' && skillLevels.mage_thunder > 0) || (u.cls.type === '도적' && skillLevels.thief_fuma > 0))) {
+        u.globalCooldown -= dt * 1000; let pbar = document.getElementById('pk-global-bar'); if (pbar) pbar.style.width = Math.max(0, Math.min(100, ((60000 - u.globalCooldown) / 60000) * 100)) + '%';
+        if (u.globalCooldown <= 0 && !isStunned) {
+            let baseDmg = (pkBaseDmg + equipStats.flatAtk) * u.grade.mult * cardMulti * rageMulti; 
+            if (target.threatTimer > 0) baseDmg *= 1.3; 
+            
+            if (u.cls.type === '전사' && skillLevels.war_death > 0) { let gdmg = baseDmg * (1.5 + skillLevels.war_death * 1.5); pkState.vfx.push({ type: 'death', timer: 1.2, dmg: gdmg }); u.globalCooldown += 60000; } 
+            else if (u.cls.type === '법사' && skillLevels.mage_thunder > 0) { let gdmg = baseDmg * (1.5 + skillLevels.mage_thunder * 1.5); pkState.vfx.push({ type: 'thunder', timer: 0.5, dmg: gdmg }); u.globalCooldown += 60000; } 
+            else if (u.cls.type === '도적' && skillLevels.thief_fuma > 0) { let gdmg = baseDmg * (1.5 + skillLevels.thief_fuma * 1.5); pkApplyDmg(gdmg, false); pkState.vfx.push({ type: 'fuma', timer: 0.5 }); u.globalCooldown += 60000; }
+        }
     }
     
-    if (u.unitStunTimer > 0) {
-        u.unitStunTimer -= dt;
-    } else {
-        let cardMulti = 1 + (getTotalCardBonus() / 100); let rageMulti = 1 + (skillLevels.common_rage * 0.01) + (equipStats.atk * 0.01); let sharpChance = (skillLevels.common_sharp * 0.05) + (equipStats.crit * 0.01); let windReduc = 1 + (skillLevels.common_wind * 0.2) + (equipStats.spd * 0.01);
-        let pkBaseDmg = 20; let pkBaseCd = 1000;
-        
-        if (u.gradeIdx >= 5 && ((u.cls.type === '전사' && skillLevels.war_death > 0) || (u.cls.type === '법사' && skillLevels.mage_thunder > 0) || (u.cls.type === '도적' && skillLevels.thief_fuma > 0))) {
-            u.globalCooldown -= dt * 1000; let pbar = document.getElementById('pk-global-bar'); if (pbar) pbar.style.width = Math.max(0, Math.min(100, ((60000 - u.globalCooldown) / 60000) * 100)) + '%';
-            if (u.globalCooldown <= 0) {
-                let baseDmg = (pkBaseDmg + equipStats.flatAtk) * u.grade.mult * cardMulti * rageMulti; 
-                if (target.threatTimer > 0) baseDmg *= 1.3; 
-                
-                if (u.cls.type === '전사' && skillLevels.war_death > 0) { let gdmg = baseDmg * (1.5 + skillLevels.war_death * 1.5); pkState.vfx.push({ type: 'death', timer: 1.2, dmg: gdmg }); u.globalCooldown += 60000; } 
-                else if (u.cls.type === '법사' && skillLevels.mage_thunder > 0) { let gdmg = baseDmg * (1.5 + skillLevels.mage_thunder * 1.5); pkState.vfx.push({ type: 'thunder', timer: 0.5, dmg: gdmg }); u.globalCooldown += 60000; } 
-                else if (u.cls.type === '도적' && skillLevels.thief_fuma > 0) { let gdmg = baseDmg * (1.5 + skillLevels.thief_fuma * 1.5); pkApplyDmg(gdmg, false); pkState.vfx.push({ type: 'fuma', timer: 0.5 }); u.globalCooldown += 60000; }
-            }
-        }
-        
-        u.lastAttack -= dt * 1000; let attackCd = (pkBaseCd * (u.grade.speedMul || 1)) / (windReduc * overloadMult);
-        while (u.lastAttack <= 0) {
-            let dmg = (pkBaseDmg + equipStats.flatAtk) * u.grade.mult * cardMulti * rageMulti; 
-            if (target.threatTimer > 0) dmg *= 1.3;
-            let isCrit = Math.random() < sharpChance; if (isCrit) dmg *= (1.2 + (equipStats.cdmg / 100)); 
-            let isFinal = false; if (u.cls.type === '전사' && skillLevels.war_final > 0 && Math.random() < (skillLevels.war_final * 0.03)) { isFinal = true; dmg *= 2; }
-            pkState.projectiles.push({ type: u.cls.type, x: u.x, y: u.y, tx: target.x, ty: target.y, dmg: dmg, color: u.cls.color, angle: 0, gradeIdx: u.gradeIdx, isCrit: isCrit, isFinal: isFinal, baseDmgToPass: dmg });
-            if (u.cls.type === '도적' && skillLevels.thief_shadow > 0 && Math.random() < (skillLevels.thief_shadow * 0.03)) { pkState.projectiles.push({ type: u.cls.type, x: u.x, y: u.y, tx: target.x, ty: target.y, dmg: dmg, color: u.cls.color, angle: 0, gradeIdx: u.gradeIdx, isCrit: isCrit, isFinal: false, isShadow: true }); }
-            u.lastAttack += attackCd;
-        }
+    u.lastAttack -= dt * 1000; let attackCd = (pkBaseCd * (u.grade.speedMul || 1)) / (windReduc * overloadMult);
+    while (u.lastAttack <= 0) {
+        if (isStunned) { u.lastAttack = 0; break; }
+        let dmg = (pkBaseDmg + equipStats.flatAtk) * u.grade.mult * cardMulti * rageMulti; 
+        if (target.threatTimer > 0) dmg *= 1.3;
+        let isCrit = Math.random() < sharpChance; if (isCrit) dmg *= (1.2 + (equipStats.cdmg / 100)); 
+        let isFinal = false; if (u.cls.type === '전사' && skillLevels.war_final > 0 && Math.random() < (skillLevels.war_final * 0.03)) { isFinal = true; dmg *= 2; }
+        pkState.projectiles.push({ type: u.cls.type, x: u.x, y: u.y, tx: target.x, ty: target.y, dmg: dmg, color: u.cls.color, angle: 0, gradeIdx: u.gradeIdx, isCrit: isCrit, isFinal: isFinal, baseDmgToPass: dmg });
+        if (u.cls.type === '도적' && skillLevels.thief_shadow > 0 && Math.random() < (skillLevels.thief_shadow * 0.03)) { pkState.projectiles.push({ type: u.cls.type, x: u.x, y: u.y, tx: target.x, ty: target.y, dmg: dmg, color: u.cls.color, angle: 0, gradeIdx: u.gradeIdx, isCrit: isCrit, isFinal: false, isShadow: true }); }
+        u.lastAttack += attackCd;
     }
 
     for (let i = pkState.projectiles.length - 1; i >= 0; i--) {
@@ -2173,43 +2153,43 @@ window.loop = () => {
     let windReduc = 1 + ((skillLevels.common_wind||0) * 0.2) + (equipStats.spd * 0.01);
 
     towers.forEach(t => {
-        if (t.unitStunTimer > 0) { t.unitStunTimer -= dt; return; } 
+        // 🔥 1. 상태 이상 및 쿨타임 계산 (기절 중에도 쿨타임은 흐름)
+        let overloadMult = 1;
+        if (t.overloadTimer > 0) {
+            t.overloadTimer -= dt; overloadMult = 2;
+            if (t.overloadTimer <= 0) t.unitStunTimer = skillLevels.thief_overload === 1 ? 6 : 5;
+        }
+        if (t.unitStunTimer > 0) t.unitStunTimer -= dt;
+        let isStunned = (t.unitStunTimer > 0);
 
-        if (t.gradeIdx >= 6) { // 🔥 6차 이상 (힐)
-            if (t.cls.type === '법사' && skillLevels.mage_heal > 0) {
-                if (t.healCooldown === undefined) t.healCooldown = 0;
-                t.healCooldown -= dt * 1000;
-                let maxHealCd = (70 - skillLevels.mage_heal * 10) * 1000;
-                let hbar = document.getElementById(`heal-bar-${t.idx}`);
-                if (hbar) hbar.style.width = Math.max(0, Math.min(100, ((maxHealCd - t.healCooldown) / maxHealCd) * 100)) + '%';
-                
-                if (t.healCooldown <= 0) {
-                    let gridWidth = state.isRank ? 5 : 5;
-                    let tCol = t.idx % gridWidth; let tRow = Math.floor(t.idx / gridWidth);
-                    let injured = towers.filter(u => {
-                        if (u.hp >= u.maxHp) return false;
-                        let uCol = u.idx % gridWidth; let uRow = Math.floor(u.idx / gridWidth);
-                        return Math.abs(uCol - tCol) <= 1 && Math.abs(uRow - tRow) <= 1;
-                    });
-                    if (injured.length > 0) {
-                        injured.forEach(u => { u.hp = Math.min(u.maxHp, u.hp + 1); visualEffects.push({ type: 'heal', x: u.x, y: u.y, timer: 1.0 }); });
-                        t.healCooldown += maxHealCd;
-                        visualEffects.push({ type: 'heal', x: t.x, y: t.y, timer: 1.0 });
-                    } else {
-                        t.healCooldown = 0;
-                    }
-                }
+        // 🔥 2. 스킬 발동 로직 (!isStunned 일 때만 스킬이 나감)
+        if (t.gradeIdx >= 6 && t.cls.type === '법사' && skillLevels.mage_heal > 0) {
+            if (t.healCooldown === undefined) t.healCooldown = 0;
+            t.healCooldown -= dt * 1000;
+            let maxHealCd = (70 - skillLevels.mage_heal * 10) * 1000;
+            let hbar = document.getElementById(`heal-bar-${t.idx}`);
+            if (hbar) hbar.style.width = Math.max(0, Math.min(100, ((maxHealCd - t.healCooldown) / maxHealCd) * 100)) + '%';
+            
+            if (t.healCooldown <= 0 && !isStunned) {
+                let gridWidth = state.isRank ? 5 : 5;
+                let tCol = t.idx % gridWidth; let tRow = Math.floor(t.idx / gridWidth);
+                let injured = towers.filter(u => u.hp < u.maxHp && Math.abs((u.idx % gridWidth) - tCol) <= 1 && Math.abs(Math.floor(u.idx / gridWidth) - tRow) <= 1);
+                if (injured.length > 0) {
+                    injured.forEach(u => { u.hp = Math.min(u.maxHp, u.hp + 1); visualEffects.push({ type: 'heal', x: u.x, y: u.y, timer: 1.0 }); });
+                    t.healCooldown += maxHealCd;
+                    visualEffects.push({ type: 'heal', x: t.x, y: t.y, timer: 1.0 });
+                } else { t.healCooldown = 0; }
             }
         }
 
-        if (t.gradeIdx >= 7) { // 🔥 제네시스 이상 (위협, 레투다)
+        if (t.gradeIdx >= 7) {
             if (t.cls.type === '전사' && skillLevels.war_threat > 0) {
                 if (t.threatCooldown === undefined) t.threatCooldown = 0;
                 t.threatCooldown -= dt * 1000;
                 let tbar = document.getElementById(`threat-bar-${t.idx}`);
                 if (tbar) tbar.style.width = Math.max(0, Math.min(100, ((25000 - t.threatCooldown) / 25000) * 100)) + '%';
                 
-                if (t.threatCooldown <= 0 && monsters.length > 0) {
+                if (t.threatCooldown <= 0 && !isStunned && monsters.length > 0) {
                     monsters[0].threatTimer = skillLevels.war_threat * 2;
                     t.threatCooldown += 25000;
                     visualEffects.push({ type: 'threat1', x: t.x, y: t.y, timer: 1.0 }); 
@@ -2218,10 +2198,10 @@ window.loop = () => {
             if (t.cls.type === '도적' && skillLevels.thief_overload > 0) {
                 if (t.rtdCooldown === undefined) t.rtdCooldown = 0;
                 t.rtdCooldown -= dt * 1000;
-                let rtdBar = document.getElementById(`rtd-bar-${t.idx}`);
-                if (rtdBar) rtdBar.style.width = Math.max(0, Math.min(100, ((45000 - t.rtdCooldown) / 45000) * 100)) + '%';
+                let rbar = document.getElementById(`rtd-bar-${t.idx}`);
+                if (rbar) rbar.style.width = Math.max(0, Math.min(100, ((45000 - t.rtdCooldown) / 45000) * 100)) + '%';
 
-                if (t.rtdCooldown <= 0 && (t.overloadTimer || 0) <= 0 && (t.unitStunTimer || 0) <= 0) {
+                if (t.rtdCooldown <= 0 && (t.overloadTimer||0) <= 0 && !isStunned) {
                     t.overloadTimer = skillLevels.thief_overload === 5 ? 15 : 6 + (skillLevels.thief_overload * 2);
                     t.rtdCooldown += 45000;
                     visualEffects.push({ type: 'rtd', x: t.x, y: t.y, timer: 1.0 });
@@ -2229,23 +2209,26 @@ window.loop = () => {
             }
         }
 
-        let overloadMult = 1;
-        if (t.overloadTimer > 0) {
-            t.overloadTimer -= dt;
-            overloadMult = 2;
-            if (t.overloadTimer <= 0) {
-                t.unitStunTimer = skillLevels.thief_overload === 1 ? 6 : 5;
+        if (t.gradeIdx === 6 && t.cls.type !== '법사') {
+            t.bindCooldown -= dt * 1000; 
+            let bar = document.getElementById(`bind-bar-${t.idx}`); 
+            if (bar) bar.style.width = Math.max(0, Math.min(100, ((75000 - t.bindCooldown) / 75000) * 100)) + '%';
+            if (t.bindCooldown <= 0 && !isStunned) { 
+                if (monsters.length > 0) { 
+                    let target = null; for (let m of monsters) { if (m.bindTimer <= 0) { target = m; break; } } 
+                    if (!target) target = monsters[0]; 
+                    if (target) { target.bindTimer = 10; t.bindCooldown += 75000; } 
+                } else { t.bindCooldown = 0; } 
             }
         }
-
-        if (t.gradeIdx === 6 && t.cls.type !== '법사') {
-            t.bindCooldown -= dt * 1000; let bar = document.getElementById(`bind-bar-${t.idx}`); if (bar) bar.style.width = Math.max(0, Math.min(100, ((75000 - t.bindCooldown) / 75000) * 100)) + '%';
-            if (t.bindCooldown <= 0) { if (monsters.length > 0) { let target = null; for (let m of monsters) { if (m.bindTimer <= 0) { target = m; break; } } if (!target) target = monsters[0]; if (target) { target.bindTimer = 10; t.bindCooldown += 75000; } } else { t.bindCooldown = 0; } }
-        }
+        
         if (t.gradeIdx >= 5) {
             if ((t.cls.type === '전사' && (skillLevels.war_death||0) > 0) || (t.cls.type === '법사' && (skillLevels.mage_thunder||0) > 0) || (t.cls.type === '도적' && (skillLevels.thief_fuma||0) > 0)) {
-                t.globalCooldown -= dt * 1000; let gbar = document.getElementById(`global-bar-${t.idx}`); if (gbar) gbar.style.width = Math.max(0, Math.min(100, ((60000 - t.globalCooldown) / 60000) * 100)) + '%';
-                if (t.globalCooldown <= 0) {
+                t.globalCooldown -= dt * 1000; 
+                let gbar = document.getElementById(`global-bar-${t.idx}`); 
+                if (gbar) gbar.style.width = Math.max(0, Math.min(100, ((60000 - t.globalCooldown) / 60000) * 100)) + '%';
+                
+                if (t.globalCooldown <= 0 && !isStunned) {
                     if (monsters.length > 0) {
                         let baseDmg = (t.cls.baseDmg + (state.upgrades[t.cls.type].val * 0.15) + equipStats.flatAtk) * t.grade.mult * cardMulti * rageMulti; 
                         if (t.cls.type === '전사' && (skillLevels.war_death||0) > 0) { let gdmg = baseDmg * (1.5 + (skillLevels.war_death||0) * 1.5); visualEffects.push({ type: 'death', timer: 1.2, dmg: gdmg }); t.globalCooldown += 60000; }
@@ -2256,19 +2239,17 @@ window.loop = () => {
             }
         }
         
-        t.lastAttack -= dt * 1000; let attackCd = (t.cls.cd * (t.grade.speedMul || 1)) / (windReduc * overloadMult); 
+        t.lastAttack -= dt * 1000; 
+        let attackCd = (t.cls.cd * (t.grade.speedMul || 1)) / (windReduc * overloadMult); 
         while(t.lastAttack <= 0) {
+            if (isStunned) { t.lastAttack = 0; break; } // 스턴 중이면 공격 무시
             let range = t.cls.range * t.grade.rangeMul; let target = null;
             for(let m of monsters) { let d = Math.hypot(m.x - t.x, m.y - t.y); if(d <= range) { target = m; break; } }
             if(target) {
                 let dmg = (t.cls.baseDmg + (state.upgrades[t.cls.type].val * 0.15) + equipStats.flatAtk) * t.grade.mult * cardMulti * rageMulti; 
-                
                 if (target.threatTimer > 0) dmg *= 1.3; 
-                let isCrit = Math.random() < sharpChance; 
-                if (isCrit) dmg *= (1.2 + (equipStats.cdmg / 100)); 
-                
-                let isFinal = false; 
-                if (t.cls.type === '전사' && (skillLevels.war_final||0) > 0 && Math.random() < ((skillLevels.war_final||0) * 0.03)) { isFinal = true; dmg *= 2; }
+                let isCrit = Math.random() < sharpChance; if (isCrit) dmg *= (1.2 + (equipStats.cdmg / 100)); 
+                let isFinal = false; if (t.cls.type === '전사' && (skillLevels.war_final||0) > 0 && Math.random() < ((skillLevels.war_final||0) * 0.03)) { isFinal = true; dmg *= 2; }
                 
                 projectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: isFinal, baseDmgToPass: dmg, sourceTower: t });
                 if (t.cls.type === '도적' && (skillLevels.thief_shadow||0) > 0 && Math.random() < ((skillLevels.thief_shadow||0) * 0.03)) { projectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: false, isShadow: true, sourceTower: t }); }
@@ -2885,18 +2866,17 @@ function mulungLoop() {
     let appliedArmor = b.armor * myUnpen;
 
     mulungState.myUnits.forEach((u) => {
-        if (u.unitStunTimer > 0) { u.unitStunTimer -= dt; return; }
-        
         let overloadMult = 1;
         if (u.overloadTimer > 0) {
             u.overloadTimer -= dt; overloadMult = 2;
             if (u.overloadTimer <= 0) u.unitStunTimer = skillLevels.thief_overload === 1 ? 6 : 5;
         }
+        if (u.unitStunTimer > 0) u.unitStunTimer -= dt;
+        let isStunned = (u.unitStunTimer > 0);
 
-        // 제네시스 특수 스킬 (힐, 위협, 레투다)
         if (u.gradeIdx >= 6 && u.type === '법사' && skillLevels.mage_heal > 0) {
             u.healCooldown -= dt * 1000;
-            if (u.healCooldown <= 0) {
+            if (u.healCooldown <= 0 && !isStunned) {
                 mulungState.myUnits.forEach(tu => { tu.hp = Math.min(tu.maxHp, tu.hp + 1); mulungState.vfx.push({ type: 'heal', x: tu.x, y: tu.y, timer: 1.0 }); });
                 u.healCooldown += (70 - skillLevels.mage_heal * 10) * 1000;
             }
@@ -2904,29 +2884,42 @@ function mulungLoop() {
         if (u.gradeIdx >= 7) {
             if (u.type === '전사' && skillLevels.war_threat > 0) {
                 u.threatCooldown -= dt * 1000;
-                if (u.threatCooldown <= 0) { b.threatTimer = skillLevels.war_threat * 2; u.threatCooldown += 25000; mulungState.vfx.push({ type: 'threat1', x: u.x, y: u.y, timer: 1.0 }); }
+                if (u.threatCooldown <= 0 && !isStunned) { b.threatTimer = skillLevels.war_threat * 2; u.threatCooldown += 25000; mulungState.vfx.push({ type: 'threat1', x: u.x, y: u.y, timer: 1.0 }); }
             }
             if (u.type === '도적' && skillLevels.thief_overload > 0) {
                 u.rtdCooldown -= dt * 1000;
-                if (u.rtdCooldown <= 0 && u.overloadTimer <= 0 && u.unitStunTimer <= 0) { u.overloadTimer = skillLevels.thief_overload === 5 ? 15 : 6 + (skillLevels.thief_overload * 2); u.rtdCooldown += 45000; mulungState.vfx.push({ type: 'rtd', x: u.x, y: u.y, timer: 1.0 }); }
+                if (u.rtdCooldown <= 0 && (u.overloadTimer||0) <= 0 && !isStunned) { u.overloadTimer = skillLevels.thief_overload === 5 ? 15 : 6 + (skillLevels.thief_overload * 2); u.rtdCooldown += 45000; mulungState.vfx.push({ type: 'rtd', x: u.x, y: u.y, timer: 1.0 }); }
             }
         }
         
         if (u.gradeIdx === 6 && u.type !== '법사') {
             u.bindCooldown -= dt * 1000;
-            if (u.bindCooldown <= 0 && b.bindTimer <= 0) { b.bindTimer = 10; u.bindCooldown += 75000; }
+            if (u.bindCooldown <= 0 && b.bindTimer <= 0 && !isStunned) { b.bindTimer = 10; u.bindCooldown += 75000; }
         }
 
+        if (u.gradeIdx >= 5) {
+            if ((u.type === '전사' && (skillLevels.war_death||0) > 0) || (u.type === '법사' && (skillLevels.mage_thunder||0) > 0) || (u.type === '도적' && (skillLevels.thief_fuma||0) > 0)) {
+                u.globalCooldown -= dt * 1000;
+                if (u.globalCooldown <= 0 && !isStunned) {
+                    let baseDmg = (CLASSES[u.type].baseDmg + equipStats.flatAtk) * GRADES[u.gradeIdx].mult * cardMulti * rageMulti; 
+                    if (u.type === '전사' && (skillLevels.war_death||0) > 0) { let gdmg = baseDmg * (1.5 + (skillLevels.war_death||0) * 1.5); mulungState.vfx.push({ type: 'death', timer: 1.2, dmg: gdmg }); u.globalCooldown += 60000; }
+                    else if (u.type === '법사' && (skillLevels.mage_thunder||0) > 0) { let gdmg = baseDmg * (1.5 + (skillLevels.mage_thunder||0) * 1.5); mulungState.vfx.push({ type: 'thunder', timer: 0.5, dmg: gdmg }); u.globalCooldown += 60000; }
+                    else if (u.type === '도적' && (skillLevels.thief_fuma||0) > 0) { let gdmg = baseDmg * (1.5 + (skillLevels.thief_fuma||0) * 1.5); mulungState.vfx.push({ type: 'fuma', timer: 0.5 }); u.globalCooldown += 60000; }
+                }
+            }
+        }
+        
         u.lastAttack -= dt * 1000; 
         let attackCd = (CLASSES[u.type].cd * (GRADES[u.gradeIdx].speedMul || 1)) / (windReduc * overloadMult); 
-        
         while(u.lastAttack <= 0) {
+            if (isStunned) { u.lastAttack = 0; break; }
             let dmg = (CLASSES[u.type].baseDmg + equipStats.flatAtk) * GRADES[u.gradeIdx].mult * cardMulti * rageMulti; 
             if (b.threatTimer > 0) dmg *= 1.3; 
             let isCrit = Math.random() < sharpChance; if (isCrit) dmg *= (1.2 + (equipStats.cdmg / 100)); 
             let isFinal = false; if (u.type === '전사' && (skillLevels.war_final||0) > 0 && Math.random() < ((skillLevels.war_final||0) * 0.03)) { isFinal = true; dmg *= 2; }
             
             mulungState.projectiles.push({ type: u.type, x: u.x, y: u.y, tx: b.x, ty: b.y, dmg: dmg, color: CLASSES[u.type].color, angle: 0, gradeIdx: u.gradeIdx, isCrit: isCrit, isFinal: isFinal, baseDmgToPass: dmg, sourceTower: u, isMine: true });
+            if (u.type === '도적' && (skillLevels.thief_shadow||0) > 0 && Math.random() < ((skillLevels.thief_shadow||0) * 0.03)) { mulungState.projectiles.push({ type: u.type, x: u.x, y: u.y, tx: b.x, ty: b.y, dmg: dmg, color: CLASSES[u.type].color, angle: 0, gradeIdx: u.gradeIdx, isCrit: isCrit, isFinal: false, baseDmgToPass: dmg, isMine: true, isShadow: true }); }
             u.lastAttack += attackCd;
         }
     });
