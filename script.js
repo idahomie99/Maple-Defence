@@ -498,7 +498,21 @@ window.goToLobby = () => {
     window.switchScreen('start-screen'); 
     if (currentUserUid) window.syncToCloud(); 
 };
-window.toggleSpeed = () => { if(state.isRank) return; if (state.speed === 1) state.speed = 10; else if (state.speed === 10) state.speed = 15; else state.speed = 1; document.getElementById('btn-speed').innerText = state.speed + "배속"; };
+window.toggleSpeed = () => { 
+    if(state.isRank) return; 
+    
+    if (typeof mulungState !== 'undefined' && mulungState.active) {
+        // 🔥 무릉도장: 1배 / 10배만 지원
+        if (state.speed === 1) state.speed = 10;
+        else state.speed = 1;
+    } else {
+        // 일반 모험 모드: 1배 / 10배 / 15배 지원
+        if (state.speed === 1) state.speed = 10; 
+        else if (state.speed === 10) state.speed = 15; 
+        else state.speed = 1; 
+    }
+    document.getElementById('btn-speed').innerText = state.speed + "배속"; 
+};
 function getGradeByProb() { let rand = Math.random() * 100; let acc = 0; for(let i=0; i<GRADES.length; i++) { acc += GRADES[i].prob; if(rand <= acc) return i; } return 0; }
 
 window.summonUnit = () => {
@@ -2675,12 +2689,6 @@ function getEquipHtml(eqObj, type) {
 }
 
 window.startMulungMatchmaking = async () => {
-    let playCount = parseInt(localStorage.getItem('mapleDefenseMulungCount')) || 0; 
-    let today = new Date().toLocaleDateString();
-    let lastDate = localStorage.getItem('mapleDefenseMulungDate');
-    if (lastDate !== today) { playCount = 0; localStorage.setItem('mapleDefenseMulungDate', today); }
-    if (playCount >= 5) return window.showMessage("오늘의 무릉도장 제한 횟수(5회)를 모두 소진했습니다!"); 
-
     window.closeAllModals();
     
     // AI 데이터 로드 
@@ -2725,7 +2733,6 @@ window.startMulungMatchmaking = async () => {
         document.body.appendChild(mDiv); intro = mDiv;
     }
 
-    // 🔥 상하(위아래) 배치로 수정한 UI HTML
     intro.innerHTML = `
         <div style="display:flex; flex-direction:column; width:85%; max-width:320px; gap:10px; align-items:center;">
             <!-- 내 정보 -->
@@ -2743,7 +2750,7 @@ window.startMulungMatchmaking = async () => {
                 </div>
             </div>
             
-            <!-- VS / WITH -->
+            <!-- WITH -->
             <div style="font-size:26px; font-weight:900; color:#ffeb3b; text-shadow:0 0 10px #ff1744, 2px 2px 0px #000; font-style:italic;">WITH</div>
             
             <!-- 상대 정보 -->
@@ -2766,19 +2773,17 @@ window.startMulungMatchmaking = async () => {
     intro.style.display = 'flex';
     intro.style.opacity = '1';
 
-    // 5초(5000ms) 대기 후 본격적인 무릉도장 진입
+    // 5초 대기 후 무릉도장 무제한 진입
     setTimeout(() => { 
         intro.style.opacity = '0'; 
         setTimeout(() => { 
             intro.style.display = 'none'; 
             
-            // 🔥 무릉도장 로비 팝업창 강제로 닫기 추가!
             let mlLobby = document.getElementById('mulung-lobby-modal');
             if (mlLobby) mlLobby.style.display = 'none';
             let onlineOv = document.getElementById('online-overlay');
             if (onlineOv) onlineOv.style.display = 'none';
 
-            playCount++; localStorage.setItem('mapleDefenseMulungCount', playCount);
             window.startMulungGame(oppName, oppEquipData);
             window.showMessage("무릉도장 진입 완료!");
         }, 500); 
@@ -2795,81 +2800,108 @@ window.startMulungGame = (oppName, oppEquipData) => {
     if(oppGridEl) oppGridEl.style.display = 'none';
     document.getElementById('boss-skip-wrapper').style.display = 'none';
     document.getElementById('best-wave-container').style.display = 'none';
-    document.getElementById('btn-speed').style.display = 'none';
     document.getElementById('btn-summon').style.display = 'none';
     
-    // 🔥 상단 헤더 텍스트 무릉도장 전용으로 변경 (메소, 메포 숨기고 무릉 코인 표시)
-    document.getElementById('ui-wave').innerText = "1층 (1/5)";
-    document.getElementById('ui-kills').innerText = "무릉도장 동료: " + oppName;
-    document.getElementById('ui-timer').innerText = "진행중";
+    // 🔥 배속 버튼 활성화 (무릉 1배/10배)
+    let speedBtn = document.getElementById('btn-speed');
+    if (speedBtn) { speedBtn.style.display = 'block'; state.speed = 1; speedBtn.innerText = "1배속"; }
     
-    // 메소 / 메포 박스를 숨기고 '무릉 코인' 전용 박스로 교체
+    // 상단 헤더 텍스트 변경
+    document.getElementById('ui-wave').innerText = "준비 중...";
+    document.getElementById('ui-kills').innerText = "무릉도장 동료: " + oppName;
+    document.getElementById('ui-timer').innerText = "10초";
+    
+    // 🔥 메소/메포 박스를 숨기고 '무릉 코인' + '보스 정보' 박스로 교체
     let resourceRow = document.querySelector('.resource-row');
     if (resourceRow) {
         resourceRow.innerHTML = `
-            <div class="meso-box" style="width: 100%; color: #e65100;">
-                🪙 무릉 코인 <span id="ui-mulung-coins">0</span>개
+            <div style="display: flex; width: 100%; gap: 10px;">
+                <div class="meso-box" style="flex: 1; color: #e65100; display:flex; align-items:center; justify-content:center; padding: 5px;">
+                    🪙 무릉 코인 <span id="ui-mulung-coins" style="margin-left:5px; font-weight:bold;">0</span>
+                </div>
+                <div class="mp-box" style="flex: 1.5; color: #333; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.2; padding: 5px;">
+                    <div id="mulung-boss-name" style="font-weight:bold; font-size:13px; color:#d32f2f;">보스 등장 대기중</div>
+                    <div id="mulung-boss-armor" style="font-size:11px; color:#555;">방어력 0%</div>
+                </div>
             </div>
         `;
     }
 
-    // 🔥 하단 업그레이드(혼돈의 주문서) 영역을 무릉도장 성장 시스템으로 변경
+    // 🔥 하단 업그레이드 영역을 단일 유닛 승급 시스템으로 변경 (합성/상점 버튼 삭제)
     let controlsPanel = document.getElementById('controls');
     if (controlsPanel) {
         controlsPanel.innerHTML = `
-            <div style="display: flex; gap: 4px; margin-bottom: 10px;">
-                <button class="ingame-btn premium-purple" style="flex: 1;" onclick="autoMerge()">✨일괄합성</button>
-                <button class="ingame-btn premium-dark" style="flex: 1;" onclick="openMulungShop()">🐼 무릉 상점</button>
-            </div>
             <div style="text-align:center; font-weight:bold; font-size:14px; color:#004d40; margin-bottom: 5px; border-top: 1px dashed #00796b; padding-top: 5px;">
                 🐼 무릉도장 유닛 승급 🐼
             </div>
-            <div class="upgrade-container" id="mulung-upgrade-buttons">
-                <!-- 동적으로 채워짐 -->
+            <div class="upgrade-container" id="mulung-upgrade-buttons" style="display:flex; justify-content:center; padding-bottom: 10px;">
+                <!-- 직업 선택 전 비워둠 -->
             </div>
         `;
     }
 
-    // 무릉도장 상태 초기화
-    let baseUnits = [
-        { idx: 0, type: '전사', gradeIdx: 0, x: 100, y: 350 },
-        { idx: 1, type: '법사', gradeIdx: 0, x: 250, y: 350 },
-        { idx: 2, type: '도적', gradeIdx: 0, x: 400, y: 350 }
-    ];
-    let oppBaseUnits = [
-        { idx: 0, type: '전사', gradeIdx: 0, x: 100, y: 150 },
-        { idx: 1, type: '법사', gradeIdx: 0, x: 250, y: 150 },
-        { idx: 2, type: '도적', gradeIdx: 0, x: 400, y: 150 }
-    ];
-
     mulungState = {
-        active: true, wave: 1, coins: 0, oppCoins: 0,
+        active: true, status: 'PREP', prepTime: 10, wave: 1, coins: 0, oppCoins: 0,
         boss: null, lastTime: performance.now(),
         oppName: oppName, oppEquipData: oppEquipData,
-        myUnits: baseUnits.map(u => ({ ...u, hp: 5, maxHp: 5, lastAttack: 0, globalCooldown: 0, threatCooldown: 0, rtdCooldown: 0, overloadTimer: 0, unitStunTimer: 0, damageDealt: 0, bindCooldown: 0, healCooldown: 0 })),
-        oppUnits: oppBaseUnits.map(u => ({ ...u, hp: 5, maxHp: 5, lastAttack: 0, globalCooldown: 0, threatCooldown: 0, rtdCooldown: 0, overloadTimer: 0, unitStunTimer: 0, bindCooldown: 0, healCooldown: 0 })),
+        myUnits: [], oppUnits: [], // 선택 전 빈 배열
         projectiles: [], vfx: [], dmgTexts: []
     };
 
-    spawnMulungBoss();
-    updateMulungUI();
-    
+    // 직업 선택 모달 띄우기
+    window.showMulungClassSelect();
+
     cancelAnimationFrame(mainReqId);
     mulungReqId = requestAnimationFrame(mulungLoop);
 };
 
-// 🔥 무릉도장 보스 스폰 로직 (피통 & 방어력 스케일링)
+// 🔥 무릉도장 직업 선택창 UI
+window.showMulungClassSelect = () => {
+    let modal = document.getElementById('mulung-class-modal');
+    if (!modal) {
+        let mDiv = document.createElement('div'); mDiv.id = 'mulung-class-modal'; mDiv.className = 'maple-modal';
+        mDiv.style.cssText = "display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:5000; width:85%; max-width:320px; background:#fff; border:2px solid #546e7a; padding:20px; border-radius:10px; text-align:center;";
+        document.body.appendChild(mDiv); modal = mDiv;
+    }
+    
+    modal.innerHTML = `
+        <h3 style="margin-top:0; color:#263238;">직업 선택</h3>
+        <p style="font-size:13px; color:#555; margin-bottom:15px; font-weight:bold;">무릉도장에서 활약할 직업을 골라주세요!</p>
+        <div style="display:flex; gap:10px;">
+            <button class="ingame-btn premium-red" style="flex:1; padding:15px 0; font-size:16px;" onclick="selectMulungClass('전사')">🗡️ 전사</button>
+            <button class="ingame-btn premium-blue" style="flex:1; padding:15px 0; font-size:16px;" onclick="selectMulungClass('법사')">🪄 법사</button>
+            <button class="ingame-btn premium-purple" style="flex:1; padding:15px 0; font-size:16px;" onclick="selectMulungClass('도적')">✦ 도적</button>
+        </div>
+    `;
+    document.getElementById('overlay').style.display = 'block';
+    modal.style.display = 'block';
+};
+
+window.selectMulungClass = (clsName) => {
+    document.getElementById('mulung-class-modal').style.display = 'none';
+    document.getElementById('overlay').style.display = 'none';
+    
+    let cls = CLASSES[clsName];
+    // 내 유닛 중앙(x:250) 1개 배치
+    mulungState.myUnits.push({ idx: 0, type: clsName, cls: cls, gradeIdx: 0, grade: GRADES[0], x: 250, y: 350, hp: 5, maxHp: 5, lastAttack: 0, globalCooldown: 0, threatCooldown: 0, rtdCooldown: 0, overloadTimer: 0, unitStunTimer: 0, damageDealt: 0, bindCooldown: 0, healCooldown: 0 });
+    
+    // AI 동료도 1개 랜덤 배치
+    let clsNames = Object.keys(CLASSES); 
+    let aiClsName = clsNames[Math.floor(Math.random() * clsNames.length)];
+    let aiCls = CLASSES[aiClsName];
+    mulungState.oppUnits.push({ idx: 0, type: aiClsName, cls: aiCls, gradeIdx: 0, grade: GRADES[0], x: 250, y: 150, hp: 5, maxHp: 5, lastAttack: 0, globalCooldown: 0, threatCooldown: 0, rtdCooldown: 0, overloadTimer: 0, unitStunTimer: 0, bindCooldown: 0, healCooldown: 0 });
+    
+    updateMulungUI();
+};
+
+// 🔥 무릉도장 보스 스폰 로직
 function spawnMulungBoss() {
     let w = mulungState.wave;
-    let stage = ((w - 1) % 5) + 1; // 1~5 페이즈 계산
+    let stage = ((w - 1) % 5) + 1; 
     
-    // 상단 UI에 층수와 1/5 페이즈 텍스트 표시
     document.getElementById('ui-wave').innerText = `${w}층 (${stage}/5)`;
     
-    // 체력 기하급수적 증가 (1층 5000 -> 150층 수억 단위)
     let hp = Math.floor(5000 * Math.pow(1.15, w)); 
-    
-    // 30층마다 방어력 10% 증가 (최대 90% 제한)
     let armor = Math.floor((w - 1) / 30) * 0.10; 
     if(armor > 0.9) armor = 0.9;
     
@@ -2881,35 +2913,46 @@ function spawnMulungBoss() {
         x: -50, y: 250, speed: 20 + Math.min(w * 0.2, 30),
         threatTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0,
         stunTimer: 0, counterTimer: 5, bindTimer: 0,
-        stage: stage // 페이즈 정보 저장
+        stage: stage
     };
+
+    // 🔥 상단 우측 보스 정보 UI 업데이트
+    let bNameEl = document.getElementById('mulung-boss-name');
+    let bArmorEl = document.getElementById('mulung-boss-armor');
+    if (bNameEl) bNameEl.innerText = `${bName} (${stage}/5)`;
+    if (bArmorEl) bArmorEl.innerText = `방어력 ${Math.round(armor*100)}%`;
 }
 
-// 🔥 무릉도장 하단 승급 UI 갱신
+// 🔥 단일 유닛 승급 UI 갱신
 function updateMulungUI() {
-    // 상단 무릉 코인 텍스트 실시간 갱신
     let coinSpan = document.getElementById('ui-mulung-coins');
     if (coinSpan) coinSpan.innerText = mulungState.coins;
 
-    // 하단 승급 버튼 렌더링
     let upgradeContainer = document.getElementById('mulung-upgrade-buttons');
     if(!upgradeContainer) return;
     
-    upgradeContainer.innerHTML = mulungState.myUnits.map((u, i) => {
-        let cost = u.gradeIdx >= 8 ? 'MAX' : (u.gradeIdx + 2);
-        let btnClass = u.gradeIdx >= 8 ? 'premium-dark' : (mulungState.coins >= cost ? 'premium-orange' : 'premium-white');
-        let actionLabel = u.gradeIdx === 0 ? "초보자 유닛 생성" : `${GRADES[u.gradeIdx].name} 레벨업`;
-        
-        return `<div class="upgrade-box" onclick="upgradeMulungUnit(${i})" style="cursor:pointer;">
-            <div class="job-title" style="color:${CLASSES[u.type].color};">${u.type}</div>
-            <div style="font-size:11px; font-weight:bold; color:#333; margin:2px 0;">${actionLabel}</div>
-            <div class="cost" style="color:#d32f2f;">${cost} 무릉코인</div>
+    if (mulungState.myUnits.length === 0) {
+        upgradeContainer.innerHTML = `<div style="color:#777; font-size:13px; padding:10px;">직업을 선택해주세요.</div>`;
+        return;
+    }
+
+    let u = mulungState.myUnits[0];
+    let cost = u.gradeIdx >= 8 ? 'MAX' : (u.gradeIdx + 2);
+    let borderColor = u.gradeIdx >= 8 ? '#424242' : '#ff9800';
+    let actionLabel = u.gradeIdx === 0 ? "초보자 유닛 생성" : `${GRADES[u.gradeIdx].name} 레벨업`;
+    
+    upgradeContainer.innerHTML = `
+        <div class="upgrade-box" onclick="upgradeMulungUnit(0)" style="cursor:pointer; width: 65%; max-width: 250px; margin: 0 auto; padding: 12px; border: 3px solid ${borderColor}; border-radius: 10px; background: #fffdf7;">
+            <div style="font-size:26px; text-shadow:1px 1px 2px rgba(0,0,0,0.5);">${CLASSES[u.type].icon}</div>
+            <div class="job-title" style="color:${CLASSES[u.type].color}; font-size:16px; margin-top:2px;">${u.type}</div>
+            <div style="font-size:14px; font-weight:bold; color:#333; margin:5px 0;">${actionLabel}</div>
+            <div class="cost" style="color:#d32f2f; font-size:15px; font-weight:900;">${cost} 무릉코인</div>
         </div>`;
-    }).join('');
 }
 
 window.upgradeMulungUnit = (idx) => {
     let u = mulungState.myUnits[idx];
+    if(!u) return;
     if(u.gradeIdx >= 8) return window.showMessage("최대 등급입니다.");
     let cost = u.gradeIdx + 2; 
     if(mulungState.coins < cost) return window.showMessage(`코인이 부족합니다. (${cost}개 필요)`);
@@ -2918,7 +2961,6 @@ window.upgradeMulungUnit = (idx) => {
     u.gradeIdx++;
     u.hp = u.maxHp = 5; 
     
-    // 컨테이너 흔들림 및 이펙트
     let container = document.getElementById('game-container'); 
     if(container) { container.classList.add('shake-active'); setTimeout(() => container.classList.remove('shake-active'), 400); }
     
@@ -2930,10 +2972,27 @@ function mulungLoop() {
     if (!mulungState.active) return;
     let now = performance.now(); let dtReal = (now - mulungState.lastTime) / 1000; 
     if (dtReal > 0.1) dtReal = 0.1; if (dtReal < 0) dtReal = 0.016; 
-    let dt = dtReal * 2; // 무릉도장 기본 2배속 진행
+    
+    let dt = dtReal * (state.speed || 1); // 1배/10배속 동적 적용
     mulungState.lastTime = now;
 
+    // 🔥 10초 대기(PREP) 로직 (시간이 흐르게 적용)
+    if (mulungState.status === 'PREP') {
+        mulungState.prepTime -= dtReal; 
+        document.getElementById('ui-timer').innerText = Math.ceil(Math.max(0, mulungState.prepTime)) + "초";
+        
+        if (mulungState.prepTime <= 0) {
+            mulungState.status = 'PLAY';
+            document.getElementById('ui-timer').innerText = "진행중";
+            spawnMulungBoss(); // 10초 땡 하면 첫 보스 스폰
+        }
+        drawMulung();
+        mulungReqId = requestAnimationFrame(mulungLoop);
+        return;
+    }
+
     let b = mulungState.boss;
+    if (!b) { drawMulung(); mulungReqId = requestAnimationFrame(mulungLoop); return; }
 
     // 1. 보스 상태 업데이트 및 이동
     if (b.freezeTimer > 0) { b.freezeTimer -= dt; b.freezeTickTimer -= dt; if (b.freezeTickTimer <= 0) { b.hp -= b.freezeDmgVal; b.freezeTickTimer = 1; } }
@@ -2958,7 +3017,6 @@ function mulungLoop() {
     if (mulungState.wave >= 90) {
         b.counterTimer -= dt;
         if (b.counterTimer <= 0) {
-            // 어그로 1순위 타겟 찾기
             let target = null; let maxDmg = -1;
             mulungState.myUnits.forEach(u => { if (u.hp > 0 && u.damageDealt > maxDmg) { maxDmg = u.damageDealt; target = u; } });
             
@@ -2966,7 +3024,6 @@ function mulungLoop() {
                 target.hp -= 1;
                 mulungState.vfx.push({ type: 'hit', x: target.x, y: target.y, timer: 0.5, color: '#ff0000' });
                 
-                // 사망 시 2단계 강등
                 if (target.hp <= 0) {
                     let oldGrade = GRADES[target.gradeIdx].name;
                     target.gradeIdx = Math.max(0, target.gradeIdx - 2);
@@ -3048,8 +3105,7 @@ function mulungLoop() {
         }
     });
 
-    // 4. AI 동료 자동 승급 로직 및 공격 (단순화된 미러 딜링)
-    // AI도 보스가 죽을 때 코인을 얻고, 가장 낮은 등급의 유닛을 자동 승급시킵니다.
+    // 4. AI 동료 자동 승급 로직 및 공격
     let oppCardBonus = oppCardData ? Object.values(oppCardData).reduce((sum, c) => sum + (c.grade||0)*0.5, 0) : 0;
     let oppMulti = 1 + oppCardBonus/100;
     
@@ -3070,7 +3126,7 @@ function mulungLoop() {
         if(p.type === '도적') p.angle += 15 * dt; 
         if(dist <= speed) {
             let hitDmg = p.dmg; 
-            if (p.type === '전사') hitDmg *= 1.5; // 보스 추가딜
+            if (p.type === '전사') hitDmg *= 1.5;
             hitDmg *= (1 - appliedArmor);
 
             b.hp -= hitDmg;
@@ -3091,7 +3147,6 @@ function mulungLoop() {
         mulungState.coins += rewardCoins;
         mulungState.oppCoins += rewardCoins;
         
-        // AI 자동 승급 (가장 등급 낮은 유닛 우선)
         let minGrade = 99; let targetAiIdx = -1;
         mulungState.oppUnits.forEach((u, idx) => { if (u.gradeIdx < 8 && u.gradeIdx < minGrade) { minGrade = u.gradeIdx; targetAiIdx = idx; } });
         if (targetAiIdx !== -1 && mulungState.oppCoins >= (minGrade + 2)) {
@@ -3116,6 +3171,16 @@ function drawMulung() {
     // 중앙 트랙 그리기
     ctx.setLineDash([]); ctx.strokeStyle = "rgba(188, 170, 164, 0.5)"; ctx.lineWidth = 40; ctx.lineJoin = "round"; ctx.beginPath();
     ctx.moveTo(0, 250); ctx.lineTo(500, 250); ctx.stroke();
+
+    // 🔥 유닛 배치용 배경 박스 그리기 (상하단 중앙)
+    ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.strokeStyle = "#555"; ctx.lineWidth = 2;
+    ctx.fillRect(250 - 35, 150 - 35, 70, 70); ctx.strokeRect(250 - 35, 150 - 35, 70, 70);
+    ctx.fillRect(250 - 35, 350 - 35, 70, 70); ctx.strokeRect(250 - 35, 350 - 35, 70, 70);
+
+    // 🔥 위/아래 진영 표시 텍스트
+    ctx.font = "bold 16px NanumSquare"; ctx.fillStyle = "rgba(255, 255, 255, 0.5)"; ctx.textAlign = "center";
+    ctx.fillText(`동료 진영 (${mulungState.oppName})`, 250, 90);
+    ctx.fillText("나의 진영", 250, 450);
 
     let b = mulungState.boss;
     
@@ -3145,10 +3210,8 @@ function drawMulung() {
         ctx.fillStyle = "#333"; ctx.fillRect(u.x - 20, u.y + 20, 40, 4);
         ctx.fillStyle = "#00e676"; ctx.fillRect(u.x - 20, u.y + 20, 40 * (u.hp / u.maxHp), 4);
 
-        // 🔥 스킬 쿨타임 바 (체력바 아래에 추가)
+        // 스킬 쿨타임 바
         let barY = u.y + 26;
-        
-        // 1. 글로벌 광역 스킬 (5차 이상)
         if (u.gradeIdx >= 5 && ((u.type === '전사' && skillLevels.war_death > 0) || (u.type === '법사' && skillLevels.mage_thunder > 0) || (u.type === '도적' && skillLevels.thief_fuma > 0))) {
             let color = u.type === '전사' ? '#ffeb3b' : (u.type === '법사' ? '#00e5ff' : '#ab47bc');
             let pct = Math.max(0, (60000 - (u.globalCooldown||0)) / 60000);
@@ -3156,7 +3219,6 @@ function drawMulung() {
             ctx.fillStyle = color; ctx.fillRect(u.x - 20, barY, 40 * pct, 3);
             barY += 4;
         }
-        // 2. 힐 (6차 이상 법사)
         if (u.gradeIdx >= 6 && u.type === '법사' && skillLevels.mage_heal > 0) {
             let maxHealCd = (70 - skillLevels.mage_heal * 10) * 1000;
             let pct = Math.max(0, (maxHealCd - (u.healCooldown||0)) / maxHealCd);
@@ -3164,7 +3226,6 @@ function drawMulung() {
             ctx.fillStyle = "#00e676"; ctx.fillRect(u.x - 20, barY, 40 * pct, 3);
             barY += 4;
         }
-        // 3. 위협/레투다 (제네시스 이상 전사/도적)
         if (u.gradeIdx >= 7) {
             if (u.type === '전사' && skillLevels.war_threat > 0) {
                 let pct = Math.max(0, (25000 - (u.threatCooldown||0)) / 25000);
@@ -3181,7 +3242,6 @@ function drawMulung() {
         }
     });
 
-    // 특수 이펙트 그리기
     mulungState.vfx.forEach(v => {
         ctx.save(); ctx.translate(v.x, v.y);
         if (v.type === 'hit') { ctx.globalAlpha = (v.timer / 0.5); ctx.fillStyle = v.color; ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI*2); ctx.fill(); }
@@ -3191,7 +3251,6 @@ function drawMulung() {
         ctx.restore();
     });
 
-    // 투사체 그리기
     mulungState.projectiles.forEach(p => {
         ctx.save(); ctx.translate(p.x, p.y); let dir = Math.atan2(p.ty - p.y, p.tx - p.x); let scale = p.isFinal ? 1.3 : 1.0; ctx.scale(scale, scale);
         let img = null; let psize = 20;
@@ -3202,7 +3261,6 @@ function drawMulung() {
         ctx.restore();
     });
 
-    // 보스 그리기 (최상단)
     if (b) {
         let size = 30; ctx.save(); ctx.translate(b.x, b.y); ctx.scale(-1, 1);
         if (bossImages[b.name] && bossImages[b.name].complete) { ctx.drawImage(bossImages[b.name], -size*1.5, -size*1.5, size*3, size*3); } 
@@ -3216,16 +3274,12 @@ function drawMulung() {
         } 
         ctx.restore();
         
-        // 보스 체력바
         ctx.fillStyle = "#111"; ctx.fillRect(b.x - 30, b.y - size - 15, 60, 6);
         ctx.fillStyle = "#ff1744"; ctx.fillRect(b.x - 30, b.y - size - 15, 60 * (b.hp / b.maxHp), 6);
         
-        // 방어력 및 보스 페이즈 텍스트 표시 🔥 (이 부분 수정)
-        ctx.font = "bold 10px Arial"; ctx.fillStyle = "#fff"; ctx.textAlign = "center"; 
-        ctx.fillText(`${b.name} (${b.stage}/5) | 방어력 ${Math.round(b.armor*100)}%`, b.x, b.y - size - 20);
+        // 🔥 보스 머리 위 텍스트 표시는 지웠습니다. 상단 UI에 반영됩니다!
     }
 
-    // 데미지 텍스트
     mulungState.dmgTexts.forEach(d => { ctx.save(); ctx.globalAlpha = Math.max(0, d.timer / 0.6); ctx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; ctx.font = d.isCrit ? "800 20px NanumSquare" : "bold 14px NanumSquare"; ctx.shadowColor = d.isCrit ? "#c62828" : "#000"; ctx.shadowBlur = 4; ctx.fillText(d.val, d.x, d.y); ctx.restore(); });
 }
 
