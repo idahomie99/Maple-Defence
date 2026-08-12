@@ -2539,19 +2539,19 @@ window.openMulungShop = () => {
                 <div style="display:flex; flex-direction:column; gap:8px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; background:#e0f2f1; padding:10px; border-radius:6px; border:1px solid #b2dfdb;">
                         <span style="font-weight:bold; font-size:14px;">🧩 코인 조각</span>
-                        <button class="ingame-btn premium-dark" style="width:80px; padding:6px 0; font-size:12px;" onclick="buyMulungItem('piece')">10 코인</button>
+                        <button class="ingame-btn premium-dark" style="width:80px; padding:6px 0; font-size:12px;" onclick="buyMulungItem('piece')">20 코인</button>
                     </div>
                     <div style="display:flex; justify-content:space-between; align-items:center; background:#e0f2f1; padding:10px; border-radius:6px; border:1px solid #b2dfdb;">
                         <span style="font-weight:bold; font-size:14px;">🌟 별의 기운</span>
-                        <button class="ingame-btn premium-dark" style="width:80px; padding:6px 0; font-size:12px;" onclick="buyMulungItem('star')">5 코인</button>
+                        <button class="ingame-btn premium-dark" style="width:80px; padding:6px 0; font-size:12px;" onclick="buyMulungItem('star')">10 코인</button>
                     </div>
                     <div style="display:flex; justify-content:space-between; align-items:center; background:#e0f2f1; padding:10px; border-radius:6px; border:1px solid #b2dfdb;">
                         <span style="font-weight:bold; font-size:14px;">🎁 장비 상자</span>
-                        <button class="ingame-btn premium-dark" style="width:80px; padding:6px 0; font-size:12px;" onclick="buyMulungItem('equipBox')">50 코인</button>
+                        <button class="ingame-btn premium-dark" style="width:80px; padding:6px 0; font-size:12px;" onclick="buyMulungItem('equipBox')">100 코인</button>
                     </div>
                     <div style="display:flex; justify-content:space-between; align-items:center; background:#e0f2f1; padding:10px; border-radius:6px; border:1px solid #b2dfdb;">
                         <span style="font-weight:bold; font-size:14px;">⬛ 블랙 큐브</span>
-                        <button class="ingame-btn premium-dark" style="width:80px; padding:6px 0; font-size:12px;" onclick="buyMulungItem('cube')">150 코인</button>
+                        <button class="ingame-btn premium-dark" style="width:80px; padding:6px 0; font-size:12px;" onclick="buyMulungItem('cube')">200 코인</button>
                     </div>
                 </div>
                 <button class="ingame-btn premium-white" style="width:100%; padding:10px; margin-top:10px;" onclick="closeMulungShop()">닫기</button>`;
