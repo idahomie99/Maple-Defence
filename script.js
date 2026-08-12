@@ -3027,6 +3027,41 @@ function drawMulung() {
         // 내 유닛 체력바
         ctx.fillStyle = "#333"; ctx.fillRect(u.x - 20, u.y + 20, 40, 4);
         ctx.fillStyle = "#00e676"; ctx.fillRect(u.x - 20, u.y + 20, 40 * (u.hp / u.maxHp), 4);
+
+        // 🔥 스킬 쿨타임 바 (체력바 아래에 추가)
+        let barY = u.y + 26;
+        
+        // 1. 글로벌 광역 스킬 (5차 이상)
+        if (u.gradeIdx >= 5 && ((u.type === '전사' && skillLevels.war_death > 0) || (u.type === '법사' && skillLevels.mage_thunder > 0) || (u.type === '도적' && skillLevels.thief_fuma > 0))) {
+            let color = u.type === '전사' ? '#ffeb3b' : (u.type === '법사' ? '#00e5ff' : '#ab47bc');
+            let pct = Math.max(0, (60000 - (u.globalCooldown||0)) / 60000);
+            ctx.fillStyle = "#333"; ctx.fillRect(u.x - 20, barY, 40, 3);
+            ctx.fillStyle = color; ctx.fillRect(u.x - 20, barY, 40 * pct, 3);
+            barY += 4;
+        }
+        // 2. 힐 (6차 이상 법사)
+        if (u.gradeIdx >= 6 && u.type === '법사' && skillLevels.mage_heal > 0) {
+            let maxHealCd = (70 - skillLevels.mage_heal * 10) * 1000;
+            let pct = Math.max(0, (maxHealCd - (u.healCooldown||0)) / maxHealCd);
+            ctx.fillStyle = "#333"; ctx.fillRect(u.x - 20, barY, 40, 3);
+            ctx.fillStyle = "#00e676"; ctx.fillRect(u.x - 20, barY, 40 * pct, 3);
+            barY += 4;
+        }
+        // 3. 위협/레투다 (제네시스 이상 전사/도적)
+        if (u.gradeIdx >= 7) {
+            if (u.type === '전사' && skillLevels.war_threat > 0) {
+                let pct = Math.max(0, (25000 - (u.threatCooldown||0)) / 25000);
+                ctx.fillStyle = "#333"; ctx.fillRect(u.x - 20, barY, 40, 3);
+                ctx.fillStyle = "#ff9100"; ctx.fillRect(u.x - 20, barY, 40 * pct, 3);
+                barY += 4;
+            }
+            if (u.type === '도적' && skillLevels.thief_overload > 0) {
+                let pct = Math.max(0, (45000 - (u.rtdCooldown||0)) / 45000);
+                ctx.fillStyle = "#333"; ctx.fillRect(u.x - 20, barY, 40, 3);
+                ctx.fillStyle = "#d50000"; ctx.fillRect(u.x - 20, barY, 40 * pct, 3);
+                barY += 4;
+            }
+        }
     });
 
     // 특수 이펙트 그리기
@@ -3093,3 +3128,17 @@ function endMulungGame() {
     alert(`☠️ 무릉도장 도전 종료!\n도달 층수: ${clearedWave}층\n획득 무릉 코인: ${reward}개`);
     window.switchScreen('start-screen');
 }
+
+// 🔥 온라인 메뉴(모달)에 무릉도장 버튼 동적 추가
+setTimeout(() => {
+    let onlineMenu = document.getElementById('online-menu-modal');
+    if (onlineMenu && !document.getElementById('btn-mulung-enter')) {
+        let btnContainer = onlineMenu.querySelector('div[style*="flex-direction"]'); // 랭크/펀치킹 버튼 있는 컨테이너
+        if (btnContainer) {
+            btnContainer.innerHTML += `
+                <button id="btn-mulung-enter" class="ingame-btn premium-orange" style="width:100%; padding:15px; font-size:16px; margin-top:10px;" onclick="startMulungMatchmaking()">🐼 협동 무릉도장 입장</button>
+                <button id="btn-mulung-shop" class="ingame-btn premium-dark" style="width:100%; padding:10px; font-size:14px; margin-top:5px;" onclick="closeOnlineMenu(); openMulungShop();">🐼 무릉 상점 가기</button>
+            `;
+        }
+    }
+}, 1000);
