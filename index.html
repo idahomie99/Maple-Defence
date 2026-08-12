@@ -136,11 +136,13 @@
 
     <!-- 온라인 모드 선택 화면 -->
     <div id="online-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:1900; flex-direction:column; align-items:center;">
-        <div id="online-menu-modal" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 25vh; width: 85%; max-width: 320px;">
+        <div id="online-menu-modal" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 20vh; width: 85%; max-width: 320px;">
             <h3 style="color:#60a5fa;">🌐 온라인 모드 🌐</h3>
             <p style="font-size:14px; font-weight:bold; color:#4e342e; margin-bottom:15px;">다른 용사들과 실력을 겨뤄보세요!</p>
-            <button class="ingame-btn premium-dark" style="width:100%; height:55px; margin-bottom:10px; font-size:16px;" onclick="openPkMenuFromOnline()">🏆 월드 펀치킹</button>
-            <button class="ingame-btn premium-red" style="width:100%; height:55px; margin-bottom:15px; font-size:16px;" onclick="openRankLobbyFromOnline()">⚔️ 랭크 게임</button>
+            <button class="ingame-btn premium-dark" style="width:100%; height:50px; margin-bottom:8px; font-size:15px;" onclick="openPkMenuFromOnline()">🏆 월드 펀치킹</button>
+            <button class="ingame-btn premium-red" style="width:100%; height:50px; margin-bottom:8px; font-size:15px;" onclick="openRankLobbyFromOnline()">⚔️ 랭크 게임</button>
+            <button class="ingame-btn premium-orange" style="width:100%; height:50px; margin-bottom:8px; font-size:15px;" onclick="startMulungMatchmaking()">🐼 협동 무릉도장</button>
+            <button class="ingame-btn premium-purple" style="width:100%; height:45px; margin-bottom:15px; font-size:14px;" onclick="closeOnlineMenu(); openMulungShop();">🐼 무릉 상점 가기</button>
             <button class="ingame-btn premium-white" style="width:100%; padding: 10px;" onclick="closeOnlineMenu()">로비로 돌아가기</button>
         </div>
     </div>

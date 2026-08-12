@@ -3128,17 +3128,3 @@ function endMulungGame() {
     alert(`☠️ 무릉도장 도전 종료!\n도달 층수: ${clearedWave}층\n획득 무릉 코인: ${reward}개`);
     window.switchScreen('start-screen');
 }
-
-// 🔥 온라인 메뉴(모달)에 무릉도장 버튼 동적 추가
-setTimeout(() => {
-    let onlineMenu = document.getElementById('online-menu-modal');
-    if (onlineMenu && !document.getElementById('btn-mulung-enter')) {
-        let btnContainer = onlineMenu.querySelector('div[style*="flex-direction"]'); // 랭크/펀치킹 버튼 있는 컨테이너
-        if (btnContainer) {
-            btnContainer.innerHTML += `
-                <button id="btn-mulung-enter" class="ingame-btn premium-orange" style="width:100%; padding:15px; font-size:16px; margin-top:10px;" onclick="startMulungMatchmaking()">🐼 협동 무릉도장 입장</button>
-                <button id="btn-mulung-shop" class="ingame-btn premium-dark" style="width:100%; padding:10px; font-size:14px; margin-top:5px;" onclick="closeOnlineMenu(); openMulungShop();">🐼 무릉 상점 가기</button>
-            `;
-        }
-    }
-}, 1000);
