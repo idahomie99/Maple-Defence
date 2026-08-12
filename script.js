@@ -509,18 +509,20 @@ function renderGrid() {
         let u = grid[i]; cells[i].className = 'grid-cell'; if (i === selectedUnitIdx) cells[i].classList.add('selected');
         
         if (u && u.overloadTimer > 0) {
-            cells[i].style.border = "2px solid #ff1744";
-            cells[i].style.boxShadow = "0 0 8px #ff1744";
+            cells[i].style.border = "2px solid #ff1744"; cells[i].style.boxShadow = "0 0 8px #ff1744";
         } else {
-            cells[i].style.border = "";
-            cells[i].style.boxShadow = "";
+            cells[i].style.border = ""; cells[i].style.boxShadow = "";
         }
 
         if(u) {
             if (u.gradeIdx === 6) cells[i].classList.add('glow-6'); if (u.gradeIdx === 7) cells[i].classList.add('glow-7'); if (u.gradeIdx === 8) cells[i].classList.add('glow-8'); let barsHtml = '';
             
-            if (u.gradeIdx >= 6) { 
+            // 🔥 6차 법사만 바인드 쿨타임 바 제외
+            if (u.gradeIdx === 6 && u.cls.type !== '법사') { 
                 barsHtml += `<div style="width: 80%; height: 3px; background: #333; margin-top: 2px; border-radius: 1.5px; overflow: hidden; border: 1px solid #111;"><div id="bind-bar-${u.idx}" style="width: 0%; height: 100%; background: #00e5ff;"></div></div>`; 
+            }
+            
+            if (u.gradeIdx >= 6) {
                 if (u.cls.type === '법사' && skillLevels.mage_heal > 0) {
                     let maxHealCd = (70 - skillLevels.mage_heal * 10) * 1000;
                     let cdPercent = Math.max(0, Math.min(100, ((maxHealCd - (u.healCooldown || 0)) / maxHealCd) * 100));
@@ -552,7 +554,7 @@ function renderGrid() {
         } else { cells[i].innerHTML = ''; }
     }
     let pkBarContainer = document.getElementById('pk-global-bar-container');
-    if(pkBarContainer && typeof pkState !== 'undefined' && pkState.active && pkState.unit) { let u = pkState.unit; if ((u.cls.type === '전사' && (skillLevels.war_death||0) > 0) || (u.cls.type === '법사' && (skillLevels.mage_thunder||0) > 0) || (u.cls.type === '도적' && (skillLevels.thief_fuma||0) > 0)) { pkBarContainer.style.display = 'block'; let color = u.cls.type === '전사' ? '#ffeb3b' : (u.cls.type === '법사' ? '#00e5ff' : '#ab47bc'); document.getElementById('pk-global-bar').style.background = color; } }
+    if(pkBarContainer && typeof pkState !== 'undefined' && pkState.active && pkState.unit) { /* 펀치킹 전용 로직 우회 */ }
 }
 
 function renderOppGrid() { let oppGridContainer = document.getElementById('opp-grid-container'); if(!oppGridContainer) return; let cells = oppGridContainer.children; if(!cells || cells.length === 0) return; for(let i=0; i<oppGrid.length; i++) { let u = oppGrid[i]; cells[i].className = 'grid-cell'; if(u) { if (u.gradeIdx === 6) cells[i].classList.add('glow-6'); if (u.gradeIdx === 7) cells[i].classList.add('glow-7'); if (u.gradeIdx === 8) cells[i].classList.add('glow-8'); cells[i].innerHTML = `<div style="font-size:18px; text-shadow:1px 1px 2px rgba(0,0,0,0.5);">${u.cls.icon}</div><div style="color:${u.cls.color}; font-size:9px; margin-top:2px;">${u.grade.name}</div>`; } else { cells[i].innerHTML = ''; } } }
@@ -1703,10 +1705,30 @@ window.startPkGame = async (clsName) => {
     document.getElementById('pk-overlay').style.display = 'none'; window.switchScreen('pk-game'); window.loadPkLiveRanking();
     let grade = GRADES[8]; let cls = CLASSES[clsName]; document.getElementById('pk-unit-icon').innerText = cls.icon; document.getElementById('pk-unit-name').style.color = cls.color;
     let bestScore = 0; if (currentUserUid) { try { let snap = await get(child(ref(database), `pk_rankings/${currentUserUid}`)); if(snap.exists()) bestScore = snap.val().score; } catch(e) {} }
+    
+    // 🔥 펀치킹 제네시스 스킬(위협, 힐, 레투다) 쿨타임 바 동적 생성
     let pkBarContainer = document.getElementById('pk-global-bar-container');
     if (pkBarContainer) {
-        if ((cls.type === '전사' && skillLevels.war_death > 0) || (cls.type === '법사' && skillLevels.mage_thunder > 0) || (cls.type === '도적' && skillLevels.thief_fuma > 0)) { pkBarContainer.style.display = 'block'; document.getElementById('pk-global-bar').style.background = cls.type === '전사' ? '#ffeb3b' : (cls.type === '법사' ? '#00e5ff' : '#ab47bc'); document.getElementById('pk-global-bar').style.width = '0%'; } else pkBarContainer.style.display = 'none';
+        pkBarContainer.innerHTML = '';
+        pkBarContainer.style.display = 'flex';
+        pkBarContainer.style.flexDirection = 'column';
+        pkBarContainer.style.gap = '3px';
+
+        if ((cls.type === '전사' && skillLevels.war_death > 0) || (cls.type === '법사' && skillLevels.mage_thunder > 0) || (cls.type === '도적' && skillLevels.thief_fuma > 0)) { 
+            let color = cls.type === '전사' ? '#ffeb3b' : (cls.type === '법사' ? '#00e5ff' : '#ab47bc'); 
+            pkBarContainer.innerHTML += `<div style="width:100%; height:6px; background:#333; border:1px solid #111; border-radius:3px; overflow:hidden;"><div id="pk-global-bar" style="width:0%; height:100%; background:${color};"></div></div>`;
+        }
+        if (cls.type === '법사' && skillLevels.mage_heal > 0) {
+            pkBarContainer.innerHTML += `<div style="width:100%; height:6px; background:#333; border:1px solid #111; border-radius:3px; overflow:hidden;"><div id="pk-heal-bar" style="width:0%; height:100%; background:#00e676;"></div></div>`;
+        }
+        if (cls.type === '전사' && skillLevels.war_threat > 0) {
+            pkBarContainer.innerHTML += `<div style="width:100%; height:6px; background:#333; border:1px solid #111; border-radius:3px; overflow:hidden;"><div id="pk-threat-bar" style="width:0%; height:100%; background:#ff9100;"></div></div>`;
+        }
+        if (cls.type === '도적' && skillLevels.thief_overload > 0) {
+            pkBarContainer.innerHTML += `<div style="width:100%; height:6px; background:#333; border:1px solid #111; border-radius:3px; overflow:hidden;"><div id="pk-rtd-bar" style="width:0%; height:100%; background:#d50000;"></div></div>`;
+        }
     }
+    
     pkState = { active: true, time: 60, score: 0, lastTime: performance.now(), speed: 1, bestScore: bestScore, unit: { cls: cls, grade: grade, gradeIdx: 8, x: 110, y: 250, lastAttack: 0, globalCooldown: 0, threatCooldown: 0, overloadTimer: 0, unitStunTimer: 0, rtdCooldown: 0 }, scarecrow: { x: 390, y: 250, size: 20, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0, threatTimer: 0 }, projectiles: [], dmgTexts: [], vfx: [] };
     document.getElementById('pk-score').innerText = '0'; document.getElementById('pk-time').innerText = '60'; document.getElementById('pk-btn-speed').innerText = "1배속"; pkLoop();
 };
@@ -1730,6 +1752,11 @@ function pkLoop() {
             if (u.healCooldown === undefined) u.healCooldown = 0;
             u.healCooldown -= dt * 1000;
             let maxHealCd = (70 - skillLevels.mage_heal * 10) * 1000;
+            
+            // 🔥 펀치킹 힐 게이지 바 적용
+            let hbar = document.getElementById('pk-heal-bar');
+            if (hbar) hbar.style.width = Math.max(0, Math.min(100, ((maxHealCd - u.healCooldown) / maxHealCd) * 100)) + '%';
+            
             if (u.healCooldown <= 0) {
                 u.healCooldown += maxHealCd;
                 pkState.vfx.push({ type: 'heal', x: u.x, y: u.y, timer: 1.0 });
@@ -1741,6 +1768,11 @@ function pkLoop() {
         if (u.cls.type === '전사' && skillLevels.war_threat > 0) {
             if (u.threatCooldown === undefined) u.threatCooldown = 0;
             u.threatCooldown -= dt * 1000;
+            
+            // 🔥 펀치킹 위협 게이지 바 적용
+            let tbar = document.getElementById('pk-threat-bar');
+            if (tbar) tbar.style.width = Math.max(0, Math.min(100, ((25000 - u.threatCooldown) / 25000) * 100)) + '%';
+            
             if (u.threatCooldown <= 0) {
                 target.threatTimer = skillLevels.war_threat * 2;
                 u.threatCooldown += 25000;
@@ -1750,6 +1782,11 @@ function pkLoop() {
         if (u.cls.type === '도적' && skillLevels.thief_overload > 0) {
             if (u.rtdCooldown === undefined) u.rtdCooldown = 0;
             u.rtdCooldown -= dt * 1000;
+            
+            // 🔥 펀치킹 레투다 게이지 바 적용
+            let rbar = document.getElementById('pk-rtd-bar');
+            if (rbar) rbar.style.width = Math.max(0, Math.min(100, ((45000 - u.rtdCooldown) / 45000) * 100)) + '%';
+
             if (u.rtdCooldown <= 0 && (u.overloadTimer || 0) <= 0 && (u.unitStunTimer || 0) <= 0) {
                 u.overloadTimer = skillLevels.thief_overload === 5 ? 15 : 6 + (skillLevels.thief_overload * 2);
                 u.rtdCooldown += 45000;
@@ -2201,7 +2238,7 @@ window.loop = () => {
             }
         }
 
-        if (t.gradeIdx === 6) {
+        if (t.gradeIdx === 6 && t.cls.type !== '법사') {
             t.bindCooldown -= dt * 1000; let bar = document.getElementById(`bind-bar-${t.idx}`); if (bar) bar.style.width = Math.max(0, Math.min(100, ((75000 - t.bindCooldown) / 75000) * 100)) + '%';
             if (t.bindCooldown <= 0) { if (monsters.length > 0) { let target = null; for (let m of monsters) { if (m.bindTimer <= 0) { target = m; break; } } if (!target) target = monsters[0]; if (target) { target.bindTimer = 10; t.bindCooldown += 75000; } } else { t.bindCooldown = 0; } }
         }
@@ -2390,3 +2427,669 @@ window.loop = () => {
     window.draw(); if(state.isRank) window.drawOpp(); 
     mainReqId = requestAnimationFrame(window.loop);
 };
+
+// ==========================================
+// 10. 협동 무릉도장 시스템 (매칭, UI, 상점, 블랙 큐브)
+// ==========================================
+
+// 무릉도장 및 큐브 전용 글로벌 변수 추가
+userRankData.mulungCoins = userRankData.mulungCoins || 0;
+userInventory.blackCubes = userInventory.blackCubes || 0;
+
+let mulungReqId; // 🔥 변수 선언 추가
+
+let mulungState = {
+    active: false, wave: 1, bossHp: 0, maxHp: 0, coins: 0,
+    bossName: "", time: 0, isDead: false,
+    myUnits: [null, null, null], oppUnits: [null, null, null],
+    projectiles: [], vfx: [], dmgTexts: []
+};
+
+let cubeTempOptions = null;
+let cubeTargetEq = null;
+let cubeTargetIndex = -1;
+let cubeIsEquipped = false;
+
+// 🔥 무릉도장 상점 열기
+window.openMulungShop = () => {
+    document.getElementById('overlay').style.display = 'block';
+    let modal = document.getElementById('mulung-shop-modal');
+    if (!modal) {
+        let mDiv = document.createElement('div'); mDiv.id = 'mulung-shop-modal'; mDiv.className = 'maple-modal';
+        mDiv.style.cssText = "display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:4800; width:85%; max-width:320px; background:#fff; border:2px solid #004d40; padding:15px; border-radius:8px; text-align:center;";
+        document.body.appendChild(mDiv); modal = mDiv;
+    }
+    
+    let html = `<h3 style="color:#004d40; margin-top:0;">🐼 무릉도장 상점</h3>
+                <div style="font-size:13px; color:#555; margin-bottom:15px; font-weight:bold;">보유 무릉 코인: <span style="color:#e65100;">${userRankData.mulungCoins}</span>개</div>
+                
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:#e0f2f1; padding:10px; border-radius:6px; border:1px solid #b2dfdb;">
+                        <span style="font-weight:bold; font-size:14px;">🧩 코인 조각</span>
+                        <button class="ingame-btn" style="padding:6px 12px; font-size:12px;" onclick="buyMulungItem('piece')">10 코인</button>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:#e0f2f1; padding:10px; border-radius:6px; border:1px solid #b2dfdb;">
+                        <span style="font-weight:bold; font-size:14px;">🌟 별의 기운</span>
+                        <button class="ingame-btn" style="padding:6px 12px; font-size:12px;" onclick="buyMulungItem('star')">5 코인</button>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:#e0f2f1; padding:10px; border-radius:6px; border:1px solid #b2dfdb;">
+                        <span style="font-weight:bold; font-size:14px;">🎁 장비 상자</span>
+                        <button class="ingame-btn" style="padding:6px 12px; font-size:12px;" onclick="buyMulungItem('equipBox')">50 코인</button>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:#e0f2f1; padding:10px; border-radius:6px; border:1px solid #b2dfdb;">
+                        <span style="font-weight:bold; font-size:14px;">⬛ 블랙 큐브</span>
+                        <button class="ingame-btn premium-dark" style="padding:6px 12px; font-size:12px;" onclick="buyMulungItem('cube')">150 코인</button>
+                    </div>
+                </div>
+                <button class="ingame-btn premium-white" style="width:100%; padding:10px; margin-top:10px;" onclick="document.getElementById('mulung-shop-modal').style.display='none'; document.getElementById('overlay').style.display='none';">닫기</button>`;
+    modal.innerHTML = html;
+    modal.style.display = 'block';
+};
+
+window.buyMulungItem = (type) => {
+    let cost = { 'piece': 10, 'star': 5, 'equipBox': 50, 'cube': 150 }[type];
+    if (userRankData.mulungCoins < cost) return window.showMessage("무릉 코인이 부족합니다.");
+    
+    userRankData.mulungCoins -= cost;
+    if (type === 'piece') userInventory.coinPieces += 1;
+    else if (type === 'star') userInventory.starPieces = (userInventory.starPieces || 0) + 1;
+    else if (type === 'equipBox') userInventory.equipBoxes += 1;
+    else if (type === 'cube') userInventory.blackCubes += 1;
+
+    window.syncToCloud();
+    window.openMulungShop(); 
+    window.showMessage("구매를 완료했습니다!");
+};
+
+// 🔥 블랙 큐브 UI 연결 (장비 상세창에 큐브 버튼 추가)
+let originalOpenEquipDetailModal = window.openEquipDetailModal;
+window.openEquipDetailModal = (eq, targetIdx, isEquipped) => {
+    originalOpenEquipDetailModal(eq, targetIdx, isEquipped);
+    let modal = document.getElementById('equip-detail-modal');
+    if (modal && eq.options && eq.options.length > 0) {
+        let btnContainer = modal.querySelector('div[style*="flex-direction:column; gap:8px;"]');
+        if (btnContainer && !document.getElementById('btn-black-cube')) {
+            let cubeBtn = document.createElement('button');
+            cubeBtn.id = 'btn-black-cube';
+            cubeBtn.className = "ingame-btn premium-dark";
+            cubeBtn.style.cssText = "width:100%; padding:10px; font-size:13px; margin-bottom:5px;";
+            cubeBtn.innerHTML = `⬛ 블랙 큐브 사용 (보유: ${userInventory.blackCubes || 0}개)`;
+            cubeBtn.onclick = () => window.useBlackCube(eq, targetIdx, isEquipped);
+            btnContainer.insertBefore(cubeBtn, btnContainer.children[1]);
+        }
+    }
+};
+
+window.useBlackCube = (eq, targetIdx, isEquipped) => {
+    if ((userInventory.blackCubes || 0) <= 0) return window.showMessage("블랙 큐브가 부족합니다.");
+    
+    let modal = document.getElementById('cube-modal');
+    if (!modal) {
+        let mDiv = document.createElement('div'); mDiv.id = 'cube-modal'; mDiv.className = 'maple-modal';
+        mDiv.style.cssText = "display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:3800; width:90%; max-width:320px; background:#fff; border:2px solid #212121; padding:15px; border-radius:8px; text-align:center;";
+        document.body.appendChild(mDiv); modal = mDiv;
+    }
+
+    userInventory.blackCubes--;
+    cubeTargetEq = eq; cubeTargetIndex = targetIdx; cubeIsEquipped = isEquipped;
+
+    let optCount = eq.options.length;
+    let availableTypes = [...OPTION_TYPES].sort(() => 0.5 - Math.random());
+    cubeTempOptions = [];
+    
+    for (let i = 0; i < optCount; i++) {
+        let optType = availableTypes.pop();
+        let range = OPTION_RANGES[eq.grade][optType];
+        let val = Math.floor(Math.random() * (range[1] - range[0] + 1)) + range[0];
+        cubeTempOptions.push({ type: optType, value: val });
+    }
+
+    let beforeHtml = eq.options.map(o => `${o.type === 'atk' ? '공' : (o.type === 'spd' ? '속' : (o.type === 'crit' ? '크' : (o.type === 'cdmg' ? '치피' : '방관')))}+${o.value}%`).join('<br>');
+    let afterHtml = cubeTempOptions.map(o => `${o.type === 'atk' ? '공' : (o.type === 'spd' ? '속' : (o.type === 'crit' ? '크' : (o.type === 'cdmg' ? '치피' : '방관')))}+${o.value}%`).join('<br>');
+
+    modal.innerHTML = `
+        <h3 style="color:#212121; margin-top:0;">⬛ 블랙 큐브 결과</h3>
+        <div style="display:flex; justify-content:space-around; align-items:center; background:#eceff1; padding:10px; border-radius:6px; margin-bottom:15px;">
+            <div style="text-align:center; flex:1;">
+                <div style="font-size:11px; color:#777; margin-bottom:5px;">기존 옵션</div>
+                <div style="font-size:13px; font-weight:bold; color:#546e7a;">${beforeHtml}</div>
+            </div>
+            <div style="font-size:20px; color:#424242;">➔</div>
+            <div style="text-align:center; flex:1;">
+                <div style="font-size:11px; color:#d32f2f; margin-bottom:5px;">신규 옵션</div>
+                <div style="font-size:13px; font-weight:bold; color:#c62828;">${afterHtml}</div>
+            </div>
+        </div>
+        <div style="display:flex; gap:8px;">
+            <button class="ingame-btn premium-blue" style="flex:1; padding:12px;" onclick="applyCubeResult(true)">신규 적용</button>
+            <button class="ingame-btn premium-white" style="flex:1; padding:12px;" onclick="applyCubeResult(false)">기존 유지</button>
+        </div>
+    `;
+    modal.style.display = 'block';
+    window.syncToCloud(); 
+};
+
+window.applyCubeResult = (applyNew) => {
+    if (applyNew) {
+        cubeTargetEq.options = cubeTempOptions;
+        if (cubeIsEquipped) calculateEquipStats();
+        window.showMessage("신규 옵션이 적용되었습니다!");
+    } else {
+        window.showMessage("기존 옵션을 유지합니다.");
+    }
+    
+    document.getElementById('cube-modal').style.display = 'none';
+    window.syncToCloud();
+    window.openEquipDetailModal(cubeTargetEq, cubeTargetIndex, cubeIsEquipped);
+};
+
+// 🔥 협동 무릉도장 매칭 및 듀얼 인트로 
+function getGradeColor(grade) {
+    if(grade === 'Legendary') return '#d32f2f';
+    if(grade === 'Unique') return '#fb8c00';
+    if(grade === 'Epic') return '#8e24aa';
+    if(grade === 'Rare') return '#1e88e5';
+    return '#9e9e9e';
+}
+
+function getEquipHtml(eqObj, type) {
+    if(!eqObj) return `<div style="width:40px; height:40px; border:2px dashed #777; border-radius:4px;"></div>`;
+    let fileName = type === '뱃지' ? 'emblem.png' : (type === '엠블럼' ? 'badge.png' : 'ring.png');
+    let borderColor = getGradeColor(eqObj.grade);
+    return `<div style="width:40px; height:40px; border:2px solid ${borderColor}; border-radius:4px; background:#fff; display:flex; justify-content:center; align-items:center; box-shadow:0 0 5px ${borderColor};">
+                <img src="image/${fileName}" style="max-width:30px; max-height:30px;">
+            </div>`;
+}
+
+window.startMulungMatchmaking = async () => {
+    let playCount = parseInt(localStorage.getItem('mapleDefenseMulungCount')) || 0; 
+    let today = new Date().toLocaleDateString();
+    let lastDate = localStorage.getItem('mapleDefenseMulungDate');
+    if (lastDate !== today) { playCount = 0; localStorage.setItem('mapleDefenseMulungDate', today); }
+    if (playCount >= 5) return window.showMessage("오늘의 무릉도장 제한 횟수(5회)를 모두 소진했습니다!"); 
+
+    window.closeAllModals();
+    
+    // AI 데이터 로드 
+    let oppName = "의문의 동료 (AI)"; 
+    let oppCardTotal = 50 + Math.floor(Math.random()*50);
+    let oppStarTotal = Math.floor(Math.random()*30);
+    let oppEquipData = { '뱃지': null, '엠블럼': null, '링': null };
+
+    try { 
+        const snap = await get(child(ref(database), `users`)); 
+        if (snap.exists()) { 
+            let users = []; snap.forEach(c => { let v = c.val(); if (v.cloudData && v.nickname && c.key !== currentUserUid) users.push(v); }); 
+            if(users.length > 0) { 
+                let aiUser = users[Math.floor(Math.random() * users.length)]; 
+                oppName = aiUser.nickname + " (AI)";
+                if(aiUser.cloudData.cards) {
+                    let parsedCards = JSON.parse(aiUser.cloudData.cards);
+                    oppCardTotal = Object.values(parsedCards).reduce((sum, c) => sum + (c.grade||0), 0);
+                }
+                if(aiUser.cloudData.equipped) {
+                    ['뱃지', '엠블럼', '링'].forEach(slot => {
+                        let item = aiUser.cloudData.equipped[slot] || aiUser.cloudData.equipped[slot==='뱃지'?'badge':(slot==='엠블럼'?'emblem':'ring')];
+                        if(item) {
+                            oppEquipData[slot] = item;
+                            oppStarTotal += (item.star || 0);
+                        }
+                    });
+                }
+            } 
+        } 
+    } catch(e) {}
+
+    // 내 스펙 로드
+    let myCardTotal = getTotalGrade();
+    let myStarTotal = ['뱃지', '엠블럼', '링'].reduce((sum, slot) => sum + (userEquipped[slot] ? (userEquipped[slot].star || 0) : 0), 0);
+
+    // 인트로 오버레이 생성
+    let intro = document.getElementById('mulung-intro-overlay');
+    if (!intro) {
+        let mDiv = document.createElement('div'); mDiv.id = 'mulung-intro-overlay';
+        mDiv.style.cssText = "display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9000; align-items:center; justify-content:center;";
+        document.body.appendChild(mDiv); intro = mDiv;
+    }
+
+    intro.innerHTML = `
+        <div style="display:flex; width:90%; max-width:600px; gap:10px;">
+            <!-- 내 정보 -->
+            <div style="flex:1; background:linear-gradient(135deg, #1e3c72, #004d40); border:2px solid #b2dfdb; border-radius:8px; padding:20px; text-align:center; color:#fff; box-shadow:0 10px 20px rgba(0,0,0,0.5);">
+                <h3 style="margin-top:0; color:#80cbc4;">나의 스펙</h3>
+                <div style="font-size:18px; font-weight:bold; margin-bottom:10px;">${currentUserName}</div>
+                <div style="font-size:13px; margin-bottom:5px;">📕 도감 총합: Lv.${myCardTotal}</div>
+                <div style="font-size:13px; margin-bottom:15px;">⭐ 스타포스 총합: ${myStarTotal}성</div>
+                <div style="display:flex; justify-content:center; gap:10px;">
+                    ${getEquipHtml(userEquipped['뱃지'], '뱃지')}
+                    ${getEquipHtml(userEquipped['엠블럼'], '엠블럼')}
+                    ${getEquipHtml(userEquipped['링'], '링')}
+                </div>
+            </div>
+            <!-- VS -->
+            <div style="display:flex; align-items:center; font-size:30px; font-weight:bold; color:#ffeb3b; text-shadow:0 0 10px #ff1744; font-style:italic;">WITH</div>
+            <!-- 상대 정보 -->
+            <div style="flex:1; background:linear-gradient(135deg, #b71c1c, #4a148c); border:2px solid #ffcdd2; border-radius:8px; padding:20px; text-align:center; color:#fff; box-shadow:0 10px 20px rgba(0,0,0,0.5);">
+                <h3 style="margin-top:0; color:#ff8a80;">동료의 스펙</h3>
+                <div style="font-size:18px; font-weight:bold; margin-bottom:10px;">${oppName}</div>
+                <div style="font-size:13px; margin-bottom:5px;">📕 도감 총합: Lv.${oppCardTotal}</div>
+                <div style="font-size:13px; margin-bottom:15px;">⭐ 스타포스 총합: ${oppStarTotal}성</div>
+                <div style="display:flex; justify-content:center; gap:10px;">
+                    ${getEquipHtml(oppEquipData['뱃지'], '뱃지')}
+                    ${getEquipHtml(oppEquipData['엠블럼'], '엠블럼')}
+                    ${getEquipHtml(oppEquipData['링'], '링')}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    intro.style.display = 'flex';
+    intro.style.opacity = '1';
+
+    // 2.5초 대기 후 본격적인 무릉도장 진입 (전투 로직은 다음 단계에 추가됨)
+    setTimeout(() => { 
+        intro.style.opacity = '0'; 
+        setTimeout(() => { 
+            intro.style.display = 'none'; 
+            playCount++; localStorage.setItem('mapleDefenseMulungCount', playCount);
+            // window.startMulungGame(oppName, oppEquipData); // 2단계에서 구현될 함수
+            window.showMessage("무릉도장 진입 준비 완료! (다음 단계 코딩을 적용해 주세요)");
+        }, 500); 
+    }, 2500);
+};
+
+// 🔥 무릉도장 시작 및 UI 세팅
+window.startMulungGame = (oppName, oppEquipData) => {
+    window.switchScreen('game-container');
+    
+    // 기존 모험모드 UI 숨기기
+    document.getElementById('grid-container').style.display = 'none';
+    let oppGridEl = document.getElementById('opp-grid-container');
+    if(oppGridEl) oppGridEl.style.display = 'none';
+    document.getElementById('boss-skip-wrapper').style.display = 'none';
+    document.getElementById('best-wave-container').style.display = 'none';
+    document.getElementById('btn-speed').style.display = 'none';
+    document.getElementById('btn-summon').style.display = 'none';
+    
+    // 상단 파티 정보창 세팅
+    document.getElementById('ui-wave').innerText = "1";
+    document.getElementById('ui-kills').innerText = "무릉도장";
+    
+    // 하단 승급 UI 컨테이너 생성
+    let mUI = document.getElementById('mulung-ui');
+    if(!mUI) {
+        mUI = document.createElement('div'); mDiv = mUI;
+        mUI.id = 'mulung-ui';
+        mUI.style.cssText = "position:absolute; bottom:15px; left:50%; transform:translateX(-50%); width:95%; display:flex; justify-content:space-around; background:rgba(0,0,0,0.8); padding:15px 10px; border-radius:10px; z-index:100; border:2px solid #b2dfdb;";
+        document.getElementById('game-container').appendChild(mUI);
+    }
+    mUI.style.display = 'flex';
+
+    // 무릉도장 상태 초기화
+    let baseUnits = [
+        { idx: 0, type: '전사', gradeIdx: 0, x: 100, y: 350 },
+        { idx: 1, type: '법사', gradeIdx: 0, x: 250, y: 350 },
+        { idx: 2, type: '도적', gradeIdx: 0, x: 400, y: 350 }
+    ];
+    let oppBaseUnits = [
+        { idx: 0, type: '전사', gradeIdx: 0, x: 100, y: 150 },
+        { idx: 1, type: '법사', gradeIdx: 0, x: 250, y: 150 },
+        { idx: 2, type: '도적', gradeIdx: 0, x: 400, y: 150 }
+    ];
+
+    mulungState = {
+        active: true, wave: 1, coins: 0, oppCoins: 0,
+        boss: null, lastTime: performance.now(),
+        oppName: oppName, oppEquipData: oppEquipData,
+        myUnits: baseUnits.map(u => ({ ...u, hp: 5, maxHp: 5, lastAttack: 0, globalCooldown: 0, threatCooldown: 0, rtdCooldown: 0, overloadTimer: 0, unitStunTimer: 0, damageDealt: 0, bindCooldown: 0, healCooldown: 0 })),
+        oppUnits: oppBaseUnits.map(u => ({ ...u, hp: 5, maxHp: 5, lastAttack: 0, globalCooldown: 0, threatCooldown: 0, rtdCooldown: 0, overloadTimer: 0, unitStunTimer: 0, bindCooldown: 0, healCooldown: 0 })),
+        projectiles: [], vfx: [], dmgTexts: []
+    };
+
+    // 인트로 함수 덮어쓰기 (주석 해제 효과)
+    window.startMulungMatchmaking = async () => { /* 기존 로직 우회 방지용 */ };
+
+    spawnMulungBoss();
+    updateMulungUI();
+    
+    // 기존 루프 멈추고 무릉 루프 시작
+    cancelAnimationFrame(mainReqId);
+    mulungReqId = requestAnimationFrame(mulungLoop);
+};
+
+// 🔥 무릉도장 보스 스폰 로직 (피통 & 방어력 스케일링)
+function spawnMulungBoss() {
+    let w = mulungState.wave;
+    let stage = ((w - 1) % 5) + 1; // 1~5 페이즈 계산
+    
+    // 상단 UI에 층수와 1/5 페이즈 텍스트 표시
+    document.getElementById('ui-wave').innerText = `${w}층 (${stage}/5)`;
+    
+    // 체력 기하급수적 증가 (1층 5000 -> 150층 수억 단위)
+    let hp = Math.floor(5000 * Math.pow(1.15, w)); 
+    
+    // 30층마다 방어력 10% 증가 (최대 90% 제한)
+    let armor = Math.floor((w - 1) / 30) * 0.10; 
+    if(armor > 0.9) armor = 0.9;
+    
+    let bossNames = Object.keys(bossImages);
+    let bName = bossNames[Math.floor((w - 1) / 5) % bossNames.length];
+
+    mulungState.boss = {
+        name: bName, hp: hp, maxHp: hp, armor: armor,
+        x: -50, y: 250, speed: 20 + Math.min(w * 0.2, 30),
+        threatTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0,
+        stunTimer: 0, counterTimer: 5, bindTimer: 0,
+        stage: stage // 페이즈 정보 저장
+    };
+}
+
+// 🔥 무릉도장 하단 승급 UI 갱신
+function updateMulungUI() {
+    let mUI = document.getElementById('mulung-ui');
+    if(!mUI) return;
+    
+    mUI.innerHTML = `
+        <div style="position:absolute; top:-35px; left:0; width:100%; text-align:center; color:#ffeb3b; font-size:18px; font-weight:bold; text-shadow:2px 2px 4px #000;">💰 보유 코인: ${mulungState.coins}개</div>
+        ${mulungState.myUnits.map((u, i) => {
+            let cost = u.gradeIdx >= 8 ? 'MAX' : (u.gradeIdx + 2);
+            let btnClass = u.gradeIdx >= 8 ? 'premium-dark' : (mulungState.coins >= cost ? 'premium-orange' : 'premium-white');
+            return `<div style="text-align:center; color:#fff; width:30%;">
+                <div style="font-size:24px; text-shadow:1px 1px 2px #000;">${CLASSES[u.type].icon}</div>
+                <div style="font-size:11px; margin-bottom:5px; color:${CLASSES[u.type].color}; font-weight:bold;">${GRADES[u.gradeIdx].name}</div>
+                <button class="ingame-btn ${btnClass}" style="width:100%; padding:8px 0; font-size:12px;" onclick="upgradeMulungUnit(${i})" ${u.gradeIdx>=8?'disabled':''}>승급 (${cost}코인)</button>
+            </div>`
+        }).join('')}
+    `;
+}
+
+window.upgradeMulungUnit = (idx) => {
+    let u = mulungState.myUnits[idx];
+    if(u.gradeIdx >= 8) return window.showMessage("최대 등급입니다.");
+    let cost = u.gradeIdx + 2; 
+    if(mulungState.coins < cost) return window.showMessage(`코인이 부족합니다. (${cost}개 필요)`);
+    
+    mulungState.coins -= cost;
+    u.gradeIdx++;
+    u.hp = u.maxHp = 5; 
+    
+    // 컨테이너 흔들림 및 이펙트
+    let container = document.getElementById('game-container'); 
+    if(container) { container.classList.add('shake-active'); setTimeout(() => container.classList.remove('shake-active'), 400); }
+    
+    updateMulungUI();
+};
+
+// 🔥 무릉도장 메인 루프 (전투 및 반격 로직)
+function mulungLoop() {
+    if (!mulungState.active) return;
+    let now = performance.now(); let dtReal = (now - mulungState.lastTime) / 1000; 
+    if (dtReal > 0.1) dtReal = 0.1; if (dtReal < 0) dtReal = 0.016; 
+    let dt = dtReal * 2; // 무릉도장 기본 2배속 진행
+    mulungState.lastTime = now;
+
+    let b = mulungState.boss;
+
+    // 1. 보스 상태 업데이트 및 이동
+    if (b.freezeTimer > 0) { b.freezeTimer -= dt; b.freezeTickTimer -= dt; if (b.freezeTickTimer <= 0) { b.hp -= b.freezeDmgVal; b.freezeTickTimer = 1; } }
+    if (b.threatTimer > 0) b.threatTimer -= dt;
+    
+    let canMove = true;
+    if (b.bindTimer > 0) { b.bindTimer -= dt; canMove = false; }
+    if (b.stunTimer > 0) { b.stunTimer -= dt; canMove = false; }
+
+    if (canMove) {
+        let currentSpeed = b.speed;
+        if (b.freezeTimer > 0) currentSpeed *= 0.5;
+        b.x += currentSpeed * dt;
+    }
+
+    // 게임 오버 판정 (보스가 트랙 끝(550) 도달)
+    if (b.x > 550) {
+        return endMulungGame();
+    }
+
+    // 2. 90층 이상 보스 반격 로직 (바인드/스턴이어도 쿨타임 돌고 반격함!)
+    if (mulungState.wave >= 90) {
+        b.counterTimer -= dt;
+        if (b.counterTimer <= 0) {
+            // 어그로 1순위 타겟 찾기
+            let target = null; let maxDmg = -1;
+            mulungState.myUnits.forEach(u => { if (u.hp > 0 && u.damageDealt > maxDmg) { maxDmg = u.damageDealt; target = u; } });
+            
+            if (target) {
+                target.hp -= 1;
+                mulungState.vfx.push({ type: 'hit', x: target.x, y: target.y, timer: 0.5, color: '#ff0000' });
+                
+                // 사망 시 2단계 강등
+                if (target.hp <= 0) {
+                    let oldGrade = GRADES[target.gradeIdx].name;
+                    target.gradeIdx = Math.max(0, target.gradeIdx - 2);
+                    target.hp = target.maxHp = 5;
+                    target.damageDealt = 0; 
+                    window.showMessage(`☠️ 보스 반격! [${target.type}] ${oldGrade} ➔ ${GRADES[target.gradeIdx].name} 강등!`);
+                    updateMulungUI();
+                }
+            }
+            b.counterTimer = 5; // 5초마다 반격
+        }
+    }
+
+    // 3. 내 유닛 공격 로직
+    let cardMulti = 1 + (getTotalCardBonus() / 100); 
+    let rageMulti = 1 + ((skillLevels.common_rage||0) * 0.01) + (equipStats.atk * 0.01); 
+    let sharpChance = ((skillLevels.common_sharp||0) * 0.05) + (equipStats.crit * 0.01); 
+    let windReduc = 1 + ((skillLevels.common_wind||0) * 0.2) + (equipStats.spd * 0.01);
+    let myUnpen = equipStats.unpenetratedRate;
+    if (b.threatTimer > 0) myUnpen *= 0.9;
+    let appliedArmor = b.armor * myUnpen;
+
+    mulungState.myUnits.forEach((u) => {
+        if (u.unitStunTimer > 0) { u.unitStunTimer -= dt; return; }
+        
+        let overloadMult = 1;
+        if (u.overloadTimer > 0) {
+            u.overloadTimer -= dt; overloadMult = 2;
+            if (u.overloadTimer <= 0) u.unitStunTimer = skillLevels.thief_overload === 1 ? 6 : 5;
+        }
+
+        // 제네시스 특수 스킬 (힐, 위협, 레투다)
+        if (u.gradeIdx >= 6 && u.type === '법사' && skillLevels.mage_heal > 0) {
+            u.healCooldown -= dt * 1000;
+            if (u.healCooldown <= 0) {
+                mulungState.myUnits.forEach(tu => { tu.hp = Math.min(tu.maxHp, tu.hp + 1); mulungState.vfx.push({ type: 'heal', x: tu.x, y: tu.y, timer: 1.0 }); });
+                u.healCooldown += (70 - skillLevels.mage_heal * 10) * 1000;
+            }
+        }
+        if (u.gradeIdx >= 7) {
+            if (u.type === '전사' && skillLevels.war_threat > 0) {
+                u.threatCooldown -= dt * 1000;
+                if (u.threatCooldown <= 0) { b.threatTimer = skillLevels.war_threat * 2; u.threatCooldown += 25000; mulungState.vfx.push({ type: 'threat1', x: u.x, y: u.y, timer: 1.0 }); }
+            }
+            if (u.type === '도적' && skillLevels.thief_overload > 0) {
+                u.rtdCooldown -= dt * 1000;
+                if (u.rtdCooldown <= 0 && u.overloadTimer <= 0 && u.unitStunTimer <= 0) { u.overloadTimer = skillLevels.thief_overload === 5 ? 15 : 6 + (skillLevels.thief_overload * 2); u.rtdCooldown += 45000; mulungState.vfx.push({ type: 'rtd', x: u.x, y: u.y, timer: 1.0 }); }
+            }
+        }
+        
+        if (u.gradeIdx === 6 && u.type !== '법사') {
+            u.bindCooldown -= dt * 1000;
+            if (u.bindCooldown <= 0 && b.bindTimer <= 0) { b.bindTimer = 10; u.bindCooldown += 75000; }
+        }
+
+        u.lastAttack -= dt * 1000; 
+        let attackCd = (CLASSES[u.type].cd * (GRADES[u.gradeIdx].speedMul || 1)) / (windReduc * overloadMult); 
+        
+        while(u.lastAttack <= 0) {
+            let dmg = (CLASSES[u.type].baseDmg + equipStats.flatAtk) * GRADES[u.gradeIdx].mult * cardMulti * rageMulti; 
+            if (b.threatTimer > 0) dmg *= 1.3; 
+            let isCrit = Math.random() < sharpChance; if (isCrit) dmg *= (1.2 + (equipStats.cdmg / 100)); 
+            let isFinal = false; if (u.type === '전사' && (skillLevels.war_final||0) > 0 && Math.random() < ((skillLevels.war_final||0) * 0.03)) { isFinal = true; dmg *= 2; }
+            
+            mulungState.projectiles.push({ type: u.type, x: u.x, y: u.y, tx: b.x, ty: b.y, dmg: dmg, color: CLASSES[u.type].color, angle: 0, gradeIdx: u.gradeIdx, isCrit: isCrit, isFinal: isFinal, baseDmgToPass: dmg, sourceTower: u, isMine: true });
+            u.lastAttack += attackCd;
+        }
+    });
+
+    // 4. AI 동료 자동 승급 로직 및 공격 (단순화된 미러 딜링)
+    // AI도 보스가 죽을 때 코인을 얻고, 가장 낮은 등급의 유닛을 자동 승급시킵니다.
+    let oppCardBonus = oppCardData ? Object.values(oppCardData).reduce((sum, c) => sum + (c.grade||0)*0.5, 0) : 0;
+    let oppMulti = 1 + oppCardBonus/100;
+    
+    mulungState.oppUnits.forEach((u) => {
+        u.lastAttack -= dt * 1000; 
+        let attackCd = CLASSES[u.type].cd * (GRADES[u.gradeIdx].speedMul || 1); 
+        while(u.lastAttack <= 0) {
+            let dmg = (CLASSES[u.type].baseDmg + 10) * GRADES[u.gradeIdx].mult * oppMulti; 
+            if (b.threatTimer > 0) dmg *= 1.3; 
+            mulungState.projectiles.push({ type: u.type, x: u.x, y: u.y, tx: b.x, ty: b.y, dmg: dmg, color: CLASSES[u.type].color, angle: 0, gradeIdx: u.gradeIdx, isCrit: false, isFinal: false, baseDmgToPass: dmg, isMine: false });
+            u.lastAttack += attackCd;
+        }
+    });
+
+    // 5. 투사체 명중 처리
+    for(let i=mulungState.projectiles.length-1; i>=0; i--) {
+        let p = mulungState.projectiles[i]; let dx = p.tx - p.x, dy = p.ty - p.y; let dist = Math.hypot(dx, dy); let speed = 600 * dt;
+        if(p.type === '도적') p.angle += 15 * dt; 
+        if(dist <= speed) {
+            let hitDmg = p.dmg; 
+            if (p.type === '전사') hitDmg *= 1.5; // 보스 추가딜
+            hitDmg *= (1 - appliedArmor);
+
+            b.hp -= hitDmg;
+            if (p.isMine && p.sourceTower) p.sourceTower.damageDealt += hitDmg;
+
+            mulungState.dmgTexts.push({ val: Math.floor(hitDmg), x: b.x + (Math.random()-0.5)*30, y: b.y - 40 + (Math.random()-0.5)*30, timer: 0.6, isCrit: p.isCrit });
+            
+            mulungState.projectiles.splice(i, 1);
+        } else { p.x += (dx/dist)*speed; p.y += (dy/dist)*speed; }
+    }
+    
+    for (let i = mulungState.vfx.length - 1; i >= 0; i--) { mulungState.vfx[i].timer -= dt; if (mulungState.vfx[i].timer <= 0) mulungState.vfx.splice(i, 1); }
+    for (let i = mulungState.dmgTexts.length - 1; i >= 0; i--) { mulungState.dmgTexts[i].timer -= dtReal; mulungState.dmgTexts[i].y -= dtReal * 60; if (mulungState.dmgTexts[i].timer <= 0) mulungState.dmgTexts.splice(i, 1); }
+
+    // 6. 보스 사망 처리
+    if (b.hp <= 0) {
+        let rewardCoins = mulungState.wave === 1 ? 2 : 1;
+        mulungState.coins += rewardCoins;
+        mulungState.oppCoins += rewardCoins;
+        
+        // AI 자동 승급 (가장 등급 낮은 유닛 우선)
+        let minGrade = 99; let targetAiIdx = -1;
+        mulungState.oppUnits.forEach((u, idx) => { if (u.gradeIdx < 8 && u.gradeIdx < minGrade) { minGrade = u.gradeIdx; targetAiIdx = idx; } });
+        if (targetAiIdx !== -1 && mulungState.oppCoins >= (minGrade + 2)) {
+            mulungState.oppCoins -= (minGrade + 2);
+            mulungState.oppUnits[targetAiIdx].gradeIdx++;
+        }
+
+        mulungState.wave++;
+        updateMulungUI();
+        spawnMulungBoss();
+    }
+
+    drawMulung();
+    mulungReqId = requestAnimationFrame(mulungLoop);
+}
+
+// 🔥 무릉도장 렌더링 함수
+function drawMulung() {
+    if(!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // 중앙 트랙 그리기
+    ctx.setLineDash([]); ctx.strokeStyle = "rgba(188, 170, 164, 0.5)"; ctx.lineWidth = 40; ctx.lineJoin = "round"; ctx.beginPath();
+    ctx.moveTo(0, 250); ctx.lineTo(500, 250); ctx.stroke();
+
+    let b = mulungState.boss;
+    
+    // AI 유닛 그리기 (상단)
+    mulungState.oppUnits.forEach(u => {
+        ctx.save(); ctx.globalAlpha = 0.8;
+        if (u.gradeIdx === 6) { ctx.shadowColor = "#00e5ff"; ctx.shadowBlur = 10; }
+        if (u.gradeIdx === 7) { ctx.shadowColor = "#ffeb3b"; ctx.shadowBlur = 15; }
+        if (u.gradeIdx === 8) { ctx.shadowColor = "#d50000"; ctx.shadowBlur = 20; }
+        ctx.font = "24px Arial"; ctx.textAlign = "center"; ctx.fillText(CLASSES[u.type].icon, u.x, u.y);
+        ctx.font = "10px Arial"; ctx.fillStyle = CLASSES[u.type].color; ctx.fillText(GRADES[u.gradeIdx].name, u.x, u.y + 15);
+        ctx.restore();
+    });
+
+    // 내 유닛 그리기 (하단)
+    mulungState.myUnits.forEach(u => {
+        ctx.save();
+        if (u.overloadTimer > 0) { ctx.strokeStyle = "#ff1744"; ctx.lineWidth = 3; ctx.strokeRect(u.x - 25, u.y - 30, 50, 50); }
+        if (u.unitStunTimer > 0) { ctx.font = "bold 20px Arial"; ctx.fillStyle = "yellow"; ctx.textAlign = "center"; ctx.fillText("💫", u.x, u.y - 30); }
+        if (u.gradeIdx === 6) { ctx.shadowColor = "#00e5ff"; ctx.shadowBlur = 10; }
+        if (u.gradeIdx === 7) { ctx.shadowColor = "#ffeb3b"; ctx.shadowBlur = 15; }
+        if (u.gradeIdx === 8) { ctx.shadowColor = "#d50000"; ctx.shadowBlur = 20; }
+        ctx.font = "30px Arial"; ctx.textAlign = "center"; ctx.fillText(CLASSES[u.type].icon, u.x, u.y);
+        ctx.restore();
+        
+        // 내 유닛 체력바
+        ctx.fillStyle = "#333"; ctx.fillRect(u.x - 20, u.y + 20, 40, 4);
+        ctx.fillStyle = "#00e676"; ctx.fillRect(u.x - 20, u.y + 20, 40 * (u.hp / u.maxHp), 4);
+    });
+
+    // 특수 이펙트 그리기
+    mulungState.vfx.forEach(v => {
+        ctx.save(); ctx.translate(v.x, v.y);
+        if (v.type === 'hit') { ctx.globalAlpha = (v.timer / 0.5); ctx.fillStyle = v.color; ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI*2); ctx.fill(); }
+        else if (v.type === 'heal' && healEffectImg.complete) { let hSize = 40; let p2 = 1 - v.timer; ctx.beginPath(); ctx.rect(-hSize/2, hSize/2 - hSize*p2 - 20, hSize, hSize*p2); ctx.clip(); ctx.drawImage(healEffectImg, -hSize/2, -hSize/2 - 20, hSize, hSize); }
+        else if (v.type === 'threat1' && threatEffect1Img.complete) { ctx.globalAlpha = Math.sin((1 - v.timer) * Math.PI); ctx.drawImage(threatEffect1Img, -20, -50, 40, 40); }
+        else if (v.type === 'rtd' && rtdEffectImg.complete) { ctx.globalAlpha = Math.sin((1 - v.timer) * Math.PI); ctx.drawImage(rtdEffectImg, -25, -60, 50, 50); }
+        ctx.restore();
+    });
+
+    // 투사체 그리기
+    mulungState.projectiles.forEach(p => {
+        ctx.save(); ctx.translate(p.x, p.y); let dir = Math.atan2(p.ty - p.y, p.tx - p.x); let scale = p.isFinal ? 1.3 : 1.0; ctx.scale(scale, scale);
+        let img = null; let psize = 20;
+        if (p.type === '전사') { img = p.gradeIdx >= 5 ? projImages.warrior2 : projImages.warrior1; ctx.rotate(dir + Math.PI); psize = p.gradeIdx >= 5 ? 30 : 20; }
+        else if (p.type === '법사') { img = p.gradeIdx >= 5 ? projImages.mage2 : projImages.mage1; ctx.rotate(dir + (15 * Math.PI / 180)); psize = p.gradeIdx >= 5 ? 30 : 20; }
+        else if (p.type === '도적') { img = p.gradeIdx >= 5 ? projImages.rogue2 : projImages.rogue1; ctx.rotate(p.angle); }
+        if (img && img.complete) { ctx.drawImage(img, -psize/2, -psize/2, psize, psize); } else { ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI*2); ctx.fill(); }
+        ctx.restore();
+    });
+
+    // 보스 그리기 (최상단)
+    if (b) {
+        let size = 30; ctx.save(); ctx.translate(b.x, b.y); ctx.scale(-1, 1);
+        if (bossImages[b.name] && bossImages[b.name].complete) { ctx.drawImage(bossImages[b.name], -size*1.5, -size*1.5, size*3, size*3); } 
+        else { ctx.fillStyle = "#ef5350"; ctx.beginPath(); ctx.arc(0, 0, size, 0, Math.PI*2); ctx.fill(); }
+        
+        if (b.freezeTimer > 0) { ctx.fillStyle = "rgba(0, 200, 255, 0.4)"; ctx.beginPath(); ctx.arc(0, 0, size * 1.5, 0, Math.PI * 2); ctx.fill(); }
+        if (b.stunTimer > 0 || b.bindTimer > 0) { ctx.font = "bold 20px Arial"; ctx.fillStyle = "yellow"; ctx.textAlign = "center"; ctx.fillText(b.bindTimer > 0 ? "⛓️" : "💫", 0, -size - 15); }
+        if (b.threatTimer > 0) { 
+            if (threatEffect2Img && threatEffect2Img.complete) { ctx.drawImage(threatEffect2Img, -15, -size - 40, 30, 30); } 
+            else { ctx.font = "bold 20px Arial"; ctx.fillStyle = "#ff1744"; ctx.textAlign = "center"; ctx.fillText("💢", 0, -size - 25); }
+        } 
+        ctx.restore();
+        
+        // 보스 체력바
+        ctx.fillStyle = "#111"; ctx.fillRect(b.x - 30, b.y - size - 15, 60, 6);
+        ctx.fillStyle = "#ff1744"; ctx.fillRect(b.x - 30, b.y - size - 15, 60 * (b.hp / b.maxHp), 6);
+        
+        // 방어력 및 보스 페이즈 텍스트 표시 🔥 (이 부분 수정)
+        ctx.font = "bold 10px Arial"; ctx.fillStyle = "#fff"; ctx.textAlign = "center"; 
+        ctx.fillText(`${b.name} (${b.stage}/5) | 방어력 ${Math.round(b.armor*100)}%`, b.x, b.y - size - 20);
+    }
+
+    // 데미지 텍스트
+    mulungState.dmgTexts.forEach(d => { ctx.save(); ctx.globalAlpha = Math.max(0, d.timer / 0.6); ctx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; ctx.font = d.isCrit ? "800 20px NanumSquare" : "bold 14px NanumSquare"; ctx.shadowColor = d.isCrit ? "#c62828" : "#000"; ctx.shadowBlur = 4; ctx.fillText(d.val, d.x, d.y); ctx.restore(); });
+}
+
+// 🔥 무릉도장 종료 및 보상 정산
+function endMulungGame() {
+    mulungState.active = false;
+    cancelAnimationFrame(mulungReqId);
+    
+    let clearedWave = mulungState.wave - 1;
+    let reward = clearedWave * 2;
+    userRankData.mulungCoins += reward;
+    window.syncToCloud();
+    
+    document.getElementById('mulung-ui').style.display = 'none';
+    document.getElementById('grid-container').style.display = 'grid'; // 기존 그리드 복구
+    
+    alert(`☠️ 무릉도장 도전 종료!\n도달 층수: ${clearedWave}층\n획득 무릉 코인: ${reward}개`);
+    window.switchScreen('start-screen');
+}
