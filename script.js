@@ -2574,7 +2574,7 @@ window.closeMulungShop = () => {
 };
 
 window.buyMulungItem = (type) => {
-    let cost = { 'piece': 10, 'star': 5, 'equipBox': 50, 'cube': 150 }[type];
+    let cost = { 'piece': 20, 'star': 10, 'equipBox': 100, 'cube': 200 }[type];
     if (userRankData.mulungCoins < cost) return window.showMessage("무릉 코인이 부족합니다.");
     
     userRankData.mulungCoins -= cost;
