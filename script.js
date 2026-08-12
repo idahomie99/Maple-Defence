@@ -1341,7 +1341,15 @@ window.closeRaidResult = () => {
 // ==========================================
 // 8. 랭크 게임 (AI 대전) 시스템
 // ==========================================
-window.openOnlineMenu = () => { if (!currentUserUid) { window.showMessage("로그인이 필요한 서비스입니다."); return; } document.getElementById('online-overlay').style.display = 'flex'; document.getElementById('online-menu-modal').style.display = 'block'; };
+window.openOnlineMenu = () => { 
+    if (!currentUserUid) { window.showMessage("로그인이 필요한 서비스입니다."); return; } 
+    document.getElementById('online-overlay').style.display = 'flex'; 
+    document.getElementById('online-menu-modal').style.display = 'block'; 
+    
+    // 🔥 무릉도장 팝업이 켜져있다면 강제로 꺼줌 (겹침 버그 방지)
+    let mlLobby = document.getElementById('mulung-lobby-modal');
+    if (mlLobby) mlLobby.style.display = 'none';
+};
 window.closeOnlineMenu = () => { document.getElementById('online-overlay').style.display = 'none'; };
 window.openPkMenuFromOnline = () => { window.closeOnlineMenu(); window.openPkMenu(); };
 window.openRankLobbyFromOnline = () => { window.closeOnlineMenu(); window.openRankLobby(); };
@@ -2432,6 +2440,7 @@ let cubeTargetIndex = -1;
 let cubeIsEquipped = false;
 
 // 🔥 무릉도장 상점 열기
+// 🔥 무릉도장 상점 열기
 window.openMulungShop = () => {
     document.getElementById('overlay').style.display = 'block';
     let modal = document.getElementById('mulung-shop-modal');
@@ -2462,9 +2471,24 @@ window.openMulungShop = () => {
                         <button class="ingame-btn premium-dark" style="padding:6px 12px; font-size:12px;" onclick="buyMulungItem('cube')">150 코인</button>
                     </div>
                 </div>
-                <button class="ingame-btn premium-white" style="width:100%; padding:10px; margin-top:10px;" onclick="document.getElementById('mulung-shop-modal').style.display='none'; document.getElementById('overlay').style.display='none';">닫기</button>`;
+                <!-- 🔥 닫기 버튼이 메인 로비가 아닌 '무릉 로비'로 가도록 함수 변경 -->
+                <button class="ingame-btn premium-white" style="width:100%; padding:10px; margin-top:10px;" onclick="closeMulungShop()">닫기</button>`;
     modal.innerHTML = html;
     modal.style.display = 'block';
+};
+
+// 🔥 무릉 상점 전용 닫기 함수 추가 (무릉 로비로 복귀)
+window.closeMulungShop = () => {
+    document.getElementById('mulung-shop-modal').style.display = 'none';
+    document.getElementById('overlay').style.display = 'none';
+    
+    // 온라인 오버레이를 다시 켜되, 메인 메뉴는 끄고 무릉 로비만 켭니다.
+    document.getElementById('online-overlay').style.display = 'flex';
+    document.getElementById('online-menu-modal').style.display = 'none';
+    let mlLobby = document.getElementById('mulung-lobby-modal');
+    if(mlLobby) mlLobby.style.display = 'block';
+    
+    window.loadMulungRanking(); // 복귀할 때 랭킹 및 코인 한 번 더 새로고침
 };
 
 window.buyMulungItem = (type) => {
@@ -2633,29 +2657,36 @@ window.startMulungMatchmaking = async () => {
         document.body.appendChild(mDiv); intro = mDiv;
     }
 
+    // 🔥 상하(위아래) 배치로 수정한 UI HTML
     intro.innerHTML = `
-        <div style="display:flex; width:90%; max-width:600px; gap:10px;">
+        <div style="display:flex; flex-direction:column; width:85%; max-width:320px; gap:10px; align-items:center;">
             <!-- 내 정보 -->
-            <div style="flex:1; background:linear-gradient(135deg, #1e3c72, #004d40); border:2px solid #b2dfdb; border-radius:8px; padding:20px; text-align:center; color:#fff; box-shadow:0 10px 20px rgba(0,0,0,0.5);">
-                <h3 style="margin-top:0; color:#80cbc4;">나의 스펙</h3>
-                <div style="font-size:18px; font-weight:bold; margin-bottom:10px;">${currentUserName}</div>
-                <div style="font-size:13px; margin-bottom:5px;">📕 도감 총합: Lv.${myCardTotal}</div>
-                <div style="font-size:13px; margin-bottom:15px;">⭐ 스타포스 총합: ${myStarTotal}성</div>
-                <div style="display:flex; justify-content:center; gap:10px;">
+            <div style="width:100%; background:linear-gradient(135deg, #1e3c72, #004d40); border:2px solid #b2dfdb; border-radius:10px; padding:15px; text-align:center; color:#fff; box-shadow:0 8px 20px rgba(0,0,0,0.6); box-sizing:border-box;">
+                <h3 style="margin:0 0 5px 0; color:#80cbc4; font-size:14px;">나의 스펙</h3>
+                <div style="font-size:18px; font-weight:900; margin-bottom:10px; letter-spacing:-0.5px;">${currentUserName}</div>
+                <div style="display:flex; justify-content:center; gap:15px; font-size:12px; margin-bottom:12px; background:rgba(0,0,0,0.3); padding:6px; border-radius:6px;">
+                    <span>📕 도감: Lv.<b style="color:#ffeb3b">${myCardTotal}</b></span>
+                    <span>⭐ 스타포스: <b style="color:#ffeb3b">${myStarTotal}</b>성</span>
+                </div>
+                <div style="display:flex; justify-content:center; gap:12px;">
                     ${getEquipHtml(userEquipped['뱃지'], '뱃지')}
                     ${getEquipHtml(userEquipped['엠블럼'], '엠블럼')}
                     ${getEquipHtml(userEquipped['링'], '링')}
                 </div>
             </div>
-            <!-- VS -->
-            <div style="display:flex; align-items:center; font-size:30px; font-weight:bold; color:#ffeb3b; text-shadow:0 0 10px #ff1744; font-style:italic;">WITH</div>
+            
+            <!-- VS / WITH -->
+            <div style="font-size:26px; font-weight:900; color:#ffeb3b; text-shadow:0 0 10px #ff1744, 2px 2px 0px #000; font-style:italic;">WITH</div>
+            
             <!-- 상대 정보 -->
-            <div style="flex:1; background:linear-gradient(135deg, #b71c1c, #4a148c); border:2px solid #ffcdd2; border-radius:8px; padding:20px; text-align:center; color:#fff; box-shadow:0 10px 20px rgba(0,0,0,0.5);">
-                <h3 style="margin-top:0; color:#ff8a80;">동료의 스펙</h3>
-                <div style="font-size:18px; font-weight:bold; margin-bottom:10px;">${oppName}</div>
-                <div style="font-size:13px; margin-bottom:5px;">📕 도감 총합: Lv.${oppCardTotal}</div>
-                <div style="font-size:13px; margin-bottom:15px;">⭐ 스타포스 총합: ${oppStarTotal}성</div>
-                <div style="display:flex; justify-content:center; gap:10px;">
+            <div style="width:100%; background:linear-gradient(135deg, #b71c1c, #4a148c); border:2px solid #ffcdd2; border-radius:10px; padding:15px; text-align:center; color:#fff; box-shadow:0 8px 20px rgba(0,0,0,0.6); box-sizing:border-box;">
+                <h3 style="margin:0 0 5px 0; color:#ff8a80; font-size:14px;">동료의 스펙</h3>
+                <div style="font-size:18px; font-weight:900; margin-bottom:10px; letter-spacing:-0.5px;">${oppName}</div>
+                <div style="display:flex; justify-content:center; gap:15px; font-size:12px; margin-bottom:12px; background:rgba(0,0,0,0.3); padding:6px; border-radius:6px;">
+                    <span>📕 도감: Lv.<b style="color:#ffeb3b">${oppCardTotal}</b></span>
+                    <span>⭐ 스타포스: <b style="color:#ffeb3b">${oppStarTotal}</b>성</span>
+                </div>
+                <div style="display:flex; justify-content:center; gap:12px;">
                     ${getEquipHtml(oppEquipData['뱃지'], '뱃지')}
                     ${getEquipHtml(oppEquipData['엠블럼'], '엠블럼')}
                     ${getEquipHtml(oppEquipData['링'], '링')}
@@ -2667,14 +2698,14 @@ window.startMulungMatchmaking = async () => {
     intro.style.display = 'flex';
     intro.style.opacity = '1';
 
-    // 2.5초 대기 후 본격적인 무릉도장 진입 (전투 로직은 다음 단계에 추가됨)
+    // 2.5초 대기 후 본격적인 무릉도장 진입
     setTimeout(() => { 
         intro.style.opacity = '0'; 
         setTimeout(() => { 
             intro.style.display = 'none'; 
             playCount++; localStorage.setItem('mapleDefenseMulungCount', playCount);
-            // window.startMulungGame(oppName, oppEquipData); // 2단계에서 구현될 함수
-            window.showMessage("무릉도장 진입 준비 완료! (다음 단계 코딩을 적용해 주세요)");
+            window.startMulungGame(oppName, oppEquipData);
+            window.showMessage("무릉도장 진입 완료!");
         }, 500); 
     }, 2500);
 };
