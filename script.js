@@ -449,9 +449,17 @@ window.goToLobby = () => {
     if(!state.isRank) window.saveGameData(); 
     state.status = 'TITLE'; 
     cancelAnimationFrame(mainReqId); 
-    cancelAnimationFrame(mulungReqId); // 무릉 루프도 확실하게 정지
+    cancelAnimationFrame(mulungReqId); 
     
-    // 🔥 무릉도장용으로 변형되었던 상단/하단 UI를 원래대로 원복
+    // 🔥 무릉도장이 켜져있었다면 전투 루프를 강제로 끕니다.
+    if (typeof mulungState !== 'undefined') mulungState.active = false;
+    
+    // 🔥 무릉도장 전용 승급창 UI를 숨기고, 그리드 컨테이너 복구
+    let mUI = document.getElementById('mulung-ui');
+    if (mUI) mUI.style.display = 'none';
+    document.getElementById('grid-container').style.display = 'grid';
+
+    // 상단/하단 모험 모드 UI 원복
     let resourceRow = document.querySelector('.resource-row');
     if (resourceRow) {
         resourceRow.innerHTML = `
@@ -473,18 +481,9 @@ window.goToLobby = () => {
                 <img src="image/chaosscroll.png" style="height: 20px; vertical-align: middle;"> 혼돈의 주문서 강화 <img src="image/chaosscroll.png" style="height: 20px; vertical-align: middle;">
             </div>
             <div class="upgrade-container">
-                <div class="upgrade-box" id="upg-w-box" onclick="upgrade('전사')">
-                    <div class="job-title warrior">전사 (+<span id="upg-w-val">0</span>)</div>
-                    <div class="cost"><span id="upg-w-cost">10</span> 메포</div>
-                </div>
-                <div class="upgrade-box" id="upg-m-box" onclick="upgrade('법사')">
-                    <div class="job-title mage">법사 (+<span id="upg-m-val">0</span>)</div>
-                    <div class="cost"><span id="upg-m-cost">10</span> 메포</div>
-                </div>
-                <div class="upgrade-box" id="upg-t-box" onclick="upgrade('도적')">
-                    <div class="job-title thief">도적 (+<span id="upg-t-val">0</span>)</div>
-                    <div class="cost"><span id="upg-t-cost">10</span> 메포</div>
-                </div>
+                <div class="upgrade-box" id="upg-w-box" onclick="upgrade('전사')"><div class="job-title warrior">전사 (+<span id="upg-w-val">0</span>)</div><div class="cost"><span id="upg-w-cost">10</span> 메포</div></div>
+                <div class="upgrade-box" id="upg-m-box" onclick="upgrade('법사')"><div class="job-title mage">법사 (+<span id="upg-m-val">0</span>)</div><div class="cost"><span id="upg-m-cost">10</span> 메포</div></div>
+                <div class="upgrade-box" id="upg-t-box" onclick="upgrade('도적')"><div class="job-title thief">도적 (+<span id="upg-t-val">0</span>)</div><div class="cost"><span id="upg-t-cost">10</span> 메포</div></div>
             </div>
             <div class="ticket-row" style="margin-top: 15px;">
                 <span>선택권: <span id="ui-tickets" class="highlight">0</span>장</span>
@@ -2852,8 +2851,6 @@ window.startMulungGame = (oppName, oppEquipData) => {
         projectiles: [], vfx: [], dmgTexts: []
     };
 
-    window.startMulungMatchmaking = async () => {};
-
     spawnMulungBoss();
     updateMulungUI();
     
@@ -3232,7 +3229,7 @@ function drawMulung() {
     mulungState.dmgTexts.forEach(d => { ctx.save(); ctx.globalAlpha = Math.max(0, d.timer / 0.6); ctx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; ctx.font = d.isCrit ? "800 20px NanumSquare" : "bold 14px NanumSquare"; ctx.shadowColor = d.isCrit ? "#c62828" : "#000"; ctx.shadowBlur = 4; ctx.fillText(d.val, d.x, d.y); ctx.restore(); });
 }
 
-// 🔥 무릉도장 종료 및 보상 정산 (랭킹 저장 로직 추가)
+// 🔥 무릉도장 종료 및 보상 정산 (모험 모드 UI 원복 로직 추가)
 async function endMulungGame() {
     mulungState.active = false;
     cancelAnimationFrame(mulungReqId);
@@ -3242,26 +3239,52 @@ async function endMulungGame() {
     userRankData.mulungCoins += reward;
     window.syncToCloud();
 
-    // 🏆 파이어베이스 랭킹 기록 저장 로직
     if (currentUserUid) {
         try {
             const snap = await get(child(ref(database), `mulung_rankings/${currentUserUid}`));
             let bestFloor = 0;
             if (snap.exists()) { bestFloor = snap.val().floor || 0; }
-            
-            // 기존 최고 기록보다 높으면 서버 업데이트
             if (clearedWave > bestFloor) {
-                await set(ref(database, `mulung_rankings/${currentUserUid}`), {
-                    nickname: currentUserName,
-                    floor: clearedWave,
-                    date: new Date().toLocaleDateString()
-                });
+                await set(ref(database, `mulung_rankings/${currentUserUid}`), { nickname: currentUserName, floor: clearedWave, date: new Date().toLocaleDateString() });
             }
         } catch(e) { console.warn("무릉 랭킹 저장 실패", e); }
     }
     
+    // 1. 무릉 전용 UI 숨기기 및 기본 그리드 복구
     document.getElementById('mulung-ui').style.display = 'none';
-    document.getElementById('grid-container').style.display = 'grid'; // 기존 그리드 복구
+    document.getElementById('grid-container').style.display = 'grid'; 
+
+    // 2. 🔥 누락되었던 상단(메소/메포) 및 하단(컨트롤) UI 원복 로직 추가!
+    let resourceRow = document.querySelector('.resource-row');
+    if (resourceRow) {
+        resourceRow.innerHTML = `
+            <div class="meso-box"><img src="image/meso.png" alt="Meso" style="height: 16px; vertical-align: middle; margin-right: 4px;">메소 <span id="ui-meso">25</span></div>
+            <div class="mp-box"><img src="image/mepo.png" alt="Mepo" style="height: 16px; vertical-align: middle; margin-right: 4px;">메포 <span id="ui-mp">0</span></div>
+        `;
+    }
+    let controlsPanel = document.getElementById('controls');
+    if (controlsPanel) {
+        controlsPanel.innerHTML = `
+            <div style="display: flex; gap: 4px; margin-bottom: 15px;">
+                <button id="btn-summon" class="ingame-btn premium-green" style="flex: 1.5; padding: 16px; font-size: 16px;" onclick="summonUnit()">소환 (10)</button>
+                <button class="ingame-btn premium-purple" style="flex: 1; font-size: 13px; padding: 0 5px;" onclick="autoMerge()">✨일괄합성</button>
+                <button id="btn-sell-single" class="ingame-btn premium-orange" style="flex: 0.8; font-size: 13px; padding: 0 5px;" onclick="sellSelectedUnit()" disabled>선택판매</button>
+                <button class="ingame-btn premium-dark" style="flex: 0.8; font-size: 13px; padding: 0 5px;" onclick="openBulkSellModal()">조건판매</button>
+            </div>
+            <div style="text-align:center; font-weight:bold; font-size:14px; color:#5a3c22; margin-bottom: 5px; border-top: 1px dashed #8b5a2b; padding-top: 5px;">
+                <img src="image/chaosscroll.png" style="height: 20px; vertical-align: middle;"> 혼돈의 주문서 강화 <img src="image/chaosscroll.png" style="height: 20px; vertical-align: middle;">
+            </div>
+            <div class="upgrade-container">
+                <div class="upgrade-box" id="upg-w-box" onclick="upgrade('전사')"><div class="job-title warrior">전사 (+<span id="upg-w-val">0</span>)</div><div class="cost"><span id="upg-w-cost">10</span> 메포</div></div>
+                <div class="upgrade-box" id="upg-m-box" onclick="upgrade('법사')"><div class="job-title mage">법사 (+<span id="upg-m-val">0</span>)</div><div class="cost"><span id="upg-m-cost">10</span> 메포</div></div>
+                <div class="upgrade-box" id="upg-t-box" onclick="upgrade('도적')"><div class="job-title thief">도적 (+<span id="upg-t-val">0</span>)</div><div class="cost"><span id="upg-t-cost">10</span> 메포</div></div>
+            </div>
+            <div class="ticket-row" style="margin-top: 15px;">
+                <span>선택권: <span id="ui-tickets" class="highlight">0</span>장</span>
+                <button class="ingame-btn premium-blue" style="padding: 8px 15px;" onclick="openTicketModal()">사용하기</button>
+            </div>
+        `;
+    }
     
     alert(`☠️ 무릉도장 도전 종료!\n도달 층수: ${clearedWave}층\n획득 무릉 코인: ${reward}개`);
     window.switchScreen('start-screen');
