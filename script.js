@@ -2689,12 +2689,17 @@ function getEquipHtml(eqObj, type) {
 }
 
 window.startMulungMatchmaking = async () => {
+    // 🔥 1번 개선: 매칭 시작하자마자 뒤에 깔린 팝업과 오버레이 즉시 숨기기
     window.closeAllModals();
+    let mlLobby = document.getElementById('mulung-lobby-modal');
+    if (mlLobby) mlLobby.style.display = 'none';
+    let onlineOv = document.getElementById('online-overlay');
+    if (onlineOv) onlineOv.style.display = 'none';
     
     // AI 데이터 로드 
     let oppName = "의문의 동료 (AI)"; 
     let oppCardTotal = 50 + Math.floor(Math.random()*50);
-    let oppStarTotal = Math.floor(Math.random()*30);
+    let oppStarTotal = 0;
     let oppEquipData = { '뱃지': null, '엠블럼': null, '링': null };
 
     try { 
@@ -2749,10 +2754,8 @@ window.startMulungMatchmaking = async () => {
                     ${getEquipHtml(userEquipped['링'], '링')}
                 </div>
             </div>
-            
             <!-- WITH -->
             <div style="font-size:26px; font-weight:900; color:#ffeb3b; text-shadow:0 0 10px #ff1744, 2px 2px 0px #000; font-style:italic;">WITH</div>
-            
             <!-- 상대 정보 -->
             <div style="width:100%; background:linear-gradient(135deg, #b71c1c, #4a148c); border:2px solid #ffcdd2; border-radius:10px; padding:15px; text-align:center; color:#fff; box-shadow:0 8px 20px rgba(0,0,0,0.6); box-sizing:border-box;">
                 <h3 style="margin:0 0 5px 0; color:#ff8a80; font-size:14px;">동료의 스펙</h3>
@@ -2773,28 +2776,28 @@ window.startMulungMatchmaking = async () => {
     intro.style.display = 'flex';
     intro.style.opacity = '1';
 
-    // 5초 대기 후 무릉도장 무제한 진입
     setTimeout(() => { 
         intro.style.opacity = '0'; 
         setTimeout(() => { 
             intro.style.display = 'none'; 
             
+            // 뒤에 남아있던 로비 창들 깔끔하게 지우기
             let mlLobby = document.getElementById('mulung-lobby-modal');
             if (mlLobby) mlLobby.style.display = 'none';
             let onlineOv = document.getElementById('online-overlay');
             if (onlineOv) onlineOv.style.display = 'none';
 
-            window.startMulungGame(oppName, oppEquipData);
+            // 🔥 횟수 제한 코드 완전 삭제 완료!
+            window.startMulungGame(oppName, oppEquipData, oppCardTotal, oppStarTotal);
             window.showMessage("무릉도장 진입 완료!");
         }, 500); 
     }, 5000);
 };
 
 // 🔥 무릉도장 시작 및 UI 세팅
-window.startMulungGame = (oppName, oppEquipData) => {
+window.startMulungGame = (oppName, oppEquipData, oppCardTotal, oppStarTotal) => {
     window.switchScreen('game-container');
     
-    // 기존 모험모드 UI 숨기기
     document.getElementById('grid-container').style.display = 'none';
     let oppGridEl = document.getElementById('opp-grid-container');
     if(oppGridEl) oppGridEl.style.display = 'none';
@@ -2802,16 +2805,20 @@ window.startMulungGame = (oppName, oppEquipData) => {
     document.getElementById('best-wave-container').style.display = 'none';
     document.getElementById('btn-summon').style.display = 'none';
     
-    // 🔥 배속 버튼 활성화 (무릉 1배/10배)
     let speedBtn = document.getElementById('btn-speed');
     if (speedBtn) { speedBtn.style.display = 'block'; state.speed = 1; speedBtn.innerText = "1배속"; }
     
-    // 상단 헤더 텍스트 변경
     document.getElementById('ui-wave').innerText = "준비 중...";
-    document.getElementById('ui-kills').innerText = "무릉도장 동료: " + oppName;
+    document.getElementById('ui-kills').innerHTML = `<span style="cursor:pointer; color:#ffeb3b; text-decoration:underline; font-weight:bold;" onclick="showMulungOppInfo()">🔍 동료 정보</span>`;
     document.getElementById('ui-timer').innerText = "10초";
     
-    // 🔥 메소/메포 박스를 숨기고 '무릉 코인' + '보스 정보' 박스로 교체
+    let guideEl = document.getElementById('early-guide');
+    if (guideEl) {
+        guideEl.style.display = 'block';
+        guideEl.innerHTML = `💡 가이드: 하단 유닛 승급을 통해 높은 층에 도달하세요!`;
+    }
+    
+    // 코인 및 보스 정보 UI
     let resourceRow = document.querySelector('.resource-row');
     if (resourceRow) {
         resourceRow.innerHTML = `
@@ -2827,35 +2834,35 @@ window.startMulungGame = (oppName, oppEquipData) => {
         `;
     }
 
-    // 🔥 하단 업그레이드 영역을 단일 유닛 승급 시스템으로 변경 (합성/상점 버튼 삭제)
+    // 하단 업그레이드 영역 초기화 (합성, 상점 버튼 삭제)
     let controlsPanel = document.getElementById('controls');
     if (controlsPanel) {
         controlsPanel.innerHTML = `
             <div style="text-align:center; font-weight:bold; font-size:14px; color:#004d40; margin-bottom: 5px; border-top: 1px dashed #00796b; padding-top: 5px;">
                 🐼 무릉도장 유닛 승급 🐼
             </div>
-            <div class="upgrade-container" id="mulung-upgrade-buttons" style="display:flex; justify-content:center; padding-bottom: 10px;">
-                <!-- 직업 선택 전 비워둠 -->
+            <div class="upgrade-container" id="mulung-upgrade-buttons" style="display:flex; justify-content:center; gap:5px; padding-bottom: 10px;">
             </div>
         `;
     }
 
+    // 🔥 3칸 배열로 변경
     mulungState = {
         active: true, status: 'PREP', prepTime: 10, wave: 1, coins: 0, oppCoins: 0,
         boss: null, lastTime: performance.now(),
-        oppName: oppName, oppEquipData: oppEquipData,
-        myUnits: [], oppUnits: [], // 선택 전 빈 배열
+        oppName: oppName, oppEquipData: oppEquipData, oppCardTotal: oppCardTotal, oppStarTotal: oppStarTotal,
+        myUnits: [null, null, null], 
+        oppUnits: [null, null, null], 
         projectiles: [], vfx: [], dmgTexts: []
     };
 
-    // 직업 선택 모달 띄우기
     window.showMulungClassSelect();
 
     cancelAnimationFrame(mainReqId);
     mulungReqId = requestAnimationFrame(mulungLoop);
 };
 
-// 🔥 무릉도장 직업 선택창 UI
+// 직업 선택창 모달
 window.showMulungClassSelect = () => {
     let modal = document.getElementById('mulung-class-modal');
     if (!modal) {
@@ -2881,20 +2888,28 @@ window.selectMulungClass = (clsName) => {
     document.getElementById('mulung-class-modal').style.display = 'none';
     document.getElementById('overlay').style.display = 'none';
     
-    let cls = CLASSES[clsName];
-    // 내 유닛 중앙(x:250) 1개 배치
-    mulungState.myUnits.push({ idx: 0, type: clsName, cls: cls, gradeIdx: 0, grade: GRADES[0], x: 250, y: 350, hp: 5, maxHp: 5, lastAttack: 0, globalCooldown: 0, threatCooldown: 0, rtdCooldown: 0, overloadTimer: 0, unitStunTimer: 0, damageDealt: 0, bindCooldown: 0, healCooldown: 0 });
+    let clsNames = ['전사', '법사', '도적'];
     
-    // AI 동료도 1개 랜덤 배치
-    let clsNames = Object.keys(CLASSES); 
-    let aiClsName = clsNames[Math.floor(Math.random() * clsNames.length)];
-    let aiCls = CLASSES[aiClsName];
-    mulungState.oppUnits.push({ idx: 0, type: aiClsName, cls: aiCls, gradeIdx: 0, grade: GRADES[0], x: 250, y: 150, hp: 5, maxHp: 5, lastAttack: 0, globalCooldown: 0, threatCooldown: 0, rtdCooldown: 0, overloadTimer: 0, unitStunTimer: 0, bindCooldown: 0, healCooldown: 0 });
+    // 내 유닛 생성 (해당 직업 칸에 배치)
+    let myIdx = clsNames.indexOf(clsName);
+    mulungState.myUnits[myIdx] = { 
+        idx: myIdx, type: clsName, cls: CLASSES[clsName], gradeIdx: 0, grade: GRADES[0], 
+        x: 100 + (myIdx * 150), y: 350, // 100, 250, 400
+        hp: 5, maxHp: 5, lastAttack: 0, globalCooldown: 0, threatCooldown: 0, rtdCooldown: 0, overloadTimer: 0, unitStunTimer: 0, damageDealt: 0, bindCooldown: 0, healCooldown: 0 
+    };
+    
+    // AI 동료 랜덤 배치
+    let aiClsName = clsNames[Math.floor(Math.random() * 3)];
+    let aiIdx = clsNames.indexOf(aiClsName);
+    mulungState.oppUnits[aiIdx] = { 
+        idx: aiIdx, type: aiClsName, cls: CLASSES[aiClsName], gradeIdx: 0, grade: GRADES[0], 
+        x: 100 + (aiIdx * 150), y: 150, 
+        hp: 5, maxHp: 5, lastAttack: 0, globalCooldown: 0, threatCooldown: 0, rtdCooldown: 0, overloadTimer: 0, unitStunTimer: 0, bindCooldown: 0, healCooldown: 0 
+    };
     
     updateMulungUI();
 };
 
-// 🔥 무릉도장 보스 스폰 로직
 function spawnMulungBoss() {
     let w = mulungState.wave;
     let stage = ((w - 1) % 5) + 1; 
@@ -2916,54 +2931,73 @@ function spawnMulungBoss() {
         stage: stage
     };
 
-    // 🔥 상단 우측 보스 정보 UI 업데이트
     let bNameEl = document.getElementById('mulung-boss-name');
     let bArmorEl = document.getElementById('mulung-boss-armor');
     if (bNameEl) bNameEl.innerText = `${bName} (${stage}/5)`;
     if (bArmorEl) bArmorEl.innerText = `방어력 ${Math.round(armor*100)}%`;
 }
 
-// 🔥 단일 유닛 승급 UI 갱신
+// 🔥 3칸으로 나뉜 하단 승급/소환 UI
 function updateMulungUI() {
     let coinSpan = document.getElementById('ui-mulung-coins');
     if (coinSpan) coinSpan.innerText = mulungState.coins;
 
     let upgradeContainer = document.getElementById('mulung-upgrade-buttons');
     if(!upgradeContainer) return;
-    
-    if (mulungState.myUnits.length === 0) {
-        upgradeContainer.innerHTML = `<div style="color:#777; font-size:13px; padding:10px;">직업을 선택해주세요.</div>`;
-        return;
-    }
 
-    let u = mulungState.myUnits[0];
-    let cost = u.gradeIdx >= 8 ? 'MAX' : (u.gradeIdx + 2);
-    let borderColor = u.gradeIdx >= 8 ? '#424242' : '#ff9800';
-    let actionLabel = u.gradeIdx === 0 ? "초보자 유닛 생성" : `${GRADES[u.gradeIdx].name} 레벨업`;
-    
-    upgradeContainer.innerHTML = `
-        <div class="upgrade-box" onclick="upgradeMulungUnit(0)" style="cursor:pointer; width: 65%; max-width: 250px; margin: 0 auto; padding: 12px; border: 3px solid ${borderColor}; border-radius: 10px; background: #fffdf7;">
-            <div style="font-size:26px; text-shadow:1px 1px 2px rgba(0,0,0,0.5);">${CLASSES[u.type].icon}</div>
-            <div class="job-title" style="color:${CLASSES[u.type].color}; font-size:16px; margin-top:2px;">${u.type}</div>
-            <div style="font-size:14px; font-weight:bold; color:#333; margin:5px 0;">${actionLabel}</div>
-            <div class="cost" style="color:#d32f2f; font-size:15px; font-weight:900;">${cost} 무릉코인</div>
+    let clsNames = ['전사', '법사', '도적'];
+    upgradeContainer.innerHTML = clsNames.map((clsName, i) => {
+        let u = mulungState.myUnits[i];
+        let cost, actionLabel, borderColor;
+        
+        if (u) {
+            cost = u.gradeIdx >= 8 ? 'MAX' : (u.gradeIdx + 2);
+            borderColor = u.gradeIdx >= 8 ? '#424242' : '#ff9800';
+            actionLabel = `${GRADES[u.gradeIdx].name} 레벨업`;
+        } else {
+            cost = 5; // 없는 직업 소환 비용
+            borderColor = '#9e9e9e';
+            actionLabel = `유닛 생성`;
+        }
+        
+        let canAfford = mulungState.coins >= (cost === 'MAX' ? Infinity : cost);
+        let btnOpacity = canAfford ? '1.0' : '0.6';
+
+        return `
+        <div class="upgrade-box" onclick="upgradeMulungUnit(${i}, '${clsName}')" style="cursor:pointer; flex: 1; padding: 10px 5px; border: 2px solid ${borderColor}; border-radius: 8px; background: #fffdf7; opacity: ${btnOpacity}; text-align:center;">
+            <div style="font-size:22px; text-shadow:1px 1px 2px rgba(0,0,0,0.5);">${CLASSES[clsName].icon}</div>
+            <div class="job-title" style="color:${CLASSES[clsName].color}; font-size:13px; margin-top:2px;">${clsName}</div>
+            <div style="font-size:11px; font-weight:bold; color:#333; margin:5px 0;">${actionLabel}</div>
+            <div class="cost" style="color:#d32f2f; font-size:12px; font-weight:900;">${cost} 코인</div>
         </div>`;
+    }).join('');
 }
 
-window.upgradeMulungUnit = (idx) => {
-    let u = mulungState.myUnits[idx];
-    if(!u) return;
-    if(u.gradeIdx >= 8) return window.showMessage("최대 등급입니다.");
-    let cost = u.gradeIdx + 2; 
-    if(mulungState.coins < cost) return window.showMessage(`코인이 부족합니다. (${cost}개 필요)`);
+window.upgradeMulungUnit = (idx, clsName) => {
+    if (mulungState.status === 'PREP' && !mulungState.myUnits[idx]) return window.showMessage("준비 시간엔 초기 직업만 선택 가능합니다!");
     
-    mulungState.coins -= cost;
-    u.gradeIdx++;
-    u.hp = u.maxHp = 5; 
+    let u = mulungState.myUnits[idx];
+    
+    if (u) {
+        if(u.gradeIdx >= 8) return window.showMessage("최대 등급입니다.");
+        let cost = u.gradeIdx + 2; 
+        if(mulungState.coins < cost) return window.showMessage(`코인이 부족합니다. (${cost}개 필요)`);
+        mulungState.coins -= cost;
+        u.gradeIdx++;
+        u.hp = u.maxHp = 5; 
+    } else {
+        let cost = 5; // 소환 비용
+        if(mulungState.coins < cost) return window.showMessage(`코인이 부족합니다. (${cost}개 필요)`);
+        mulungState.coins -= cost;
+        mulungState.myUnits[idx] = { 
+            idx: idx, type: clsName, cls: CLASSES[clsName], gradeIdx: 0, grade: GRADES[0], 
+            x: 100 + (idx * 150), y: 350, 
+            hp: 5, maxHp: 5, lastAttack: 0, globalCooldown: 0, threatCooldown: 0, rtdCooldown: 0, overloadTimer: 0, unitStunTimer: 0, damageDealt: 0, bindCooldown: 0, healCooldown: 0 
+        };
+    }
     
     let container = document.getElementById('game-container'); 
     if(container) { container.classList.add('shake-active'); setTimeout(() => container.classList.remove('shake-active'), 400); }
-    
     updateMulungUI();
 };
 
@@ -3172,14 +3206,19 @@ function drawMulung() {
     ctx.setLineDash([]); ctx.strokeStyle = "rgba(188, 170, 164, 0.5)"; ctx.lineWidth = 40; ctx.lineJoin = "round"; ctx.beginPath();
     ctx.moveTo(0, 250); ctx.lineTo(500, 250); ctx.stroke();
 
-    // 🔥 유닛 배치용 배경 박스 그리기 (상하단 중앙)
+    // 🔥 유닛 배치용 배경 박스 그리기 (상하단 각각 3칸)
     ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.strokeStyle = "#555"; ctx.lineWidth = 2;
-    ctx.fillRect(250 - 35, 150 - 35, 70, 70); ctx.strokeRect(250 - 35, 150 - 35, 70, 70);
-    ctx.fillRect(250 - 35, 350 - 35, 70, 70); ctx.strokeRect(250 - 35, 350 - 35, 70, 70);
+    for(let i=0; i<3; i++) {
+        let px = 100 + (i * 150) - 35;
+        // 위쪽 (동료 진영)
+        ctx.fillRect(px, 150 - 35, 70, 70); ctx.strokeRect(px, 150 - 35, 70, 70);
+        // 아래쪽 (나의 진영)
+        ctx.fillRect(px, 350 - 35, 70, 70); ctx.strokeRect(px, 350 - 35, 70, 70);
+    }
 
-    // 🔥 위/아래 진영 표시 텍스트
+    // 위/아래 진영 표시 텍스트
     ctx.font = "bold 16px NanumSquare"; ctx.fillStyle = "rgba(255, 255, 255, 0.5)"; ctx.textAlign = "center";
-    ctx.fillText(`동료 진영 (${mulungState.oppName})`, 250, 90);
+    ctx.fillText(`동료 진영 (${mulungState.oppName})`, 250, 80);
     ctx.fillText("나의 진영", 250, 450);
 
     let b = mulungState.boss;
@@ -3283,15 +3322,19 @@ function drawMulung() {
     mulungState.dmgTexts.forEach(d => { ctx.save(); ctx.globalAlpha = Math.max(0, d.timer / 0.6); ctx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; ctx.font = d.isCrit ? "800 20px NanumSquare" : "bold 14px NanumSquare"; ctx.shadowColor = d.isCrit ? "#c62828" : "#000"; ctx.shadowBlur = 4; ctx.fillText(d.val, d.x, d.y); ctx.restore(); });
 }
 
-// 🔥 무릉도장 종료 및 보상 정산 (모험 모드 UI 원복 로직 추가)
+// 🔥 7번 & 8번 개선: 코인 보상 로직 변경 및 게임 오버 팝업 구현
 async function endMulungGame() {
     mulungState.active = false;
     cancelAnimationFrame(mulungReqId);
     
     let clearedWave = mulungState.wave - 1;
-    let reward = clearedWave * 2;
-    userRankData.mulungCoins += reward;
-    window.syncToCloud();
+    
+    // 🔥 7번: 5층 클리어(5웨이브) 당 5코인 지급으로 변경
+    let reward = Math.floor(clearedWave / 5) * 5;
+    if (reward > 0) {
+        userRankData.mulungCoins += reward;
+        window.syncToCloud();
+    }
 
     if (currentUserUid) {
         try {
@@ -3304,11 +3347,10 @@ async function endMulungGame() {
         } catch(e) { console.warn("무릉 랭킹 저장 실패", e); }
     }
     
-    // 1. 무릉 전용 UI 숨기기 및 기본 그리드 복구
+    // 기존 UI 원복
     document.getElementById('mulung-ui').style.display = 'none';
     document.getElementById('grid-container').style.display = 'grid'; 
 
-    // 2. 🔥 누락되었던 상단(메소/메포) 및 하단(컨트롤) UI 원복 로직 추가!
     let resourceRow = document.querySelector('.resource-row');
     if (resourceRow) {
         resourceRow.innerHTML = `
@@ -3340,9 +3382,32 @@ async function endMulungGame() {
         `;
     }
     
-    alert(`☠️ 무릉도장 도전 종료!\n도달 층수: ${clearedWave}층\n획득 무릉 코인: ${reward}개`);
-    window.switchScreen('start-screen');
+    // 🔥 8번: 알림창(alert) 대신 멋진 무릉도장 종료 팝업 띄우기
+    let resultModal = document.getElementById('mulung-result-modal');
+    if (!resultModal) {
+        let mDiv = document.createElement('div'); mDiv.id = 'mulung-result-modal'; mDiv.className = 'maple-modal';
+        mDiv.style.cssText = "display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:5000; width:85%; max-width:300px; background:#fff; border:2px solid #004d40; padding:20px; border-radius:10px; text-align:center; box-shadow: 0 10px 30px rgba(0,0,0,0.5);";
+        document.body.appendChild(mDiv); resultModal = mDiv;
+    }
+    resultModal.innerHTML = `
+        <h2 style="color:#d32f2f; margin-top:0; font-size:24px;">☠️ 도전 종료!</h2>
+        <div style="font-size:16px; font-weight:bold; margin:15px 0; color:#333;">도달 층수: <span style="color:#1e88e5; font-size:20px;">${clearedWave}층</span></div>
+        <div style="font-size:14px; color:#555; margin-bottom:20px; padding:10px; background:#f1f8e9; border-radius:6px; border:1px solid #c5e1a5;">
+            획득 무릉 코인: <b style="color:#e65100; font-size:16px;">${reward}개</b>
+        </div>
+        <button class="ingame-btn premium-blue" style="width:100%; padding:12px; font-size:16px;" onclick="closeMulungResult()">마을로 돌아가기</button>
+    `;
+    document.getElementById('overlay').style.display = 'block';
+    resultModal.style.display = 'block';
 }
+
+// 🔥 게임오버 팝업에서 [마을로 돌아가기] 버튼을 눌렀을 때 실행될 함수
+window.closeMulungResult = () => {
+    document.getElementById('mulung-result-modal').style.display = 'none';
+    document.getElementById('overlay').style.display = 'none';
+    state.status = 'TITLE';
+    window.switchScreen('start-screen');
+};
 
 // ==========================================
 // 🔥 무릉도장 전용 로비 및 랭킹 UI 제어 함수
@@ -3389,4 +3454,80 @@ window.loadMulungRanking = async () => {
     } catch(e) { 
         list.innerHTML = '<div style="text-align:center; color:#ff5252;">서버 연결 실패.</div>'; 
     }
+};
+
+// ==========================================
+// 🔥 무릉도장 동료 스펙 및 장비 상세 정보 팝업
+// ==========================================
+window.showMulungOppInfo = () => {
+    if (!mulungState || !mulungState.active) return;
+    
+    let modal = document.getElementById('mulung-opp-info-modal');
+    if (!modal) {
+        let mDiv = document.createElement('div'); mDiv.id = 'mulung-opp-info-modal'; mDiv.className = 'maple-modal';
+        mDiv.style.cssText = "display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:9500; width:85%; max-width:320px; background:#fff; border:2px solid #4a148c; padding:20px; border-radius:10px; text-align:center; box-shadow: 0 10px 30px rgba(0,0,0,0.6);";
+        document.body.appendChild(mDiv); modal = mDiv;
+    }
+
+    // 장비 아이콘들 (클릭 시 세부 옵션 보기)
+    let equipHtml = ['뱃지', '엠블럼', '링'].map(slot => {
+        let item = mulungState.oppEquipData[slot];
+        let border = item ? (item.grade === 'Legendary' ? '#d32f2f' : (item.grade === 'Unique' ? '#fb8c00' : (item.grade === 'Epic' ? '#8e24aa' : '#1e88e5'))) : '#777';
+        let img = item ? `<img src="image/${slot === '뱃지' ? 'emblem.png' : (slot === '엠블럼' ? 'badge.png' : 'ring.png')}" style="max-width:30px; max-height:30px;">` : '';
+        return `<div onclick="showOppEquipDetail('${slot}')" style="cursor:pointer; width:50px; height:50px; border:2px solid ${border}; border-radius:6px; background:#fff; display:flex; justify-content:center; align-items:center; box-shadow:0 0 5px ${border};">${img}</div>`;
+    }).join('');
+
+    modal.innerHTML = `
+        <h3 style="margin:0 0 15px 0; color:#4a148c;">동료 스펙 정보</h3>
+        <div style="font-size:18px; font-weight:900; margin-bottom:10px; color:#333;">${mulungState.oppName}</div>
+        <div style="display:flex; justify-content:center; gap:15px; font-size:13px; margin-bottom:15px; background:#f3e5f5; padding:8px; border-radius:6px; color:#4a148c; font-weight:bold;">
+            <span>📕 도감: Lv.<b style="color:#d32f2f">${mulungState.oppCardTotal}</b></span>
+            <span>⭐ 스타포스: <b style="color:#d32f2f">${mulungState.oppStarTotal}</b>성</span>
+        </div>
+        <div style="font-size:11px; color:#777; margin-bottom:5px;">아이콘을 누르면 장비 옵션을 볼 수 있습니다.</div>
+        <div style="display:flex; justify-content:center; gap:15px; margin-bottom:20px;">
+            ${equipHtml}
+        </div>
+        <button class="ingame-btn premium-blue" style="width:100%; padding:12px; font-size:15px;" onclick="document.getElementById('mulung-opp-info-modal').style.display='none'">닫기</button>
+    `;
+    
+    modal.style.display = 'block';
+};
+
+window.showOppEquipDetail = (slot) => {
+    let item = mulungState.oppEquipData[slot];
+    if (!item) return window.showMessage("장착된 장비가 없습니다.");
+
+    let modal = document.getElementById('opp-equip-detail-modal');
+    if (!modal) {
+        let mDiv = document.createElement('div'); mDiv.id = 'opp-equip-detail-modal'; mDiv.className = 'maple-modal';
+        mDiv.style.cssText = "display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:9600; width:80%; max-width:280px; background:#fff; border:2px solid #546e7a; padding:15px; border-radius:8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8);";
+        document.body.appendChild(mDiv); modal = mDiv;
+    }
+
+    let gradeColor = item.grade === 'Rare' ? '#1e88e5' : (item.grade === 'Epic' ? '#8e24aa' : (item.grade === 'Unique' ? '#fb8c00' : '#d32f2f'));
+    let starStr = item.star > 0 ? ` <span style="color:#fbc02d;">★${item.star}</span>` : '';
+    
+    let baseOpt = "";
+    if (item.options && Array.isArray(item.options)) {
+        baseOpt = item.options.map(o => {
+            let name = o.type === 'atk' ? '공격력' : (o.type === 'spd' ? '공속' : (o.type === 'crit' ? '크확' : (o.type === 'cdmg' ? '치피' : '방관')));
+            return `${name} +${o.value}%`;
+        }).join('<br>');
+    } else {
+        baseOpt = item.atk > 0 ? `기본 옵션: 공격력 +${item.atk}%` : (item.spd > 0 ? `기본 옵션: 공속 +${item.spd}%` : `기본 옵션: 크확 +${item.crit}%`);
+    }
+
+    let perStar = STARFORCE_BONUS[item.grade] || 0;
+    let flatAtkVal = (item.star || 0) * perStar;
+    let starOpt = flatAtkVal > 0 ? `<br><span style="color:#e65100;">스타포스 추가 공격력: +${flatAtkVal}</span>` : `<br><span style="color:#777;">스타포스 강화 없음</span>`;
+
+    modal.innerHTML = `
+        <h3 style="margin-top:0; text-align:center;"><span style="color:${gradeColor}">${item.grade} ${item.type}</span>${starStr}</h3>
+        <div style="background:#eceff1; padding:10px; border-radius:6px; font-size:13px; color:#37474f; font-weight:bold; margin-bottom:15px; line-height:1.6; text-align:center;">
+            ${baseOpt}<br>${starOpt}
+        </div>
+        <button class="ingame-btn premium-dark" style="width:100%; padding:10px;" onclick="document.getElementById('opp-equip-detail-modal').style.display='none'">닫기</button>
+    `;
+    modal.style.display = 'block';
 };
