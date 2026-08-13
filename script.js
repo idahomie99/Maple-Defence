@@ -2836,11 +2836,11 @@ window.startMulungMatchmaking = async () => {
     }, 5000);
 };
 
-// 🔥 무릉도장 시작 및 UI 세팅
+// 🔥 1. 무릉도장 시작 및 UI 세팅
 window.startMulungGame = (oppName, oppEquipData, oppCardTotal, oppStarTotal) => {
     window.switchScreen('game-container');
     
-    // 🔥 모험모드 5칸 UI 세팅 
+    // 🔥 모험모드 5칸 UI 세팅 (이 부분이 있어야 박스가 보입니다!)
     setGridMode('MULUNG');
     document.getElementById('grid-container').style.display = 'grid';
     let oppGridEl = document.getElementById('opp-grid-container');
@@ -2853,11 +2853,12 @@ window.startMulungGame = (oppName, oppEquipData, oppCardTotal, oppStarTotal) => 
     let speedBtn = document.getElementById('btn-speed');
     if (speedBtn) { speedBtn.style.display = 'block'; state.speed = 1; speedBtn.innerText = "1배속"; }
     
-    // 🔥 1. 타이머 10초초 에러 수정
+    // 🔥 타이머 10초초 에러 수정
     document.getElementById('ui-wave').innerText = "준비 중...";
     document.getElementById('ui-timer').innerText = "10"; 
     
-    // 🔥 2. 킬수/몹 표시줄 완전 숨김 처리
+    // 🔥 킬수 및 남은 몹수 줄 숨김 처리
+    document.getElementById('ui-kills').innerText = "";
     let mobsRow = document.getElementById('ui-mobs');
     if (mobsRow && mobsRow.parentNode && mobsRow.parentNode.parentNode) {
         mobsRow.parentNode.parentNode.style.display = 'none';
@@ -2870,7 +2871,7 @@ window.startMulungGame = (oppName, oppEquipData, oppCardTotal, oppStarTotal) => 
         guideEl.innerHTML = `💡 가이드: 하단 유닛 승급을 통해 높은 층에 도달하세요!`;
     }
     
-    // 🔥 3. 동료 정보 버튼을 코인 우측으로 이동시키고 디자인 변경 (파란색)
+    // 🔥 파란색의 눈에 띄는 동료 정보 버튼
     let resourceRow = document.querySelector('.resource-row');
     if (resourceRow) {
         resourceRow.innerHTML = `
@@ -2939,7 +2940,7 @@ window.selectMulungClass = (clsName) => {
     document.getElementById('mulung-class-modal').style.display = 'none';
     document.getElementById('overlay').style.display = 'none';
     
-    // 가운데(idx 2)에 첫 유닛 배치
+    // 가운데(idx 2)에 첫 유닛 배치 (글로벌 grid 사용)
     grid[2] = { 
         idx: 2, type: clsName, cls: CLASSES[clsName], gradeIdx: 0, grade: GRADES[0], 
         x: 50 + (2 % 5) * 100, y: 380, 
@@ -3052,7 +3053,6 @@ window.upgradeMulungUnit = (clsName) => {
     updateMulungUI();
 };
 
-// 🔥 무릉도장 메인 루프 (전투 및 반격 로직)
 function mulungLoop() {
     if (!mulungState.active) return;
     let now = performance.now(); let dtReal = (now - mulungState.lastTime) / 1000; 
@@ -3130,7 +3130,7 @@ function mulungLoop() {
     let appliedArmor = b.armor * myUnpen;
 
     grid.forEach((u) => {
-        if (!u) return; // 🔥 멈춤 현상의 원인 해결 완료!
+        if (!u) return;
         
         let overloadMult = 1;
         if (u.overloadTimer > 0) {
@@ -3242,7 +3242,6 @@ function mulungLoop() {
             mulungState.oppCoins -= (minGrade + 2);
             oppGrid[targetAiIdx].gradeIdx++;
         } else if (oppGrid.filter(u => u !== null).length < 3 && mulungState.oppCoins >= 1) {
-            // 🔥 AI 동료도 유닛 자동 추가 소환!
             mulungState.oppCoins -= 1;
             let aiEmptyIdx = oppGrid.findIndex(v => v === null);
             let clsNames = Object.keys(CLASSES);
@@ -3264,16 +3263,13 @@ function mulungLoop() {
     mulungReqId = requestAnimationFrame(mulungLoop);
 }
 
-// 🔥 무릉도장 렌더링 함수
 function drawMulung() {
     if(!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // 중앙 트랙 그리기
     ctx.setLineDash([]); ctx.strokeStyle = "rgba(188, 170, 164, 0.5)"; ctx.lineWidth = 40; ctx.lineJoin = "round"; ctx.beginPath();
     ctx.moveTo(0, 250); ctx.lineTo(500, 250); ctx.stroke();
 
-    // 진영 표시 텍스트
     ctx.font = "bold 16px NanumSquare"; ctx.fillStyle = "rgba(255, 255, 255, 0.5)"; ctx.textAlign = "center";
     ctx.fillText(`동료 진영 (${mulungState.oppName})`, 250, 80);
     ctx.fillText("나의 진영", 250, 480);
