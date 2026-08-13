@@ -2743,6 +2743,10 @@ window.startMulungMatchmaking = async () => {
     let oppStarTotal = 0;
     let oppEquipData = { '뱃지': null, '엠블럼': null, '링': null };
 
+    oppCardData = {}; 
+    oppSkillLevels = { ...DEFAULT_SKILLS }; 
+    oppEquipStats = { atk: 0, spd: 0, crit: 0, cdmg: 0, pen: 0, flatAtk: 0, unpenetratedRate: 1.0 };
+
     try { 
         const snap = await get(child(ref(database), `users`)); 
         if (snap.exists()) { 
@@ -2752,7 +2756,11 @@ window.startMulungMatchmaking = async () => {
                 oppName = aiUser.nickname + " (AI)";
                 if(aiUser.cloudData.cards) {
                     let parsedCards = JSON.parse(aiUser.cloudData.cards);
+                    oppCardData = parsedCards;
                     oppCardTotal = Object.values(parsedCards).reduce((sum, c) => sum + (c.grade||0), 0);
+                }
+                if(aiUser.cloudData.skills) {
+                    oppSkillLevels = { ...DEFAULT_SKILLS, ...JSON.parse(aiUser.cloudData.skills) };
                 }
                 if(aiUser.cloudData.equipped) {
                     ['뱃지', '엠블럼', '링'].forEach(slot => {
@@ -2760,6 +2768,18 @@ window.startMulungMatchmaking = async () => {
                         if(item) {
                             oppEquipData[slot] = item;
                             oppStarTotal += (item.star || 0);
+                            if (item.options && Array.isArray(item.options)) {
+                                item.options.forEach(o => {
+                                    if(o.type==='atk') oppEquipStats.atk += o.value;
+                                    else if(o.type==='spd') oppEquipStats.spd += o.value;
+                                    else if(o.type==='crit') oppEquipStats.crit += o.value;
+                                    else if(o.type==='cdmg') oppEquipStats.cdmg += o.value;
+                                    else if(o.type==='pen') oppEquipStats.unpenetratedRate *= (1 - (o.value / 100));
+                                });
+                            } else {
+                                oppEquipStats.atk += item.atk || 0; oppEquipStats.spd += item.spd || 0; oppEquipStats.crit += item.crit || 0; 
+                            }
+                            let star = item.star || 0; if (star > 0) { let perStar = STARFORCE_BONUS[item.grade] || 0; oppEquipStats.flatAtk += star * perStar; }
                         }
                     });
                 }
@@ -2816,11 +2836,6 @@ window.startMulungMatchmaking = async () => {
         intro.style.opacity = '0'; 
         setTimeout(() => { 
             intro.style.display = 'none'; 
-            let mlLobby = document.getElementById('mulung-lobby-modal');
-            if (mlLobby) mlLobby.style.display = 'none';
-            let onlineOv = document.getElementById('online-overlay');
-            if (onlineOv) onlineOv.style.display = 'none';
-
             window.startMulungGame(oppName, oppEquipData, oppCardTotal, oppStarTotal);
             window.showMessage("무릉도장 진입 완료!");
         }, 500); 
@@ -2828,14 +2843,17 @@ window.startMulungMatchmaking = async () => {
 };
 
 window.startMulungGame = (oppName, oppEquipData, oppCardTotal, oppStarTotal) => {
+    state.status = 'MULUNG'; 
+    cancelAnimationFrame(mainReqId);
+    cancelAnimationFrame(mulungReqId);
+
     window.switchScreen('game-container');
     
-    // 🔥 모험모드 5칸 UI 세팅 및 빨간 박스 숨기기
     setGridMode('MULUNG');
     document.getElementById('grid-container').style.display = 'grid';
     
     let oppBoardWrapper = document.getElementById('opp-board-wrapper');
-    if (oppBoardWrapper) oppBoardWrapper.style.display = 'none'; // 🔥 징그러운 빨간 박스 완벽 차단!
+    if (oppBoardWrapper) oppBoardWrapper.style.display = 'none'; 
     
     let oppGridEl = document.getElementById('opp-grid-container');
     if(oppGridEl) oppGridEl.style.display = 'grid';
@@ -2847,11 +2865,16 @@ window.startMulungGame = (oppName, oppEquipData, oppCardTotal, oppStarTotal) => 
     let speedBtn = document.getElementById('btn-speed');
     if (speedBtn) { speedBtn.style.display = 'block'; state.speed = 1; speedBtn.innerText = "1배속"; }
     
-    // 🔥 타이머 '10초초' 에러 수정
     document.getElementById('ui-wave').innerText = "준비 중...";
-    document.getElementById('ui-timer').innerText = "10"; 
     
-    // 🔥 킬수, 몹수 줄 완전 삭제 처리
+    let timerEl = document.getElementById('ui-timer');
+    if (timerEl) {
+        timerEl.innerText = "10";
+        if (timerEl.nextSibling && timerEl.nextSibling.nodeType === 3 && !timerEl.nextSibling.textContent.includes('초')) {
+            timerEl.nextSibling.textContent = '초';
+        }
+    }
+    
     try {
         let uiKills = document.getElementById('ui-kills');
         if (uiKills && uiKills.parentElement) uiKills.parentElement.style.display = 'none';
@@ -2865,7 +2888,6 @@ window.startMulungGame = (oppName, oppEquipData, oppCardTotal, oppStarTotal) => 
         guideEl.innerHTML = `💡 가이드: 하단 유닛 승급을 통해 높은 층에 도달하세요!`;
     }
     
-    // 🔥 파란색의 예쁜 동료 정보 버튼
     let resourceRow = document.querySelector('.resource-row');
     if (resourceRow) {
         resourceRow.innerHTML = `
@@ -2900,12 +2922,11 @@ window.startMulungGame = (oppName, oppEquipData, oppCardTotal, oppStarTotal) => 
         active: true, status: 'PREP', prepTime: 10, wave: 1, coins: 0, oppCoins: 0,
         boss: null, lastTime: performance.now(),
         oppName: oppName, oppEquipData: oppEquipData, oppCardTotal: oppCardTotal, oppStarTotal: oppStarTotal,
-        projectiles: [], vfx: [], dmgTexts: []
+        projectiles: [], vfx: [], dmgTexts: [], 
+        roundTime: 60 // 🔥 매 라운드 타이머 상태 추가
     };
 
     window.showMulungClassSelect();
-
-    cancelAnimationFrame(mainReqId);
     mulungReqId = requestAnimationFrame(mulungLoop);
 };
 
@@ -2934,14 +2955,12 @@ window.selectMulungClass = (clsName) => {
     document.getElementById('mulung-class-modal').style.display = 'none';
     document.getElementById('overlay').style.display = 'none';
     
-    // 가운데(idx 2)에 첫 유닛 배치 (글로벌 grid 사용)
     grid[2] = { 
         idx: 2, type: clsName, cls: CLASSES[clsName], gradeIdx: 0, grade: GRADES[0], 
         x: 50 + (2 % 5) * 100, y: 340, 
         hp: 5, maxHp: 5, lastAttack: 0, globalCooldown: 0, threatCooldown: 0, rtdCooldown: 0, overloadTimer: 0, unitStunTimer: 0, damageDealt: 0, bindCooldown: 0, healCooldown: 0 
     };
     
-    // 🔥 동료 AI도 내가 선택한 '동일한 직업'으로 매칭
     oppGrid[2] = { 
         idx: 2, type: clsName, cls: CLASSES[clsName], gradeIdx: 0, grade: GRADES[0], 
         x: 50 + (2 % 5) * 100, y: 90, 
@@ -2963,9 +2982,11 @@ function spawnMulungBoss() {
     let bossNames = Object.keys(bossImages);
     let bName = bossNames[Math.floor((w - 1) / 5) % bossNames.length];
 
+    mulungState.roundTime = 60; // 🔥 60초 타이머 초기화
+
     mulungState.boss = {
         name: bName, hp: hp, maxHp: hp, armor: armor,
-        x: -50, y: 200, speed: 20 + Math.min(w * 0.2, 30),
+        x: -50, y: 200, speed: 10, // 🔥 이동 속도 10으로 완전히 고정 (60초간 정확히 600 전진)
         threatTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0,
         stunTimer: 0, counterTimer: 5, bindTimer: 0, stage: stage
     };
@@ -2991,11 +3012,10 @@ function updateMulungUI() {
         if (u) {
             cost = u.gradeIdx >= 8 ? 'MAX' : (u.gradeIdx + 2);
             borderColor = u.gradeIdx >= 8 ? '#424242' : '#ff9800';
-            // 🔥 '초보자 레벨업' 대신 1차, 2차 레벨업으로 텍스트 출력
             let nextGradeName = u.gradeIdx >= 8 ? 'MAX' : GRADES[u.gradeIdx + 1].name;
             actionLabel = `${nextGradeName} 레벨업`;
         } else {
-            cost = 1; // 🔥 소환 코스트 1로 변경
+            cost = 1;
             borderColor = '#9e9e9e';
             actionLabel = `유닛 생성`;
         }
@@ -3024,10 +3044,9 @@ window.upgradeMulungUnit = (clsName) => {
         if(mulungState.coins < cost) return window.showMessage(`코인이 부족합니다. (${cost}개 필요)`);
         mulungState.coins -= cost;
         u.gradeIdx++;
-        u.grade = GRADES[u.gradeIdx]; // 🔥 레벨업 시 등급 및 이름 정상 반영!
+        u.grade = GRADES[u.gradeIdx]; 
         u.hp = u.maxHp = 5; 
         
-        // 🔥 5차 이상일 때만 화면 흔들림 효과
         if (u.gradeIdx >= 5) {
             let container = document.getElementById('game-container'); 
             if(container) { container.classList.add('shake-active'); setTimeout(() => container.classList.remove('shake-active'), 400); }
@@ -3036,7 +3055,7 @@ window.upgradeMulungUnit = (clsName) => {
         let currentCount = grid.filter(v => v !== null).length;
         if (currentCount >= 3) return window.showMessage("최대 3유닛까지만 배치 가능합니다.");
         
-        let cost = 1; // 🔥 1코인 소환
+        let cost = 1; 
         if(mulungState.coins < cost) return window.showMessage(`코인이 부족합니다. (${cost}개 필요)`);
         mulungState.coins -= cost;
         
@@ -3066,7 +3085,11 @@ function mulungLoop() {
         
         if (mulungState.prepTime <= 0) {
             mulungState.status = 'PLAY';
-            document.getElementById('ui-timer').innerText = "- "; // 🔥 10초초 에러 덮기 (타이머: - 초)
+            // 🔥 전투 시작 시 지워졌던 '초' 텍스트를 정상 복구
+            let timerEl = document.getElementById('ui-timer');
+            if (timerEl && timerEl.nextSibling && timerEl.nextSibling.nodeType === 3 && !timerEl.nextSibling.textContent.includes('초')) {
+                timerEl.nextSibling.textContent = '초'; 
+            }
             spawnMulungBoss(); 
         }
         drawMulung();
@@ -3076,6 +3099,12 @@ function mulungLoop() {
 
     let b = mulungState.boss;
     if (!b) { drawMulung(); mulungReqId = requestAnimationFrame(mulungLoop); return; }
+
+    // 🔥 60초 타임어택 로직 적용 및 UI 출력
+    mulungState.roundTime -= dt;
+    document.getElementById('ui-timer').innerText = Math.ceil(Math.max(0, mulungState.roundTime));
+
+    if (mulungState.roundTime <= 0) return endMulungGame(); // 60초 지나면 가차없이 게임오버
 
     if (b.freezeTimer > 0) { b.freezeTimer -= dt; b.freezeTickTimer -= dt; if (b.freezeTickTimer <= 0) { b.hp -= b.freezeDmgVal; b.freezeTickTimer = 1; } }
     if (b.threatTimer > 0) b.threatTimer -= dt;
@@ -3090,8 +3119,6 @@ function mulungLoop() {
         b.x += currentSpeed * dt;
     }
 
-    if (b.x > 550) return endMulungGame();
-
     if (mulungState.wave >= 60) {
         b.counterTimer -= dt;
         if (b.counterTimer <= 0) {
@@ -3105,7 +3132,7 @@ function mulungLoop() {
                 if (target.hp <= 0) {
                     let oldGrade = GRADES[target.gradeIdx].name;
                     target.gradeIdx = Math.max(0, target.gradeIdx - 2);
-                    target.grade = GRADES[target.gradeIdx]; // 🔥 강등 시 등급명 갱신
+                    target.grade = GRADES[target.gradeIdx]; 
                     target.hp = target.maxHp = 5;
                     target.damageDealt = 0; 
                     window.showMessage(`☠️ 보스 반격! [${target.type}] ${oldGrade} ➔ ${GRADES[target.gradeIdx].name} 강등!`);
@@ -3130,7 +3157,7 @@ function mulungLoop() {
     let appliedArmor = b.armor * myUnpen;
 
     grid.forEach((u) => {
-        if (!u) return; // 🔥 루프 멈춤 현상 완전 방어
+        if (!u) return; 
         
         let overloadMult = 1;
         if (u.overloadTimer > 0) {
@@ -3197,16 +3224,74 @@ function mulungLoop() {
     });
 
     let oppCardBonus = oppCardData ? Object.values(oppCardData).reduce((sum, c) => sum + (c.grade||0)*0.5, 0) : 0;
-    let oppMulti = 1 + oppCardBonus/100;
-    
+    let oppCardMulti = 1 + (oppCardBonus / 100); 
+    let oppRageMulti = 1 + ((oppSkillLevels.common_rage||0) * 0.01) + (oppEquipStats.atk * 0.01); 
+    let oppSharpChance = ((oppSkillLevels.common_sharp||0) * 0.05) + (oppEquipStats.crit * 0.01); 
+    let oppWindReduc = 1 + ((oppSkillLevels.common_wind||0) * 0.2) + (oppEquipStats.spd * 0.01);
+    let oppUnpen = oppEquipStats.unpenetratedRate;
+    if (b.threatTimer > 0) oppUnpen *= 0.9;
+    let oppAppliedArmor = b.armor * oppUnpen;
+
     oppGrid.forEach((u) => {
         if (!u) return;
+
+        let overloadMult = 1;
+        if (u.overloadTimer > 0) {
+            u.overloadTimer -= dt; overloadMult = 2;
+            if (u.overloadTimer <= 0) u.unitStunTimer = oppSkillLevels.thief_overload === 1 ? 6 : 5;
+        }
+        if (u.unitStunTimer > 0) u.unitStunTimer -= dt;
+        let isStunned = (u.unitStunTimer > 0);
+
+        if (u.gradeIdx >= 6 && u.cls.type === '법사' && oppSkillLevels.mage_heal > 0) {
+            u.healCooldown -= dt * 1000;
+            if (u.healCooldown <= 0 && !isStunned) {
+                oppGrid.forEach(tu => { 
+                    if(!tu) return;
+                    tu.hp = Math.min(tu.maxHp, tu.hp + 1); 
+                    mulungState.vfx.push({ type: 'heal', x: tu.x, y: tu.y, timer: 1.0 }); 
+                });
+                u.healCooldown += (70 - oppSkillLevels.mage_heal * 10) * 1000;
+            }
+        }
+        if (u.gradeIdx >= 7) {
+            if (u.cls.type === '전사' && oppSkillLevels.war_threat > 0) {
+                u.threatCooldown -= dt * 1000;
+                if (u.threatCooldown <= 0 && !isStunned) { b.threatTimer = oppSkillLevels.war_threat * 2; u.threatCooldown += 25000; mulungState.vfx.push({ type: 'threat1', x: u.x, y: u.y, timer: 1.0 }); }
+            }
+            if (u.cls.type === '도적' && oppSkillLevels.thief_overload > 0) {
+                u.rtdCooldown -= dt * 1000;
+                if (u.rtdCooldown <= 0 && (u.overloadTimer||0) <= 0 && !isStunned) { u.overloadTimer = oppSkillLevels.thief_overload === 5 ? 15 : 6 + (oppSkillLevels.thief_overload * 2); u.rtdCooldown += 45000; mulungState.vfx.push({ type: 'rtd', x: u.x, y: u.y, timer: 1.0 }); }
+            }
+        }
+        if (u.gradeIdx === 6 && u.cls.type !== '법사') {
+            u.bindCooldown -= dt * 1000;
+            if (u.bindCooldown <= 0 && b.bindTimer <= 0 && !isStunned) { b.bindTimer = 10; u.bindCooldown += 75000; }
+        }
+
+        if (u.gradeIdx >= 5) {
+            if ((u.cls.type === '전사' && (oppSkillLevels.war_death||0) > 0) || (u.cls.type === '법사' && (oppSkillLevels.mage_thunder||0) > 0) || (u.cls.type === '도적' && (oppSkillLevels.thief_fuma||0) > 0)) {
+                u.globalCooldown -= dt * 1000;
+                if (u.globalCooldown <= 0 && !isStunned) {
+                    let baseDmg = (CLASSES[u.cls.type].baseDmg + oppEquipStats.flatAtk) * GRADES[u.gradeIdx].mult * oppCardMulti * oppRageMulti; 
+                    if (u.cls.type === '전사' && (oppSkillLevels.war_death||0) > 0) { let gdmg = baseDmg * (1.5 + (oppSkillLevels.war_death||0) * 1.5); mulungState.vfx.push({ type: 'death', timer: 1.2, dmg: gdmg, isOpp: true }); u.globalCooldown += 60000; }
+                    else if (u.cls.type === '법사' && (oppSkillLevels.mage_thunder||0) > 0) { let gdmg = baseDmg * (1.5 + (oppSkillLevels.mage_thunder||0) * 1.5); mulungState.vfx.push({ type: 'thunder', timer: 0.5, dmg: gdmg, isOpp: true }); u.globalCooldown += 60000; }
+                    else if (u.cls.type === '도적' && (oppSkillLevels.thief_fuma||0) > 0) { let gdmg = baseDmg * (1.5 + (oppSkillLevels.thief_fuma||0) * 1.5); mulungState.vfx.push({ type: 'fuma', timer: 0.5, dmg: gdmg, isOpp: true }); u.globalCooldown += 60000; }
+                }
+            }
+        }
+
         u.lastAttack -= dt * 1000; 
-        let attackCd = CLASSES[u.cls.type].cd * (GRADES[u.gradeIdx].speedMul || 1); 
+        let attackCd = (CLASSES[u.cls.type].cd * (GRADES[u.gradeIdx].speedMul || 1)) / (oppWindReduc * overloadMult); 
         while(u.lastAttack <= 0) {
-            let dmg = (CLASSES[u.cls.type].baseDmg + 10) * GRADES[u.gradeIdx].mult * oppMulti; 
+            if (isStunned) { u.lastAttack = 0; break; }
+            let dmg = (CLASSES[u.cls.type].baseDmg + oppEquipStats.flatAtk) * GRADES[u.gradeIdx].mult * oppCardMulti * oppRageMulti; 
             if (b.threatTimer > 0) dmg *= 1.3; 
-            mulungState.projectiles.push({ type: u.cls.type, x: u.x, y: u.y, tx: b.x, ty: b.y, dmg: dmg, color: CLASSES[u.cls.type].color, angle: 0, gradeIdx: u.gradeIdx, isCrit: false, isFinal: false, baseDmgToPass: dmg, isMine: false });
+            let isCrit = Math.random() < oppSharpChance; if (isCrit) dmg *= (1.2 + (oppEquipStats.cdmg / 100)); 
+            let isFinal = false; if (u.cls.type === '전사' && (oppSkillLevels.war_final||0) > 0 && Math.random() < ((oppSkillLevels.war_final||0) * 0.03)) { isFinal = true; dmg *= 2; }
+            
+            mulungState.projectiles.push({ type: u.cls.type, x: u.x, y: u.y, tx: b.x, ty: b.y, dmg: dmg, color: CLASSES[u.cls.type].color, angle: 0, gradeIdx: u.gradeIdx, isCrit: isCrit, isFinal: isFinal, baseDmgToPass: dmg, isMine: false, appliedArmor: oppAppliedArmor });
+            if (u.cls.type === '도적' && (oppSkillLevels.thief_shadow||0) > 0 && Math.random() < ((oppSkillLevels.thief_shadow||0) * 0.03)) { mulungState.projectiles.push({ type: u.cls.type, x: u.x, y: u.y, tx: b.x, ty: b.y, dmg: dmg, color: CLASSES[u.cls.type].color, angle: 0, gradeIdx: u.gradeIdx, isCrit: isCrit, isFinal: false, baseDmgToPass: dmg, isMine: false, appliedArmor: oppAppliedArmor, isShadow: true }); }
             u.lastAttack += attackCd;
         }
     });
@@ -3217,7 +3302,9 @@ function mulungLoop() {
         if(dist <= speed) {
             let hitDmg = p.dmg; 
             if (p.type === '전사') hitDmg *= 1.5;
-            hitDmg *= (1 - appliedArmor);
+            
+            if (p.isMine !== undefined && p.isMine === false) { hitDmg *= (1 - p.appliedArmor); }
+            else { hitDmg *= (1 - appliedArmor); }
 
             b.hp -= hitDmg;
             if (p.isMine && p.sourceTower) p.sourceTower.damageDealt += hitDmg;
@@ -3228,20 +3315,17 @@ function mulungLoop() {
         } else { p.x += (dx/dist)*speed; p.y += (dy/dist)*speed; }
     }
     
-    // 🔥 전역 스킬 데미지 처리 완벽 대응!
     for (let i = mulungState.vfx.length - 1; i >= 0; i--) { 
         mulungState.vfx[i].timer -= dt; 
         if (mulungState.vfx[i].timer <= 0) { 
             let v = mulungState.vfx[i];
             if (v.type === 'death' || v.type === 'thunder' || v.type === 'fuma') {
                 if (b && b.hp > 0) {
-                    let actualDmg = v.dmg * (1 - appliedArmor);
+                    let finalArmor = v.isOpp ? oppAppliedArmor : appliedArmor;
+                    let actualDmg = v.dmg * (1 - finalArmor);
                     if (b.threatTimer > 0) actualDmg *= 1.3;
                     b.hp -= actualDmg;
                     mulungState.dmgTexts.push({ val: Math.floor(actualDmg), x: b.x + (Math.random()-0.5)*30, y: b.y - 40 + (Math.random()-0.5)*30, timer: 0.6, isCrit: true });
-                    
-                    let container = document.getElementById('game-container'); 
-                    if (container && v.type === 'death') { container.classList.add('mild-shake-active'); setTimeout(() => container.classList.remove('mild-shake-active'), 300); } 
                 }
             }
             mulungState.vfx.splice(i, 1); 
@@ -3249,8 +3333,8 @@ function mulungLoop() {
     }
     for (let i = mulungState.dmgTexts.length - 1; i >= 0; i--) { mulungState.dmgTexts[i].timer -= dtReal; mulungState.dmgTexts[i].y -= dtReal * 60; if (mulungState.dmgTexts[i].timer <= 0) mulungState.dmgTexts.splice(i, 1); }
 
+    // 🔥 보스 처치 시! 60초가 끝나기 전에 체력을 다 깎으면 다음 층으로 즉시 이동
     if (b.hp <= 0) {
-        // 🔥 5웨이브마다 5코인 지급
         let rewardCoins = (mulungState.wave % 5 === 0) ? 5 : 0;
         mulungState.coins += rewardCoins;
         mulungState.oppCoins += rewardCoins;
@@ -3265,7 +3349,11 @@ function mulungLoop() {
             mulungState.oppCoins -= 1;
             let aiEmptyIdx = oppGrid.findIndex(v => v === null);
             let clsNames = Object.keys(CLASSES);
-            let aiClsName = clsNames[Math.floor(Math.random() * 3)];
+            let currentAiTypes = oppGrid.filter(u => u !== null).map(u => u.type);
+            let availableAiClasses = clsNames.filter(c => !currentAiTypes.includes(c));
+            if (availableAiClasses.length === 0) availableAiClasses = clsNames; 
+            let aiClsName = availableAiClasses[Math.floor(Math.random() * availableAiClasses.length)];
+            
             oppGrid[aiEmptyIdx] = { 
                 idx: aiEmptyIdx, type: aiClsName, cls: CLASSES[aiClsName], gradeIdx: 0, grade: GRADES[0], 
                 x: 50 + (aiEmptyIdx % 5) * 100, y: 90, 
@@ -3296,7 +3384,6 @@ function drawMulung() {
 
     let b = mulungState.boss;
     
-    // 🔥 스턴 마커 (HTML 셀 위쪽에 그려줌)
     grid.forEach(u => {
         if (u && u.unitStunTimer > 0) { ctx.font = "bold 20px Arial"; ctx.fillStyle = "yellow"; ctx.textAlign = "center"; ctx.fillText("💫", u.x, u.y - 25); }
     });
@@ -3365,7 +3452,6 @@ function drawMulung() {
     mulungState.dmgTexts.forEach(d => { ctx.save(); ctx.globalAlpha = Math.max(0, d.timer / 0.6); ctx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; ctx.font = d.isCrit ? "800 20px NanumSquare" : "bold 14px NanumSquare"; ctx.shadowColor = d.isCrit ? "#c62828" : "#000"; ctx.shadowBlur = 4; ctx.fillText(d.val, d.x, d.y); ctx.restore(); });
 }
 
-// 🔥 6번 수정: 게임 오버 결과 팝업 안전하게 출력 처리
 async function endMulungGame() {
     mulungState.active = false;
     cancelAnimationFrame(mulungReqId);
@@ -3380,16 +3466,16 @@ async function endMulungGame() {
 
     if (currentUserUid) {
         try {
-            const snap = await get(child(ref(database), `mulung_rankings/${currentUserUid}`));
-            let bestFloor = 0;
-            if (snap.exists()) { bestFloor = snap.val().floor || 0; }
-            if (clearedWave > bestFloor) {
-                await set(ref(database, `mulung_rankings/${currentUserUid}`), { nickname: currentUserName, floor: clearedWave, date: new Date().toLocaleDateString() });
-            }
+            await runTransaction(ref(database, `mulung_rankings/${currentUserUid}`), (rankData) => {
+                let bestFloor = (rankData && typeof rankData.floor === 'number') ? rankData.floor : 0;
+                if (clearedWave > bestFloor) {
+                    return { nickname: currentUserName, floor: clearedWave, date: new Date().toLocaleDateString() };
+                }
+                return undefined;
+            });
         } catch(e) { console.warn("무릉 랭킹 저장 실패", e); }
     }
     
-    // UI 원복 처리 (에러 방지를 위해 try-catch로 단단히 감쌈)
     try {
         let uiKills = document.getElementById('ui-kills');
         if (uiKills && uiKills.parentElement) uiKills.parentElement.style.display = 'inline-block';
@@ -3402,7 +3488,7 @@ async function endMulungGame() {
         let oppBoardWrapper = document.getElementById('opp-board-wrapper');
         let oppGridEl = document.getElementById('opp-grid-container');
         if (oppBoardWrapper && oppGridEl) {
-            oppBoardWrapper.appendChild(oppGridEl); // 동료 박스를 다시 제자리로 돌려놓음
+            oppBoardWrapper.appendChild(oppGridEl); 
         }
     } catch(e) {}
     
@@ -3418,7 +3504,7 @@ async function endMulungGame() {
         <div style="font-size:14px; color:#555; margin-bottom:20px; padding:10px; background:#f1f8e9; border-radius:6px; border:1px solid #c5e1a5;">
             획득 무릉 코인: <b style="color:#e65100; font-size:16px;">${reward}개</b>
         </div>
-        <button class="ingame-btn premium-blue" style="width:100%; padding:12px; font-size:16px;" onclick="closeMulungResult()">마을로 돌아가기</button>
+        <button class="ingame-btn premium-blue" style="width:100%; padding:12px; font-size:16px;" onclick="closeMulungResult()">마 마을로 돌아가기</button>
     `;
     document.getElementById('overlay').style.display = 'block';
     resultModal.style.display = 'block';
