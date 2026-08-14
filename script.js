@@ -449,6 +449,7 @@ function setGridMode(mode) {
     if(oppGridContainer) {
         oppGridContainer.innerHTML = '';
         oppGridContainer.style.gap = (isRankGrid || isMulung) ? "0px" : "2px";
+        oppGridContainer.style.pointerEvents = "auto";
         oppGridContainer.style.gridTemplateColumns = "repeat(5, 1fr)";
         oppGridContainer.style.gridTemplateRows = (isRankGrid || isMulung) ? "repeat(1, 1fr)" : "repeat(5, 1fr)";
 
@@ -515,6 +516,7 @@ window.goToLobby = () => {
     cancelAnimationFrame(mulungReqId); 
     
     if (typeof mulungState !== 'undefined') mulungState.active = false;
+    if (typeof isMulungLoopRunning !== 'undefined') isMulungLoopRunning = false;
     let mUI = document.getElementById('mulung-ui'); if (mUI) mUI.style.display = 'none';
     document.getElementById('grid-container').style.display = 'grid';
 
@@ -2869,7 +2871,7 @@ window.startMulungMatchmaking = async () => {
             
             if(matchPool.length > 0) { 
                 let aiUser = matchPool[Math.floor(Math.random() * matchPool.length)]; 
-                oppName = aiUser.nickname + " (AI)";
+                oppName = aiUser.nickname;
                 if(aiUser.cloudData.cards) {
                     let parsedCards = JSON.parse(aiUser.cloudData.cards);
                     oppCardData = parsedCards;
@@ -3004,10 +3006,11 @@ window.startMulungGame = (oppName, oppEquipData, oppCardTotal, oppStarTotal) => 
     window.showMulungClassSelect();
     
     // 🔥 철벽 가드: 이미 루프가 돌아가고 있지 않을 때만 새로 켬!
-    if (!isMulungLoopRunning) {
-        isMulungLoopRunning = true;
-        mulungReqId = requestAnimationFrame(mulungLoop);
-    }
+    isMulungLoopRunning = false; 
+    if (typeof mulungReqId !== 'undefined') cancelAnimationFrame(mulungReqId);
+    
+    isMulungLoopRunning = true;
+    mulungReqId = requestAnimationFrame(mulungLoop);
 };
 
 window.showMulungClassSelect = () => {
@@ -3534,9 +3537,11 @@ function drawMulung() {
     ctx.setLineDash([]); ctx.strokeStyle = "rgba(188, 170, 164, 0.5)"; ctx.lineWidth = 40; ctx.lineJoin = "round"; ctx.beginPath();
     ctx.moveTo(0, 235); ctx.lineTo(500, 235); ctx.stroke(); 
 
-    ctx.font = "bold 16px NanumSquare"; ctx.fillStyle = "rgba(255, 255, 255, 0.5)"; ctx.textAlign = "center";
-    ctx.fillText(`동료 진영 (${mulungState.oppName})`, 250, 40);
-    ctx.fillText("나의 진영", 250, 480);
+    ctx.font = "bold 18px NanumSquare"; 
+    ctx.fillStyle = "#ffffff"; 
+    ctx.textAlign = "center";
+    ctx.fillText(mulungState.oppName, 250, 40);
+    ctx.fillText(currentUserName, 250, 480);
 
     let b = mulungState.boss;
     
