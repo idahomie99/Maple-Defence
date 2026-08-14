@@ -437,7 +437,7 @@ function setGridMode(mode) {
         }
     }
     
-    // 🔥 무릉 몬스터 걷는 길을 10px 내려서 자연스럽게 맞춤 (Y: 225)
+    // 🔥 몬스터 길을 10px 더 내림 (Y: 225)
     currentPath = isRankGrid ? [ {x:25,y:25}, {x:475,y:25}, {x:475,y:265}, {x:25,y:265} ] : 
                   (isMulung ? [{x: -50, y: 225}, {x: 550, y: 225}] : [ {x:25,y:25}, {x:475,y:25}, {x:475,y:475}, {x:25,y:475} ]);
                   
@@ -2791,6 +2791,7 @@ window.applyCubeResult = (applyNew) => {
 };
 
 // 🔥 레전더리 색상 연두색으로 완벽 교체
+// 🔥 레전더리 색상 연두색으로 완벽 교체
 function getGradeColor(grade) {
     if(grade === 'Legendary') return '#76ff03'; 
     if(grade === 'Unique') return '#fb8c00';
@@ -2877,7 +2878,7 @@ window.startMulungMatchmaking = async () => {
         document.body.appendChild(mDiv); intro = mDiv;
     }
 
-    // 🔥 매칭 인트로 화면 위/아래 위치 통일 (동료 위, 나 아래)
+    // 🔥 매칭 화면 UI: 동료를 위로, 나를 아래로 배치!
     intro.innerHTML = `
         <div style="display:flex; flex-direction:column; width:85%; max-width:320px; gap:10px; align-items:center;">
             <div style="width:100%; background:linear-gradient(135deg, #b71c1c, #4a148c); border:2px solid #ffcdd2; border-radius:10px; padding:15px; text-align:center; color:#fff; box-shadow:0 8px 20px rgba(0,0,0,0.6); box-sizing:border-box;">
@@ -2980,7 +2981,7 @@ window.showMulungClassSelect = () => {
     }
     
     modal.innerHTML = `
-        <h3 style="margin-top:0; color:#263238;">직업 선택</h3>
+        <h3 style="margin:0; color:#263238;">직업 선택</h3>
         <p style="font-size:13px; color:#555; margin-bottom:15px; font-weight:bold;">무릉도장에서 활약할 직업을 골라주세요!</p>
         <div style="display:flex; gap:10px;">
             <button class="ingame-btn premium-red" style="flex:1; padding:15px 0; font-size:16px;" onclick="selectMulungClass('전사')">🗡️ 전사</button>
@@ -3030,7 +3031,7 @@ function spawnMulungBoss() {
 
     mulungState.boss = {
         name: bName, hp: hp, maxHp: hp, armor: armor,
-        x: -50, y: 220, speed: 10, // 🔥 보스 Y좌표를 220으로 내려서 길에 자연스럽게 겹치게 함
+        x: -50, y: 220, speed: 10, 
         threatTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0,
         stunTimer: 0, counterTimer: 5, bindTimer: 0, stage: stage
     };
@@ -3274,7 +3275,6 @@ function mulungLoop() {
                     else if (u.cls.type === '법사' && (skillLevels.mage_thunder||0) > 0) { let gdmg = baseDmg * (1.5 + (skillLevels.mage_thunder||0) * 1.5); mulungState.vfx.push({ type: 'thunder', timer: 0.5, dmg: gdmg, isOpp: false }); u.globalCooldown += 60000; }
                     else if (u.cls.type === '도적' && (skillLevels.thief_fuma||0) > 0) { 
                         let gdmg = baseDmg * (1.5 + (skillLevels.thief_fuma||0) * 1.5); 
-                        // 🔥 풍마수리검 Y축도 220으로 내려줌
                         mulungState.fumaList.push({ x: u.x, y: 220, dmg: gdmg, hitSet: new Set(), angle: 0, isOpp: false }); 
                         u.globalCooldown += 60000; 
                     }
@@ -3488,7 +3488,7 @@ function drawMulung() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     ctx.setLineDash([]); ctx.strokeStyle = "rgba(188, 170, 164, 0.5)"; ctx.lineWidth = 40; ctx.lineJoin = "round"; ctx.beginPath();
-    ctx.moveTo(0, 225); ctx.lineTo(500, 225); ctx.stroke(); // 🔥 길 Y좌표를 225로 맞춰서 발끝이랑 완벽 정렬
+    ctx.moveTo(0, 225); ctx.lineTo(500, 225); ctx.stroke(); // 🔥 몬스터 길을 10px 내려서(225) 몹이 걷는 느낌 최적화
 
     ctx.font = "bold 16px NanumSquare"; ctx.fillStyle = "rgba(255, 255, 255, 0.5)"; ctx.textAlign = "center";
     ctx.fillText(`동료 진영 (${mulungState.oppName})`, 250, 40);
@@ -3576,9 +3576,148 @@ function drawMulung() {
     mulungState.dmgTexts.forEach(d => { ctx.save(); ctx.globalAlpha = Math.max(0, d.timer / 0.6); ctx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; ctx.font = d.isCrit ? "800 20px NanumSquare" : "bold 14px NanumSquare"; ctx.shadowColor = d.isCrit ? "#c62828" : "#000"; ctx.shadowBlur = 4; ctx.fillText(d.val, d.x, d.y); ctx.restore(); });
 }
 
-// (async function endMulungGame() { ... 그대로 두시면 됩니다.)
-// ... 중략 ...
-// (window.showOppEquipDetail 끝나는 곳까지 복사 덮어쓰기)
+async function endMulungGame() {
+    mulungState.active = false;
+    cancelAnimationFrame(mulungReqId);
+    
+    let clearedWave = mulungState.wave - 1;
+    let reward = Math.floor(clearedWave / 5) * 5;
+    
+    if (reward > 0) {
+        userRankData.mulungCoins += reward;
+        window.syncToCloud();
+    }
+
+    if (currentUserUid) {
+        try {
+            await runTransaction(ref(database, `mulung_rankings/${currentUserUid}`), (rankData) => {
+                let bestFloor = (rankData && typeof rankData.floor === 'number') ? rankData.floor : 0;
+                if (clearedWave > bestFloor) {
+                    return { nickname: currentUserName, floor: clearedWave, date: new Date().toLocaleDateString() };
+                }
+                return undefined; 
+            });
+        } catch(e) { console.warn("무릉 랭킹 저장 실패", e); }
+    }
+    
+    try {
+        let uiKills = document.getElementById('ui-kills');
+        if (uiKills && uiKills.parentElement) uiKills.parentElement.style.display = 'inline-block';
+        let uiMobs = document.getElementById('ui-mobs');
+        if (uiMobs && uiMobs.parentElement) uiMobs.parentElement.style.display = 'inline-block';
+        
+        let hiddenStatsRow = document.getElementById('mulung-hidden-stats-row'); 
+        if (hiddenStatsRow) { hiddenStatsRow.style.display = 'flex'; hiddenStatsRow.id = ''; }
+
+        let oppBoardWrapper = document.getElementById('opp-board-wrapper');
+        let oppGridEl = document.getElementById('opp-grid-container');
+        if (oppBoardWrapper && oppGridEl) {
+            oppBoardWrapper.appendChild(oppGridEl); 
+        }
+    } catch(e) {}
+    
+    let resultModal = document.getElementById('mulung-result-modal');
+    if (!resultModal) {
+        let mDiv = document.createElement('div'); mDiv.id = 'mulung-result-modal'; mDiv.className = 'maple-modal';
+        mDiv.style.cssText = "display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:5000; width:85%; max-width:300px; background:#fff; border:2px solid #004d40; padding:20px; border-radius:10px; text-align:center; box-shadow: 0 10px 30px rgba(0,0,0,0.5);";
+        document.body.appendChild(mDiv); resultModal = mDiv;
+    }
+    resultModal.innerHTML = `
+        <h2 style="color:#d32f2f; margin-top:0; font-size:24px;">☠️ 도전 종료!</h2>
+        <div style="font-size:16px; font-weight:bold; margin:15px 0; color:#333;">도달 층수: <span style="color:#1e88e5; font-size:20px;">${clearedWave}층</span></div>
+        <div style="font-size:14px; color:#555; margin-bottom:20px; padding:10px; background:#f1f8e9; border-radius:6px; border:1px solid #c5e1a5;">
+            획득 무릉 코인: <b style="color:#e65100; font-size:16px;">${reward}개</b>
+        </div>
+        <button class="ingame-btn premium-blue" style="width:100%; padding:12px; font-size:16px;" onclick="closeMulungResult()">마을로 돌아가기</button>
+    `;
+    document.getElementById('overlay').style.display = 'block';
+    resultModal.style.display = 'block';
+}
+
+window.closeMulungResult = () => {
+    document.getElementById('mulung-result-modal').style.display = 'none';
+    document.getElementById('overlay').style.display = 'none';
+    state.status = 'TITLE';
+    window.switchScreen('start-screen');
+};
+
+window.openMulungLobby = () => {
+    document.getElementById('online-menu-modal').style.display = 'none';
+    document.getElementById('mulung-lobby-modal').style.display = 'block';
+    window.loadMulungRanking();
+};
+
+window.closeMulungLobby = () => {
+    document.getElementById('mulung-lobby-modal').style.display = 'none';
+    document.getElementById('online-menu-modal').style.display = 'block';
+};
+
+window.openMulungShopFromLobby = () => {
+    document.getElementById('online-overlay').style.display = 'none'; 
+    window.openMulungShop();
+};
+
+window.loadMulungRanking = async () => {
+    let list = document.getElementById('mulung-live-ranking-list');
+    if(!list) return;
+    try {
+        const snap = await get(child(ref(database), `mulung_rankings`));
+        if (snap.exists()) {
+            let ranks = []; 
+            snap.forEach(c => { 
+                let v = c.val(); 
+                if(typeof v.floor === 'number') ranks.push(v); 
+            }); 
+            ranks.sort((a, b) => b.floor - a.floor); 
+            ranks = ranks.slice(0, 10); 
+            list.innerHTML = '';
+            
+            ranks.forEach((entry, idx) => { 
+                let color = idx === 0 ? '#ffd700' : (idx === 1 ? '#e0e0e0' : (idx === 2 ? '#cd7f32' : '#fff')); 
+                list.innerHTML += `<div style="display:flex; justify-content:space-between; background:rgba(255,255,255,0.1); padding:6px 10px; border-radius:4px; color:${color}; font-weight:bold;"><span>${idx + 1}. ${entry.nickname}</span><span>${entry.floor}층</span></div>`; 
+            });
+        } else { 
+            list.innerHTML = '<div style="text-align:center; color:#ccc;">아직 등록된 랭킹이 없습니다.</div>'; 
+        }
+    } catch(e) { 
+        list.innerHTML = '<div style="text-align:center; color:#ff5252;">서버 연결 실패.</div>'; 
+    }
+};
+
+window.showMulungOppInfo = () => {
+    if (!mulungState || !mulungState.active) return;
+    
+    let modal = document.getElementById('mulung-opp-info-modal');
+    if (!modal) {
+        let mDiv = document.createElement('div'); mDiv.id = 'mulung-opp-info-modal'; mDiv.className = 'maple-modal';
+        mDiv.style.cssText = "display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:9500; width:85%; max-width:320px; background:#fff; border:2px solid #4a148c; padding:20px; border-radius:10px; text-align:center; box-shadow: 0 10px 30px rgba(0,0,0,0.6);";
+        document.body.appendChild(mDiv); modal = mDiv;
+    }
+
+    let equipHtml = ['뱃지', '엠블럼', '링'].map(slot => {
+        let item = mulungState.oppEquipData[slot];
+        // 🔥 레전더리 색상 연두색(#76ff03) 완벽 적용!
+        let border = item ? (item.grade === 'Legendary' ? '#76ff03' : (item.grade === 'Unique' ? '#fb8c00' : (item.grade === 'Epic' ? '#8e24aa' : '#1e88e5'))) : '#777';
+        let img = item ? `<img src="image/${slot === '뱃지' ? 'emblem.png' : (slot === '엠블럼' ? 'badge.png' : 'ring.png')}" style="max-width:30px; max-height:30px;">` : '';
+        return `<div onclick="showOppEquipDetail('${slot}')" style="cursor:pointer; width:50px; height:50px; border:2px solid ${border}; border-radius:6px; background:#fff; display:flex; justify-content:center; align-items:center; box-shadow:0 0 5px ${border};">${img}</div>`;
+    }).join('');
+
+    modal.innerHTML = `
+        <h3 style="margin:0 0 15px 0; color:#4a148c;">동료 스펙 정보</h3>
+        <div style="font-size:18px; font-weight:900; margin-bottom:10px; color:#333;">${mulungState.oppName}</div>
+        <div style="display:flex; justify-content:center; gap:15px; font-size:13px; margin-bottom:15px; background:#f3e5f5; padding:8px; border-radius:6px; color:#4a148c; font-weight:bold;">
+            <span>📕 도감: Lv.<b style="color:#d32f2f">${mulungState.oppCardTotal}</b></span>
+            <span>⭐ 스타포스: <b style="color:#d32f2f">${mulungState.oppStarTotal}</b>성</span>
+        </div>
+        <div style="font-size:11px; color:#777; margin-bottom:5px;">아이콘을 누르면 장비 옵션을 볼 수 있습니다.</div>
+        <div style="display:flex; justify-content:center; gap:15px; margin-bottom:20px;">
+            ${equipHtml}
+        </div>
+        <button class="ingame-btn premium-blue" style="width:100%; padding:12px; font-size:15px;" onclick="document.getElementById('mulung-opp-info-modal').style.display='none'">닫기</button>
+    `;
+    
+    modal.style.display = 'block';
+};
 
 window.showOppEquipDetail = (slot) => {
     let item = mulungState.oppEquipData[slot];
@@ -3591,7 +3730,7 @@ window.showOppEquipDetail = (slot) => {
         document.body.appendChild(mDiv); modal = mDiv;
     }
 
-    // 🔥 디테일 창 레전더리 색상 연두색으로 반영
+    // 🔥 디테일 창 레전더리 색상 연두색(#76ff03) 완벽 적용!
     let gradeColor = item.grade === 'Rare' ? '#1e88e5' : (item.grade === 'Epic' ? '#8e24aa' : (item.grade === 'Unique' ? '#fb8c00' : '#76ff03'));
     let starStr = item.star > 0 ? ` <span style="color:#fbc02d;">★${item.star}</span>` : '';
     
