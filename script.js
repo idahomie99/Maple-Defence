@@ -2862,15 +2862,14 @@ window.startMulungMatchmaking = async () => {
 };
 
 window.startMulungGame = (oppName, oppEquipData, oppCardTotal, oppStarTotal) => {
-    // 🔥 1번 해결: 이전 라운드의 좀비 루프를 확실히 죽이기 위해 상태 변경 및 배열 완전 초기화!
+    // 🔥 1번 해결: 메모리 폭발(좀비 루프)을 일으키던 꼼수 코드를 삭제하고, 
+    // 모든 배열을 확실하게 초기화하여 재도전 시 완벽하게 새 게임으로 시작되게 합니다!
     state.status = 'MULUNG'; 
     cancelAnimationFrame(mainReqId);
     cancelAnimationFrame(mulungReqId);
+    
     monsters = []; towers = []; projectiles = []; hitEffects = []; visualEffects = []; fumaList = []; damageTexts = [];
-
-    // 모험 모드의 메인 루프를 무릉에서는 절대 안 돌게 방어막 설정
-    let originalLoop = window.loop;
-    window.loop = () => { if (state.status === 'MULUNG') return; originalLoop(); };
+    oppMonsters = []; oppTowers = []; oppProjectiles = []; oppVisualEffects = []; oppFumaList = []; oppDamageTexts = [];
 
     window.switchScreen('game-container');
     
@@ -2984,7 +2983,8 @@ function spawnMulungBoss() {
 
     mulungState.boss = {
         name: bName, hp: hp, maxHp: hp, armor: armor,
-        x: -50, y: 237.5, speed: 10, // 🔥 보스 동선을 237.5(완벽한 중앙)로 맞춤
+        // 🔥 2번 해결: 보스의 Y좌표를 237.5 -> 195로 올려 발바닥이 길 중앙에 오게 변경!
+        x: -50, y: 195, speed: 10, 
         threatTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0,
         stunTimer: 0, counterTimer: 5, bindTimer: 0, stage: stage
     };
@@ -3228,8 +3228,8 @@ function mulungLoop() {
                     else if (u.cls.type === '법사' && (skillLevels.mage_thunder||0) > 0) { let gdmg = baseDmg * (1.5 + (skillLevels.mage_thunder||0) * 1.5); mulungState.vfx.push({ type: 'thunder', timer: 0.5, dmg: gdmg, isOpp: false }); u.globalCooldown += 60000; }
                     else if (u.cls.type === '도적' && (skillLevels.thief_fuma||0) > 0) { 
                         let gdmg = baseDmg * (1.5 + (skillLevels.thief_fuma||0) * 1.5); 
-                        // 🔥 5번 해결: 풍마수리검 리스트에 넣어서 정상적으로 일직선 횡단하게 수정!
-                        mulungState.fumaList.push({ x: u.x, y: 237.5, dmg: gdmg, hitSet: new Set(), angle: 0, isOpp: false }); 
+                        // 🔥 3번 해결: 풍마수리검 발사 위치도 보스(195)에 완벽하게 맞춤!
+                        mulungState.fumaList.push({ x: u.x, y: 195, dmg: gdmg, hitSet: new Set(), angle: 0, isOpp: false }); 
                         u.globalCooldown += 60000; 
                     }
                 }
@@ -3240,8 +3240,6 @@ function mulungLoop() {
         let attackCd = (CLASSES[u.cls.type].cd * (GRADES[u.gradeIdx].speedMul || 1)) / (windReduc * overloadMult); 
         while(u.lastAttack <= 0) {
             if (isStunned) { u.lastAttack = 0; break; }
-            
-            // 🔥 3번 해결: 사거리 무한 버그 수정 (무릉에선 상하 거리 125px을 고려해 1.5배 보정 부여)
             let attackRange = (CLASSES[u.cls.type].range || 150) * u.grade.rangeMul * 1.5; 
             if (Math.hypot(b.x - u.x, b.y - u.y) <= attackRange) {
                 let dmg = (CLASSES[u.cls.type].baseDmg + equipStats.flatAtk) * GRADES[u.gradeIdx].mult * cardMulti * rageMulti; 
@@ -3319,8 +3317,8 @@ function mulungLoop() {
                     else if (u.cls.type === '법사' && (oppSkillLevels.mage_thunder||0) > 0) { let gdmg = baseDmg * (1.5 + (oppSkillLevels.mage_thunder||0) * 1.5); mulungState.vfx.push({ type: 'thunder', timer: 0.5, dmg: gdmg, isOpp: true }); u.globalCooldown += 60000; }
                     else if (u.cls.type === '도적' && (oppSkillLevels.thief_fuma||0) > 0) { 
                         let gdmg = baseDmg * (1.5 + (oppSkillLevels.thief_fuma||0) * 1.5); 
-                        // 🔥 AI 풍마수리검 역시 보스 위치 237.5로 설정
-                        mulungState.fumaList.push({ x: u.x, y: 237.5, dmg: gdmg, hitSet: new Set(), angle: 0, isOpp: true }); 
+                        // 🔥 AI 풍마수리검 Y축 역시 195로 완벽 조준
+                        mulungState.fumaList.push({ x: u.x, y: 195, dmg: gdmg, hitSet: new Set(), angle: 0, isOpp: true }); 
                         u.globalCooldown += 60000; 
                     }
                 }
@@ -3347,7 +3345,7 @@ function mulungLoop() {
         }
     });
 
-    // 🔥 풍마수리검 이동 로직 (보스가 있는 237.5 라인을 향해 일직선 관통)
+    // 🔥 풍마수리검 이동 로직 (보스가 있는 195 라인을 향해 일직선 관통)
     for(let i=mulungState.fumaList.length-1; i>=0; i--) {
         let f = mulungState.fumaList[i]; f.angle += 15 * dt; 
         f.x += 300 * dt; 
@@ -3445,7 +3443,7 @@ function drawMulung() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     ctx.setLineDash([]); ctx.strokeStyle = "rgba(188, 170, 164, 0.5)"; ctx.lineWidth = 40; ctx.lineJoin = "round"; ctx.beginPath();
-    ctx.moveTo(0, 237.5); ctx.lineTo(500, 237.5); ctx.stroke(); // 🔥 몬스터 걷는 길 정중앙
+    ctx.moveTo(0, 237.5); ctx.lineTo(500, 237.5); ctx.stroke(); // 🔥 보스 길도 중앙으로 조정
 
     ctx.font = "bold 16px NanumSquare"; ctx.fillStyle = "rgba(255, 255, 255, 0.5)"; ctx.textAlign = "center";
     ctx.fillText(`동료 진영 (${mulungState.oppName})`, 250, 40);
@@ -3484,14 +3482,14 @@ function drawMulung() {
         ctx.restore();
     });
     
-    // 🔥 풍마수리검 렌더링 추가
+    // 풍마수리검 렌더링
     mulungState.fumaList.forEach(f => {
         ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.angle);
         if (fumaImg && fumaImg.complete) { let fsize = 80; ctx.drawImage(fumaImg, -fsize/2, -fsize/2, fsize, fsize); }
         ctx.restore();
     });
 
-    // 🔥 4. 사거리 표시 (노란색 원 테두리 - 클릭 시 표시됨)
+    // 사거리 렌더링
     if (selectedUnitIdx !== -1 && grid[selectedUnitIdx]) { 
         let u = grid[selectedUnitIdx]; let attackRange = (CLASSES[u.cls.type].range || 150) * u.grade.rangeMul * 1.5; 
         ctx.save(); ctx.beginPath(); ctx.arc(u.x, u.y, attackRange, 0, Math.PI * 2); 
@@ -3514,7 +3512,9 @@ function drawMulung() {
     });
 
     if (b) {
-        let size = 30; ctx.save(); ctx.translate(b.x, b.y); ctx.scale(-1, 1);
+        let size = 30; ctx.save(); 
+        ctx.translate(b.x, b.y - 25); // 🔥 보스 이미지를 25픽셀 위로 올려 발바닥을 길 중앙에 맞춤!
+        ctx.scale(-1, 1);
         if (bossImages[b.name] && bossImages[b.name].complete) { ctx.drawImage(bossImages[b.name], -size*1.5, -size*1.5, size*3, size*3); } 
         else { ctx.fillStyle = "#ef5350"; ctx.beginPath(); ctx.arc(0, 0, size, 0, Math.PI*2); ctx.fill(); }
         
@@ -3526,8 +3526,9 @@ function drawMulung() {
         } 
         ctx.restore();
         
-        ctx.fillStyle = "#111"; ctx.fillRect(b.x - 30, b.y - size - 15, 60, 6);
-        ctx.fillStyle = "#ff1744"; ctx.fillRect(b.x - 30, b.y - size - 15, 60 * (b.hp / b.maxHp), 6);
+        // 체력바 위치도 보스가 올라간 만큼 보정
+        ctx.fillStyle = "#111"; ctx.fillRect(b.x - 30, b.y - 25 - size - 15, 60, 6);
+        ctx.fillStyle = "#ff1744"; ctx.fillRect(b.x - 30, b.y - 25 - size - 15, 60 * (b.hp / b.maxHp), 6);
     }
 
     mulungState.dmgTexts.forEach(d => { ctx.save(); ctx.globalAlpha = Math.max(0, d.timer / 0.6); ctx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; ctx.font = d.isCrit ? "800 20px NanumSquare" : "bold 14px NanumSquare"; ctx.shadowColor = d.isCrit ? "#c62828" : "#000"; ctx.shadowBlur = 4; ctx.fillText(d.val, d.x, d.y); ctx.restore(); });
@@ -3711,4 +3712,341 @@ window.showOppEquipDetail = (slot) => {
         <button class="ingame-btn premium-dark" style="width:100%; padding:10px;" onclick="document.getElementById('opp-equip-detail-modal').style.display='none'">닫기</button>
     `;
     modal.style.display = 'block';
+};
+
+// 🔥 모험 모드의 메인 루프 (여기에 안전장치 추가)
+window.loop = () => {
+    // 🔥 무릉도장 진입 시 이 루프가 겹쳐서 도는 것을 완벽 차단!
+    if(state.status === 'GAMEOVER' || state.status === 'TITLE' || state.status === 'MULUNG') return;
+    
+    let now = performance.now(); if (!lastTime) lastTime = now; let dtReal = (now - lastTime) / 1000; if (dtReal > 0.1) dtReal = 0.1; if (dtReal < 0) dtReal = 0.016; 
+    let dt = dtReal * (state.speed || 1); lastTime = now;
+    
+    for (let i = hitEffects.length - 1; i >= 0; i--) { hitEffects[i].timer -= dt; if (hitEffects[i].timer <= 0) hitEffects.splice(i, 1); }
+    
+    for (let i = visualEffects.length - 1; i >= 0; i--) { 
+        visualEffects[i].timer -= dt; 
+        if (visualEffects[i].timer <= 0) { 
+            let v = visualEffects[i]; 
+            if (v.type === 'death' || v.type === 'thunder') { 
+                monsters.forEach(m => { 
+                    let armor = 0;
+                    if (m.isBoss) {
+                        if (state.wave >= 310) armor = 0.50;
+                        else if (state.wave >= 210) armor = 0.30;
+                        else if (state.wave >= 160) armor = 0.10;
+                    }
+                    let unpen = equipStats.unpenetratedRate;
+                    if (m.threatTimer > 0) unpen *= 0.9;
+                    let actualDmg = v.dmg * (1 - (armor * unpen));
+                    if (m.threatTimer > 0) actualDmg *= 1.3;
+                    
+                    m.hp -= actualDmg; 
+                }); 
+                let container = document.getElementById('game-container'); 
+                if (container && v.type === 'death') { container.classList.add('mild-shake-active'); setTimeout(() => container.classList.remove('mild-shake-active'), 300); } 
+            } 
+            visualEffects.splice(i, 1); 
+        } 
+    }
+    
+    for (let i = damageTexts.length - 1; i >= 0; i--) { damageTexts[i].timer -= dt; damageTexts[i].y -= dt * 30; if (damageTexts[i].timer <= 0) damageTexts.splice(i, 1); }
+    
+    if (state.status === 'PREP') { state.time -= dtReal; document.getElementById('ui-timer').innerText = Math.ceil(Math.max(0, state.time)); if (state.time <= 0) { state.status = 'PLAY'; state.wave = state.wave || 1; waveTimer = 0; spawnTimer = 0; window.showMessage(state.wave + "웨이브 시작!"); window.updateUI(); } window.draw(); if(state.isRank) window.drawOpp(); mainReqId = requestAnimationFrame(window.loop); return; }
+    
+    updateWave(dt); if(state.isRank) processOpponentTick(dt);
+    
+    for(let i=monsters.length-1; i>=0; i--) {
+        let m = monsters[i];
+        if (m.freezeTimer > 0) { m.freezeTimer -= dt; m.freezeTickTimer -= dt; if (m.freezeTickTimer <= 0) { m.hp -= m.freezeDmgVal; m.freezeTickTimer = 1; } }
+
+        if (state.wave >= 160 && m.isBoss && m.name !== "어둠의 늑대" && !state.isRank) {
+            if (m.counterTimer === undefined) m.counterTimer = 5; 
+            m.counterTimer -= dt;
+            if (m.counterTimer <= 0) {
+                let targetTower = null; let maxDmg = -1;
+                towers.forEach(t => { if (t.hp > 0 && t.damageDealt > maxDmg) { maxDmg = t.damageDealt; targetTower = t; } });
+                if (targetTower) {
+                    let dmgTaken = (targetTower.overloadTimer > 0) ? 2 : 1; 
+                    targetTower.hp -= dmgTaken;
+                    hitEffects.push({ x: targetTower.x, y: targetTower.y, timer: 0.5, color: '#ff0000' });
+                    if (targetTower.hp <= 0) {
+                        towers = towers.filter(tw => tw !== targetTower);
+                        grid[targetTower.idx] = null;
+                        window.showMessage("보스의 공격으로 유닛이 파괴되었습니다!");
+                    }
+                }
+                m.counterTimer = 10; 
+            }
+        }
+
+        if (m.bindTimer > 0) { m.bindTimer -= dt; continue; } 
+        if (m.stunTimer > 0) { m.stunTimer -= dt; continue; }  
+        if (m.threatTimer > 0) { m.threatTimer -= dt; }
+
+        let t = currentPath[m.targetNode]; let dx = t.x - m.x, dy = t.y - m.y; let dist = Math.hypot(dx, dy); let currentSpeed = m.speed; if (m.freezeTimer > 0) currentSpeed *= 0.5; let move = currentSpeed * dt;
+        if (dx > 0) m.facingRight = true; else if (dx < 0) m.facingRight = false;
+        if(dist <= move) { m.x = t.x; m.y = t.y; m.targetNode = (m.targetNode + 1) % currentPath.length; } else { m.x += (dx/dist)*move; m.y += (dy/dist)*move; }
+    }
+    if(state.isRank && monsters.length >= 25) return handleRankGameOver("몹 25마리 초과!");
+    if(!state.isRank && monsters.length >= 50) return gameOver("몬스터 50마리 초과! 게임 오버");
+    
+    let cardMulti = 1 + (getTotalCardBonus() / 100); 
+    let rageMulti = 1 + ((skillLevels.common_rage||0) * 0.01) + (equipStats.atk * 0.01); 
+    let sharpChance = ((skillLevels.common_sharp||0) * 0.05) + (equipStats.crit * 0.01); 
+    let windReduc = 1 + ((skillLevels.common_wind||0) * 0.2) + (equipStats.spd * 0.01);
+
+    towers.forEach(t => {
+        let overloadMult = 1;
+        if (t.overloadTimer > 0) {
+            t.overloadTimer -= dt; overloadMult = 2;
+            if (t.overloadTimer <= 0) t.unitStunTimer = skillLevels.thief_overload === 1 ? 6 : 5;
+        }
+        if (t.unitStunTimer > 0) t.unitStunTimer -= dt;
+        let isStunned = (t.unitStunTimer > 0);
+
+        if (t.gradeIdx >= 6 && t.cls.type === '법사' && skillLevels.mage_heal > 0) {
+            if (t.healCooldown === undefined) t.healCooldown = 0;
+            t.healCooldown -= dt * 1000;
+            let maxHealCd = (70 - skillLevels.mage_heal * 10) * 1000;
+            let hbar = document.getElementById(`heal-bar-${t.idx}`);
+            if (hbar) hbar.style.width = Math.max(0, Math.min(100, ((maxHealCd - t.healCooldown) / maxHealCd) * 100)) + '%';
+            
+            if (t.healCooldown <= 0 && !isStunned) {
+                let gridWidth = state.isRank ? 5 : 5;
+                let tCol = t.idx % gridWidth; let tRow = Math.floor(t.idx / gridWidth);
+                let injured = towers.filter(u => u.hp < u.maxHp && Math.abs((u.idx % gridWidth) - tCol) <= 1 && Math.abs(Math.floor(u.idx / gridWidth) - tRow) <= 1);
+                if (injured.length > 0) {
+                    injured.forEach(u => { u.hp = Math.min(u.maxHp, u.hp + 1); visualEffects.push({ type: 'heal', x: u.x, y: u.y, timer: 1.0 }); });
+                    t.healCooldown += maxHealCd;
+                    visualEffects.push({ type: 'heal', x: t.x, y: t.y, timer: 1.0 });
+                } else { t.healCooldown = 0; }
+            }
+        }
+
+        if (t.gradeIdx >= 7) {
+            if (t.cls.type === '전사' && skillLevels.war_threat > 0) {
+                if (t.threatCooldown === undefined) t.threatCooldown = 0;
+                t.threatCooldown -= dt * 1000;
+                let tbar = document.getElementById(`threat-bar-${t.idx}`);
+                if (tbar) tbar.style.width = Math.max(0, Math.min(100, ((25000 - t.threatCooldown) / 25000) * 100)) + '%';
+                
+                if (t.threatCooldown <= 0 && !isStunned && monsters.length > 0) {
+                    monsters[0].threatTimer = skillLevels.war_threat * 2;
+                    t.threatCooldown += 25000;
+                    visualEffects.push({ type: 'threat1', x: t.x, y: t.y, timer: 1.0 }); 
+                }
+            }
+            if (t.cls.type === '도적' && skillLevels.thief_overload > 0) {
+                if (t.rtdCooldown === undefined) t.rtdCooldown = 0;
+                t.rtdCooldown -= dt * 1000;
+                let rbar = document.getElementById(`rtd-bar-${t.idx}`);
+                if (rbar) rbar.style.width = Math.max(0, Math.min(100, ((45000 - t.rtdCooldown) / 45000) * 100)) + '%';
+
+                if (t.rtdCooldown <= 0 && (t.overloadTimer||0) <= 0 && !isStunned) {
+                    t.overloadTimer = skillLevels.thief_overload === 5 ? 15 : 6 + (skillLevels.thief_overload * 2);
+                    t.rtdCooldown += 45000;
+                    visualEffects.push({ type: 'rtd', x: t.x, y: t.y, timer: 1.0 });
+                }
+            }
+        }
+
+        if (t.gradeIdx === 6 && t.cls.type !== '법사') {
+            t.bindCooldown -= dt * 1000; 
+            let bar = document.getElementById(`bind-bar-${t.idx}`); 
+            if (bar) bar.style.width = Math.max(0, Math.min(100, ((75000 - t.bindCooldown) / 75000) * 100)) + '%';
+            if (t.bindCooldown <= 0 && !isStunned) { 
+                if (monsters.length > 0) { 
+                    let target = null; for (let m of monsters) { if (m.bindTimer <= 0) { target = m; break; } } 
+                    if (!target) target = monsters[0]; 
+                    if (target) { target.bindTimer = 10; t.bindCooldown += 75000; } 
+                } else { t.bindCooldown = 0; } 
+            }
+        }
+        
+        if (t.gradeIdx >= 5) {
+            if ((t.cls.type === '전사' && (skillLevels.war_death||0) > 0) || (t.cls.type === '법사' && (skillLevels.mage_thunder||0) > 0) || (t.cls.type === '도적' && (skillLevels.thief_fuma||0) > 0)) {
+                t.globalCooldown -= dt * 1000; 
+                let gbar = document.getElementById(`global-bar-${t.idx}`); 
+                if (gbar) gbar.style.width = Math.max(0, Math.min(100, ((60000 - t.globalCooldown) / 60000) * 100)) + '%';
+                
+                if (t.globalCooldown <= 0 && !isStunned) {
+                    if (monsters.length > 0) {
+                        let baseDmg = (t.cls.baseDmg + (state.upgrades[t.cls.type].val * 0.15) + equipStats.flatAtk) * t.grade.mult * cardMulti * rageMulti; 
+                        if (t.cls.type === '전사' && (skillLevels.war_death||0) > 0) { let gdmg = baseDmg * (1.5 + (skillLevels.war_death||0) * 1.5); visualEffects.push({ type: 'death', timer: 1.2, dmg: gdmg }); t.globalCooldown += 60000; }
+                        else if (t.cls.type === '법사' && (skillLevels.mage_thunder||0) > 0) { let gdmg = baseDmg * (1.5 + (skillLevels.mage_thunder||0) * 1.5); visualEffects.push({ type: 'thunder', timer: 0.5, dmg: gdmg }); t.globalCooldown += 60000; }
+                        else if (t.cls.type === '도적' && (skillLevels.thief_fuma||0) > 0) { let gdmg = baseDmg * (1.5 + (skillLevels.thief_fuma||0) * 1.5); fumaList.push({ x: t.x, y: t.y, targetNode: 0, nodesVisited: 0, dmg: gdmg, hitSet: new Set(), angle: 0 }); t.globalCooldown += 60000; }
+                    } else { t.globalCooldown = 0; }
+                }
+            }
+        }
+        
+        t.lastAttack -= dt * 1000; 
+        let attackCd = (t.cls.cd * (t.grade.speedMul || 1)) / (windReduc * overloadMult); 
+        while(t.lastAttack <= 0) {
+            if (isStunned) { t.lastAttack = 0; break; } 
+            let range = t.cls.range * t.grade.rangeMul; let target = null;
+            for(let m of monsters) { let d = Math.hypot(m.x - t.x, m.y - t.y); if(d <= range) { target = m; break; } }
+            if(target) {
+                let dmg = (t.cls.baseDmg + (state.upgrades[t.cls.type].val * 0.15) + equipStats.flatAtk) * t.grade.mult * cardMulti * rageMulti; 
+                if (target.threatTimer > 0) dmg *= 1.3; 
+                let isCrit = Math.random() < sharpChance; if (isCrit) dmg *= (1.2 + (equipStats.cdmg / 100)); 
+                let isFinal = false; if (t.cls.type === '전사' && (skillLevels.war_final||0) > 0 && Math.random() < ((skillLevels.war_final||0) * 0.03)) { isFinal = true; dmg *= 2; }
+                
+                projectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: isFinal, baseDmgToPass: dmg, sourceTower: t });
+                if (t.cls.type === '도적' && (skillLevels.thief_shadow||0) > 0 && Math.random() < ((skillLevels.thief_shadow||0) * 0.03)) { projectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: false, isShadow: true, sourceTower: t }); }
+                
+                t.lastAttack += attackCd;
+            } else { t.lastAttack = 0; break; }
+        }
+    });
+    
+    for(let i=fumaList.length-1; i>=0; i--) {
+        let f = fumaList[i]; f.angle += 15 * dt; let t_node = currentPath[f.targetNode]; let dx = t_node.x - f.x, dy = t_node.y - f.y; let dist = Math.hypot(dx, dy); let move = 300 * dt; 
+        monsters.forEach(m => { 
+            if (!f.hitSet.has(m) && Math.hypot(m.x - f.x, m.y - f.y) <= 50) { 
+                let armor = 0;
+                if (m.isBoss) {
+                    if (state.wave >= 310) armor = 0.50;
+                    else if (state.wave >= 210) armor = 0.30;
+                    else if (state.wave >= 160) armor = 0.10;
+                }
+                let unpen = equipStats.unpenetratedRate;
+                if (m.threatTimer > 0) unpen *= 0.9;
+                let actualDmg = f.dmg * (1 - (armor * unpen));
+                if (m.threatTimer > 0) actualDmg *= 1.3;
+                
+                m.hp -= actualDmg; 
+                f.hitSet.add(m); 
+                if(state.isRank && m.isBoss) rankState.myBossDamage += actualDmg; 
+            } 
+        });
+        if(dist <= move) { f.x = t_node.x; f.y = t_node.y; f.targetNode++; f.nodesVisited++; if (f.targetNode >= currentPath.length) f.targetNode = 0; if (f.nodesVisited > currentPath.length) fumaList.splice(i, 1); } else { f.x += (dx/dist)*move; f.y += (dy/dist)*move; }
+    }
+
+    for(let i=projectiles.length-1; i>=0; i--) {
+        let p = projectiles[i]; let dx = p.tx - p.x, dy = p.ty - p.y; let dist = Math.hypot(dx, dy); let speed = 400 * dt;
+        if(p.type === '도적') p.angle += 15 * dt; 
+        if(dist <= speed) {
+            if (p.gradeIdx >= 6) { hitEffects.push({ x: p.tx, y: p.ty, timer: 0.2, color: p.color }); }
+            if(monsters.includes(p.target)) {
+                let hitDmg = p.dmg; if (p.type === '전사' && p.target.isBoss) hitDmg *= 1.5; 
+                
+                let bossArmor = 0;
+                if (p.target.isBoss) {
+                    if (state.wave >= 310) bossArmor = 0.50;
+                    else if (state.wave >= 210) bossArmor = 0.30;
+                    else if (state.wave >= 160) bossArmor = 0.10;
+                }
+
+                let myUnpen = equipStats.unpenetratedRate;
+                if (p.target.threatTimer > 0) myUnpen *= 0.9;
+
+                let appliedArmor = bossArmor * myUnpen;
+                hitDmg *= (1 - appliedArmor);
+
+                p.target.hp -= hitDmg; p.sourceTower.damageDealt += hitDmg; 
+                if(state.isRank && p.target.isBoss) rankState.myBossDamage += hitDmg;
+                if (p.isCrit) damageTexts.push({ val: Math.floor(hitDmg), x: p.target.x, y: p.target.y - 35, timer: 0.8 });
+                if (p.type === '전사' && Math.random() < 0.2) p.target.stunTimer = 1;
+                if (p.type === '법사' && (skillLevels.mage_freeze||0) > 0 && Math.random() < ((10 + (skillLevels.mage_freeze||0) * 2) / 100)) { if (p.target.freezeTimer <= 0) { p.target.freezeTimer = 3; p.target.freezeTickTimer = 1; p.target.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][(skillLevels.mage_freeze||0) - 1]; } }
+            }
+            if(p.splash > 0) {
+                monsters.forEach(m => {
+                    if(m !== p.target && Math.hypot(m.x - p.tx, m.y - p.ty) <= p.splash) {
+                        let splashDmg = p.dmg; if (p.type === '전사' && m.isBoss) splashDmg *= 1.5; 
+                        
+                        let bossArmor = 0;
+                        if (m.isBoss) {
+                            if (state.wave >= 310) bossArmor = 0.50;
+                            else if (state.wave >= 210) bossArmor = 0.30;
+                            else if (state.wave >= 160) bossArmor = 0.10;
+                        }
+                        let myUnpen = equipStats.unpenetratedRate;
+                        if (m.threatTimer > 0) myUnpen *= 0.9;
+                        let appliedArmor = bossArmor * myUnpen;
+                        splashDmg *= (1 - appliedArmor);
+
+                        m.hp -= splashDmg; p.sourceTower.damageDealt += splashDmg;
+                        if(state.isRank && m.isBoss) rankState.myBossDamage += splashDmg;
+                        if (p.isCrit) damageTexts.push({ val: Math.floor(splashDmg), x: m.x, y: m.y - 35, timer: 0.8 });
+                        if (p.type === '전사' && Math.random() < 0.2) m.stunTimer = 1;
+                        if (p.type === '법사' && (skillLevels.mage_freeze||0) > 0 && Math.random() < ((10 + (skillLevels.mage_freeze||0) * 2) / 100)) { if (m.freezeTimer <= 0) { m.freezeTimer = 3; m.freezeTickTimer = 1; m.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][(skillLevels.mage_freeze||0) - 1]; } }
+                    }
+                });
+            }
+            projectiles.splice(i, 1);
+        } else { let moveAmt = speed; if (p.isShadow) moveAmt *= 0.85; p.x += (dx/dist)*moveAmt; p.y += (dy/dist)*moveAmt; }
+    }
+    for(let i=monsters.length-1; i>=0; i--) {
+        if(monsters[i].hp <= 0) {
+            state.kills++;
+            if (!state.isRank) {
+                state.mp++; state.mpTotal++; if(state.mpTotal >= 10) { state.meso += 5; state.mpTotal -= 10; }
+                if(monsters[i].isBoss) {
+                    let bInfo = getBossInfo(state.wave); 
+                    state.meso += bInfo.meso; 
+                    
+                    let tCount = bInfo.count || 1;
+                    let tTier = bInfo.tier || 5; 
+                    for (let t = 0; t < tCount; t++) {
+                        state.tickets.push(tTier);
+                    }
+                    
+                    let drops = [];
+                    if (Math.random() * 100 <= 5) { userInventory.equipBoxes = (userInventory.equipBoxes || 0) + 1; drops.push({ type: 'equip' }); }
+                    if (Math.random() * 100 <= 20) { cardData[bInfo.name] = cardData[bInfo.name] || { owned: 0, grade: 0 }; cardData[bInfo.name].owned++; localStorage.setItem('mapleDefenseCards', JSON.stringify(cardData)); if (currentUserUid) window.syncToCloud(); drops.push({ type: 'card', name: bInfo.name }); }
+                    if (drops.length > 0) { window.showLootPopup(drops); } else { window.showMessage(`${state.wave}라운드 보스 처치!`); }
+                }
+            }
+            monsters.splice(i, 1); window.updateUI();
+        }
+    }
+
+    for(let i=oppMonsters.length-1; i>=0; i--) { 
+        if(oppMonsters[i].hp <= 0) {
+            oppMonsters.splice(i, 1); 
+        } 
+    }
+    
+    if (oppMonsters.length === 0) {
+        let oppClearedBlock = 0;
+        if (oppState.wave % 10 === 0 && oppWaveTimer >= 58.5) {
+            oppClearedBlock = oppState.wave / 10;
+        } else if (oppState.wave % 10 !== 0) {
+            oppClearedBlock = Math.floor((oppState.wave - 1) / 10);
+        }
+
+        if (oppClearedBlock > 0) {
+            if (!rankState.blockWinner) rankState.blockWinner = {};
+            if (!rankState.blockWinner[oppClearedBlock]) {
+                rankState.blockWinner[oppClearedBlock] = 'opp'; 
+                let wolfHp = Math.floor(100000 * Math.pow(1.5, oppClearedBlock)); 
+                monsters.push({ hp: wolfHp, maxHp: wolfHp, x: currentPath[0].x, y: currentPath[0].y, targetNode: 1, speed: 25, isBoss: true, bindTimer: 0, stunTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0, name: "어둠의 늑대", facingRight: true, threatTimer: 0, counterTimer: 5 });
+                window.showMessage(`☠️ 상대방이 ${oppClearedBlock * 10}웨이브를 먼저 클리어하여 늑대가 난입했습니다!`);
+            }
+        }
+    }
+
+    if (state.isRank && monsters.length === 0) {
+        let clearedBlock = 0;
+        if (state.wave % 10 === 0 && waveTimer >= 58.5) {
+            clearedBlock = state.wave / 10;
+        } else if (state.wave % 10 !== 0) {
+            clearedBlock = Math.floor((state.wave - 1) / 10);
+        }
+
+        if (clearedBlock > 0) {
+            if (!rankState.blockWinner) rankState.blockWinner = {};
+            if (!rankState.blockWinner[clearedBlock]) { 
+                rankState.blockWinner[clearedBlock] = 'player'; 
+                let wolfHp = Math.floor(100000 * Math.pow(1.5, clearedBlock)); 
+                oppMonsters.push({ hp: wolfHp, maxHp: wolfHp, x: currentPath[0].x, y: currentPath[0].y, targetNode: 1, speed: 25, isBoss: true, bindTimer: 0, stunTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0, name: "어둠의 늑대", facingRight: true, threatTimer: 0, counterTimer: 5 });
+                window.showMessage(`🔥 ${clearedBlock * 10}웨이브 클리어! 상대에게 어둠의 늑대를 보냈습니다!`);
+            }
+        }
+    }
+    
+    window.draw(); if(state.isRank) window.drawOpp(); 
+    mainReqId = requestAnimationFrame(window.loop);
 };
