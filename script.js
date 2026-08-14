@@ -2942,20 +2942,27 @@ window.startMulungMatchmaking = async () => {
 };
 
 window.startMulungGame = (oppName, oppEquipData, oppCardTotal, oppStarTotal) => {
+    // 🔥 1. 기존 루프 및 상태 완벽 차단
     state.status = 'MULUNG'; 
+    isMulungLoopRunning = false; 
     cancelAnimationFrame(mainReqId);
     if (typeof mulungReqId !== 'undefined') cancelAnimationFrame(mulungReqId);
     
-    // 🔥 게임 재도전 시 데이터, 투사체, 이펙트 완전 삭제 (클린 상태 보장)
+    // 🔥 2. 글로벌 변수 강제 초기화 (이전 판 데이터 절대 못 넘어오게 막음)
+    state.wave = 1; 
+    waveTimer = 0;
+    spawnTimer = 0;
     monsters = []; towers = []; projectiles = []; hitEffects = []; visualEffects = []; fumaList = []; damageTexts = [];
     oppMonsters = []; oppTowers = []; oppProjectiles = []; oppVisualEffects = []; oppFumaList = []; oppDamageTexts = [];
     selectedUnitIdx = -1; selectedOppUnitIdx = -1;
 
+    // 🔥 3. 캔버스 화면 지우기
     if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (oppCtx) oppCtx.clearRect(0, 0, oppCanvas.width, oppCanvas.height);
 
     window.switchScreen('game-container');
     
+    // 🔥 4. 그리드 완전히 새로 깔기
     setGridMode('MULUNG');
     document.getElementById('grid-container').style.display = 'grid';
     
@@ -2972,6 +2979,7 @@ window.startMulungGame = (oppName, oppEquipData, oppCardTotal, oppStarTotal) => 
     let speedBtn = document.getElementById('btn-speed');
     if (speedBtn) { speedBtn.style.display = 'block'; state.speed = 1; speedBtn.innerText = "1배속"; }
     
+    // 🔥 5. 텍스트 강제 고정 (30층 등 이전 텍스트 덮어씌움)
     document.getElementById('ui-wave').innerText = "준비 중...";
     let timerEl = document.getElementById('ui-timer');
     if (timerEl) { timerEl.innerText = "10"; if (timerEl.nextSibling && timerEl.nextSibling.nodeType === 3 && !timerEl.nextSibling.textContent.includes('초')) { timerEl.nextSibling.textContent = '초'; } }
@@ -2996,23 +3004,17 @@ window.startMulungGame = (oppName, oppEquipData, oppCardTotal, oppStarTotal) => 
         controlsPanel.innerHTML = `<div style="text-align:center; font-weight:bold; font-size:14px; color:#004d40; margin-bottom: 5px; border-top: 1px dashed #00796b; padding-top: 5px;">🐼 무릉도장 유닛 승급 🐼</div><div class="upgrade-container" id="mulung-upgrade-buttons" style="display:flex; justify-content:center; gap:5px; padding-bottom: 10px;"></div>`;
     }
 
+    // 🔥 6. 무릉도장 전용 상태 완벽 초기화
     mulungState = {
-        active: true, status: 'SELECTING', prepTime: 10, wave: 1, coins: 0, oppCoins: 0, // 🔥 wave 1, coins 0 확인
+        active: true, status: 'SELECTING', prepTime: 10, wave: 1, coins: 0, oppCoins: 0,
         boss: null, lastTime: performance.now(),
         oppName: oppName, oppEquipData: oppEquipData, oppCardTotal: oppCardTotal, oppStarTotal: oppStarTotal,
         projectiles: [], vfx: [], dmgTexts: [], fumaList: [], roundTime: 60
     };
-    
-    // 🔥 이 두 줄을 반드시 추가해!
-    state.wave = 1; 
-    waveTimer = 0;
 
     window.showMulungClassSelect();
     
-    // 🔥 철벽 가드: 이미 루프가 돌아가고 있지 않을 때만 새로 켬!
-    isMulungLoopRunning = false; 
-    if (typeof mulungReqId !== 'undefined') cancelAnimationFrame(mulungReqId);
-    
+    // 🔥 7. 루프 재가동
     isMulungLoopRunning = true;
     mulungReqId = requestAnimationFrame(mulungLoop);
 };
@@ -3705,7 +3707,15 @@ async function endMulungGame() {
 window.closeMulungResult = () => {
     document.getElementById('mulung-result-modal').style.display = 'none';
     document.getElementById('overlay').style.display = 'none';
+    
+    // 🔥 게임 종료 시 확실하게 상태값 초기화
     state.status = 'TITLE';
+    state.wave = 1;
+    waveTimer = 0;
+    if (typeof mulungState !== 'undefined') mulungState.active = false;
+    isMulungLoopRunning = false;
+    cancelAnimationFrame(mulungReqId);
+
     window.switchScreen('start-screen');
 };
 
