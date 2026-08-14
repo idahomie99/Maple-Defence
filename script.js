@@ -2997,11 +2997,15 @@ window.startMulungGame = (oppName, oppEquipData, oppCardTotal, oppStarTotal) => 
     }
 
     mulungState = {
-        active: true, status: 'SELECTING', prepTime: 10, wave: 1, coins: 0, oppCoins: 0,
+        active: true, status: 'SELECTING', prepTime: 10, wave: 1, coins: 0, oppCoins: 0, // 🔥 wave 1, coins 0 확인
         boss: null, lastTime: performance.now(),
         oppName: oppName, oppEquipData: oppEquipData, oppCardTotal: oppCardTotal, oppStarTotal: oppStarTotal,
         projectiles: [], vfx: [], dmgTexts: [], fumaList: [], roundTime: 60
     };
+    
+    // 🔥 이 두 줄을 반드시 추가해!
+    state.wave = 1; 
+    waveTimer = 0;
 
     window.showMulungClassSelect();
     
@@ -3537,11 +3541,25 @@ function drawMulung() {
     ctx.setLineDash([]); ctx.strokeStyle = "rgba(188, 170, 164, 0.5)"; ctx.lineWidth = 40; ctx.lineJoin = "round"; ctx.beginPath();
     ctx.moveTo(0, 235); ctx.lineTo(500, 235); ctx.stroke(); 
 
-    ctx.font = "bold 18px NanumSquare"; 
+    // 🔥 폰트 굵기 800으로 설정
+    ctx.font = "800 18px NanumSquare"; 
     ctx.fillStyle = "#ffffff"; 
     ctx.textAlign = "center";
+
+    // 🔥 검은색 그림자를 진하게 넣어서 글씨를 배경과 분리 (선명도 UP)
+    ctx.shadowColor = "#000000"; 
+    ctx.shadowBlur = 4; 
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
+
     ctx.fillText(mulungState.oppName, 250, 40);
     ctx.fillText(currentUserName, 250, 480);
+
+    // 🔥 그림자 설정 초기화 (다른 유닛이나 이펙트 그릴 때 영향 안 가게)
+    ctx.shadowColor = "transparent";
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
 
     let b = mulungState.boss;
     
