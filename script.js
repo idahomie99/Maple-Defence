@@ -401,6 +401,7 @@ function getBossInfo(w) {
     return null;
 }
 
+// 🔥 1. UI 모드 세팅 (랭크 게임 5칸 원래대로 완벽 복구!)
 function setGridMode(mode) {
     let isRankGrid = (mode === 'RANK'); 
     let isMulung = (mode === 'MULUNG'); 
@@ -410,22 +411,21 @@ function setGridMode(mode) {
     if(canvas) canvas.height = canvasHeight; 
     document.getElementById('board-area').style.aspectRatio = isRankGrid ? "500/290" : "1/1";
     
+    gridContainer.style.gridTemplateColumns = "repeat(5, 1fr)"; 
     gridContainer.style.gridTemplateRows = (isRankGrid || isMulung) ? "repeat(1, 1fr)" : "repeat(5, 1fr)"; 
-    gridContainer.style.gridTemplateColumns = (isRankGrid || isMulung) ? "repeat(5, 1fr)" : "repeat(5, 1fr)"; 
     gridContainer.style.gap = (isRankGrid || isMulung) ? "0px" : "2px";
     
     if (isMulung) {
         gridContainer.style.top = "65%"; 
-        gridContainer.style.height = "15%";
+        gridContainer.style.height = "14%";
     } else if (isRankGrid) {
-        gridContainer.style.top = "25.86%"; 
-        gridContainer.style.height = "48.27%";
+        gridContainer.style.top = "37.93%"; 
+        gridContainer.style.height = "24.13%";
     } else {
         gridContainer.style.top = "15%"; 
         gridContainer.style.height = "70%";
     }
     
-    // 🔥 무릉도장 전용 배경화면 적용 로직!
     let gameContainer = document.getElementById('game-container');
     if (gameContainer) {
         if (isMulung) {
@@ -437,8 +437,9 @@ function setGridMode(mode) {
         }
     }
     
+    // 🔥 무릉 몬스터 동선 Y좌표를 195 -> 215로 낮춰서 발끝이 길에 겹치도록 수정
     currentPath = isRankGrid ? [ {x:25,y:25}, {x:475,y:25}, {x:475,y:265}, {x:25,y:265} ] : 
-                  (isMulung ? [{x: -50, y: 237.5}, {x: 550, y: 237.5}] : [ {x:25,y:25}, {x:475,y:25}, {x:475,y:475}, {x:25,y:475} ]);
+                  (isMulung ? [{x: -50, y: 215}, {x: 550, y: 215}] : [ {x:25,y:25}, {x:475,y:25}, {x:475,y:475}, {x:25,y:475} ]);
                   
     grid = new Array(gridSize).fill(null); 
     oppGrid = new Array(gridSize).fill(null); 
@@ -447,34 +448,29 @@ function setGridMode(mode) {
     let oppGridContainer = document.getElementById('opp-grid-container'); 
     if(oppGridContainer) {
         oppGridContainer.innerHTML = '';
-        oppGridContainer.style.position = '';
-        oppGridContainer.style.top = '';
-        oppGridContainer.style.height = '';
         oppGridContainer.style.gap = (isRankGrid || isMulung) ? "0px" : "2px";
-        oppGridContainer.style.gridTemplateRows = (isRankGrid || isMulung) ? "repeat(1, 1fr)" : "repeat(5, 1fr)";
         oppGridContainer.style.gridTemplateColumns = "repeat(5, 1fr)";
+        oppGridContainer.style.gridTemplateRows = (isRankGrid || isMulung) ? "repeat(1, 1fr)" : "repeat(5, 1fr)";
 
         if (isMulung) {
             document.getElementById('board-area').appendChild(oppGridContainer);
             oppGridContainer.style.display = 'grid';
             oppGridContainer.style.position = 'absolute';
-            // 🔥 나의 진영 박스 크기와 100% 동일하게 맞춰줌 (박스 밀림 해결)
             oppGridContainer.style.width = '70%'; 
             oppGridContainer.style.left = '15%'; 
             oppGridContainer.style.top = "15%";
-            oppGridContainer.style.height = "15%";
+            oppGridContainer.style.height = "14%";
         } else if (isRankGrid) {
-            let oppBoardWrapper = document.getElementById('opp-board-wrapper');
-            if(oppBoardWrapper) {
-                oppBoardWrapper.appendChild(oppGridContainer);
-                oppBoardWrapper.style.display = 'block';
+            let oppCanvasParent = document.getElementById('oppCanvas').parentNode;
+            if(oppCanvasParent) {
+                oppCanvasParent.appendChild(oppGridContainer);
             }
             oppGridContainer.style.display = 'grid';
-            oppGridContainer.style.position = 'relative';
-            oppGridContainer.style.width = '100%';
-            oppGridContainer.style.left = '0%';
-            oppGridContainer.style.top = "0%";
-            oppGridContainer.style.height = "100%";
+            oppGridContainer.style.position = 'absolute';
+            oppGridContainer.style.width = '70%';
+            oppGridContainer.style.left = '15%';
+            oppGridContainer.style.top = "37.93%";
+            oppGridContainer.style.height = "24.13%"; 
         } else {
             oppGridContainer.style.display = 'none';
         }
@@ -610,17 +606,36 @@ window.autoMerge = () => {
 
 function showSummonToast(gradeName, gradeIdx, clsName, color) { let toast = document.getElementById('summon-toast'); let fontSize = 16 + (gradeIdx * 2); toast.innerHTML = `<span style="color:${color}">${gradeName}</span> ${clsName}!`; toast.style.fontSize = fontSize + 'px'; toast.style.color = '#fff'; toast.className = 'toast-show'; setTimeout(() => { toast.className = ''; }, 1500); if (gradeIdx >= 5) { let container = document.getElementById('game-container'); container.classList.add('shake-active'); setTimeout(() => container.classList.remove('shake-active'), 400); } }
 
+// 🔥 발사 위치 좌표 Y축 145로 완벽 매핑
 window.addUnit = (idx, gradeIdx, clsName, isLoad = false) => { 
     let grade = GRADES[gradeIdx]; let cls = CLASSES[clsName]; 
+    let isMulung = (typeof mulungState !== 'undefined' && mulungState.active);
+    let yPos = state.isRank ? 145 : (110 + Math.floor(idx / 5) * 70);
+    if (isMulung) yPos = 362.5;
+
     let unit = { 
-        idx: idx, gradeIdx: gradeIdx, grade: grade, cls: cls, x: 75 + (idx % 5) * 70 + 35, y: 75 + Math.floor(idx / 5) * 70 + 35, 
+        idx: idx, gradeIdx: gradeIdx, grade: grade, cls: cls, 
+        x: 110 + (idx % 5) * 70, y: yPos, 
         lastAttack: 0, bindCooldown: 0, globalCooldown: 0,
         hp: 5, maxHp: 5, damageDealt: 0, threatCooldown: 0, healCooldown: 0, overloadTimer: 0, unitStunTimer: 0, rtdCooldown: 0
     }; 
     grid[idx] = unit; towers.push(unit); 
     if(!isLoad) showSummonToast(grade.name, gradeIdx, clsName, cls.color); renderGrid(); 
 };
-function addUnitOpp(idx, gradeIdx, clsName) { let grade = GRADES[gradeIdx]; let cls = CLASSES[clsName]; let unit = { idx: idx, gradeIdx: gradeIdx, grade: grade, cls: cls, x: 75 + (idx % 5) * 70 + 35, y: 75 + Math.floor(idx / 5) * 70 + 35, lastAttack: 0, bindCooldown: 0, globalCooldown: 0, threatCooldown: 0, healCooldown: 0, overloadTimer: 0, unitStunTimer: 0, rtdCooldown: 0 }; oppGrid[idx] = unit; oppTowers.push(unit); renderOppGrid(); }
+
+function addUnitOpp(idx, gradeIdx, clsName) { 
+    let grade = GRADES[gradeIdx]; let cls = CLASSES[clsName]; 
+    let isMulung = (typeof mulungState !== 'undefined' && mulungState.active);
+    let yPos = state.isRank ? 145 : (110 + Math.floor(idx / 5) * 70);
+    if (isMulung) yPos = 112.5;
+
+    let unit = { 
+        idx: idx, gradeIdx: gradeIdx, grade: grade, cls: cls, 
+        x: 110 + (idx % 5) * 70, y: yPos, 
+        lastAttack: 0, bindCooldown: 0, globalCooldown: 0, threatCooldown: 0, healCooldown: 0, overloadTimer: 0, unitStunTimer: 0, rtdCooldown: 0 
+    }; 
+    oppGrid[idx] = unit; oppTowers.push(unit); renderOppGrid(); 
+}
 
 window.onCellClick = (idx) => { 
     if(state.status !== 'PREP' && state.status !== 'PLAY' && (!mulungState || !mulungState.active)) return; 
@@ -634,15 +649,18 @@ window.onCellClick = (idx) => {
             grid[idx] = grid[selectedUnitIdx]; 
             if (grid[idx]) { 
                 grid[idx].idx = idx; 
-                // 🔥 데이터(투사체 발사 지점)를 HTML 박스 정중앙 좌표로 완벽 일치!
-                if (isMulung) { grid[idx].x = 110 + (idx % 5) * 70; grid[idx].y = 362.5; }
-                else { grid[idx].x = 75 + (idx % 5) * 70 + 35; grid[idx].y = 75 + Math.floor(idx / 5) * 70 + 35; }
+                grid[idx].x = 110 + (idx % 5) * 70;
+                if (isMulung) grid[idx].y = 362.5;
+                else if (state.isRank) grid[idx].y = 145;
+                else grid[idx].y = 110 + Math.floor(idx / 5) * 70;
             } 
             grid[selectedUnitIdx] = target; 
             if(target) { 
                 target.idx = selectedUnitIdx; 
-                if (isMulung) { target.x = 110 + (selectedUnitIdx % 5) * 70; target.y = 362.5; }
-                else { target.x = 75 + (selectedUnitIdx % 5) * 70 + 35; target.y = 75 + Math.floor(selectedUnitIdx / 5) * 70 + 35; }
+                target.x = 110 + (selectedUnitIdx % 5) * 70;
+                if (isMulung) target.y = 362.5;
+                else if (state.isRank) target.y = 145;
+                else target.y = 110 + Math.floor(selectedUnitIdx / 5) * 70;
             } 
             selectedUnitIdx = -1; 
         } 
@@ -653,7 +671,6 @@ window.onCellClick = (idx) => {
     if (!isMulung) window.updateUI(); 
 };
 
-// 🔥 동료 진영 유닛 클릭(이동) 함수 추가
 window.onOppCellClick = (idx) => {
     if(!mulungState || !mulungState.active) return; 
     
@@ -688,7 +705,7 @@ window.renderOppGrid = function() {
     for(let i=0; i<oppGrid.length; i++) { 
         let u = oppGrid[i]; 
         cells[i].className = 'grid-cell'; 
-        if (typeof selectedOppUnitIdx !== 'undefined' && i === selectedOppUnitIdx) cells[i].classList.add('selected'); // 선택 시 하이라이트
+        if (typeof selectedOppUnitIdx !== 'undefined' && i === selectedOppUnitIdx) cells[i].classList.add('selected'); 
         if(u) { 
             if (u.gradeIdx === 6) cells[i].classList.add('glow-6'); 
             if (u.gradeIdx === 7) cells[i].classList.add('glow-7'); 
@@ -2798,9 +2815,31 @@ window.startMulungMatchmaking = async () => {
     try { 
         const snap = await get(child(ref(database), `users`)); 
         if (snap.exists()) { 
-            let users = []; snap.forEach(c => { let v = c.val(); if (v.cloudData && v.nickname && c.key !== currentUserUid) users.push(v); }); 
-            if(users.length > 0) { 
-                let aiUser = users[Math.floor(Math.random() * users.length)]; 
+            let validUsers = []; 
+            let allUsers = [];
+            snap.forEach(c => { 
+                let v = c.val(); 
+                if (v.cloudData && v.nickname && c.key !== currentUserUid) {
+                    allUsers.push(v);
+                    let cTotal = 0;
+                    if(v.cloudData.cards) {
+                        try {
+                            let parsedCards = JSON.parse(v.cloudData.cards);
+                            cTotal = Object.values(parsedCards).reduce((sum, card) => sum + (card.grade||0), 0);
+                        } catch(e){}
+                    }
+                    // 🔥 도감 총합이 5 이상인 유저만 진짜 매칭 풀에 추가!
+                    if (cTotal >= 5) {
+                        validUsers.push(v);
+                    }
+                } 
+            }); 
+            
+            // 5 이상인 유저가 있으면 거기서 뽑고, 아무도 없으면 어쩔 수 없이 전체 유저에서 뽑음 (에러 방지)
+            let matchPool = validUsers.length > 0 ? validUsers : allUsers;
+            
+            if(matchPool.length > 0) { 
+                let aiUser = matchPool[Math.floor(Math.random() * matchPool.length)]; 
                 oppName = aiUser.nickname + " (AI)";
                 if(aiUser.cloudData.cards) {
                     let parsedCards = JSON.parse(aiUser.cloudData.cards);
@@ -2862,14 +2901,13 @@ window.startMulungMatchmaking = async () => {
 };
 
 window.startMulungGame = (oppName, oppEquipData, oppCardTotal, oppStarTotal) => {
-    // 🔥 1번 해결: 메모리 폭발(좀비 루프)을 일으키던 꼼수 코드를 삭제하고, 
-    // 모든 배열을 확실하게 초기화하여 재도전 시 완벽하게 새 게임으로 시작되게 합니다!
     state.status = 'MULUNG'; 
     cancelAnimationFrame(mainReqId);
     cancelAnimationFrame(mulungReqId);
-    
     monsters = []; towers = []; projectiles = []; hitEffects = []; visualEffects = []; fumaList = []; damageTexts = [];
-    oppMonsters = []; oppTowers = []; oppProjectiles = []; oppVisualEffects = []; oppFumaList = []; oppDamageTexts = [];
+
+    let originalLoop = window.loop;
+    window.loop = () => { if (state.status === 'MULUNG') return; originalLoop(); };
 
     window.switchScreen('game-container');
     
@@ -2983,8 +3021,7 @@ function spawnMulungBoss() {
 
     mulungState.boss = {
         name: bName, hp: hp, maxHp: hp, armor: armor,
-        // 🔥 2번 해결: 보스의 Y좌표를 237.5 -> 195로 올려 발바닥이 길 중앙에 오게 변경!
-        x: -50, y: 195, speed: 10, 
+        x: -50, y: 215, speed: 10, // 🔥 Y축 215로 낮춤
         threatTimer: 0, freezeTimer: 0, freezeTickTimer: 0, freezeDmgVal: 0,
         stunTimer: 0, counterTimer: 5, bindTimer: 0, stage: stage
     };
@@ -3228,8 +3265,8 @@ function mulungLoop() {
                     else if (u.cls.type === '법사' && (skillLevels.mage_thunder||0) > 0) { let gdmg = baseDmg * (1.5 + (skillLevels.mage_thunder||0) * 1.5); mulungState.vfx.push({ type: 'thunder', timer: 0.5, dmg: gdmg, isOpp: false }); u.globalCooldown += 60000; }
                     else if (u.cls.type === '도적' && (skillLevels.thief_fuma||0) > 0) { 
                         let gdmg = baseDmg * (1.5 + (skillLevels.thief_fuma||0) * 1.5); 
-                        // 🔥 3번 해결: 풍마수리검 발사 위치도 보스(195)에 완벽하게 맞춤!
-                        mulungState.fumaList.push({ x: u.x, y: 195, dmg: gdmg, hitSet: new Set(), angle: 0, isOpp: false }); 
+                        // 🔥 풍마 Y축도 215로 하향
+                        mulungState.fumaList.push({ x: u.x, y: 215, dmg: gdmg, hitSet: new Set(), angle: 0, isOpp: false }); 
                         u.globalCooldown += 60000; 
                     }
                 }
@@ -3317,8 +3354,7 @@ function mulungLoop() {
                     else if (u.cls.type === '법사' && (oppSkillLevels.mage_thunder||0) > 0) { let gdmg = baseDmg * (1.5 + (oppSkillLevels.mage_thunder||0) * 1.5); mulungState.vfx.push({ type: 'thunder', timer: 0.5, dmg: gdmg, isOpp: true }); u.globalCooldown += 60000; }
                     else if (u.cls.type === '도적' && (oppSkillLevels.thief_fuma||0) > 0) { 
                         let gdmg = baseDmg * (1.5 + (oppSkillLevels.thief_fuma||0) * 1.5); 
-                        // 🔥 AI 풍마수리검 Y축 역시 195로 완벽 조준
-                        mulungState.fumaList.push({ x: u.x, y: 195, dmg: gdmg, hitSet: new Set(), angle: 0, isOpp: true }); 
+                        mulungState.fumaList.push({ x: u.x, y: 215, dmg: gdmg, hitSet: new Set(), angle: 0, isOpp: true }); 
                         u.globalCooldown += 60000; 
                     }
                 }
@@ -3345,7 +3381,6 @@ function mulungLoop() {
         }
     });
 
-    // 🔥 풍마수리검 이동 로직 (보스가 있는 195 라인을 향해 일직선 관통)
     for(let i=mulungState.fumaList.length-1; i>=0; i--) {
         let f = mulungState.fumaList[i]; f.angle += 15 * dt; 
         f.x += 300 * dt; 
@@ -3443,7 +3478,7 @@ function drawMulung() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     ctx.setLineDash([]); ctx.strokeStyle = "rgba(188, 170, 164, 0.5)"; ctx.lineWidth = 40; ctx.lineJoin = "round"; ctx.beginPath();
-    ctx.moveTo(0, 237.5); ctx.lineTo(500, 237.5); ctx.stroke(); // 🔥 보스 길도 중앙으로 조정
+    ctx.moveTo(0, 215); ctx.lineTo(500, 215); ctx.stroke(); // 🔥 몬스터 걷는 길 위치 수정 (215)
 
     ctx.font = "bold 16px NanumSquare"; ctx.fillStyle = "rgba(255, 255, 255, 0.5)"; ctx.textAlign = "center";
     ctx.fillText(`동료 진영 (${mulungState.oppName})`, 250, 40);
@@ -3482,14 +3517,12 @@ function drawMulung() {
         ctx.restore();
     });
     
-    // 풍마수리검 렌더링
     mulungState.fumaList.forEach(f => {
         ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.angle);
         if (fumaImg && fumaImg.complete) { let fsize = 80; ctx.drawImage(fumaImg, -fsize/2, -fsize/2, fsize, fsize); }
         ctx.restore();
     });
 
-    // 사거리 렌더링
     if (selectedUnitIdx !== -1 && grid[selectedUnitIdx]) { 
         let u = grid[selectedUnitIdx]; let attackRange = (CLASSES[u.cls.type].range || 150) * u.grade.rangeMul * 1.5; 
         ctx.save(); ctx.beginPath(); ctx.arc(u.x, u.y, attackRange, 0, Math.PI * 2); 
@@ -3513,7 +3546,7 @@ function drawMulung() {
 
     if (b) {
         let size = 30; ctx.save(); 
-        ctx.translate(b.x, b.y - 25); // 🔥 보스 이미지를 25픽셀 위로 올려 발바닥을 길 중앙에 맞춤!
+        ctx.translate(b.x, b.y); // 🔥 시각적 위로 올리는 꼼수(-25) 제거, 순수 215 좌표에 배치
         ctx.scale(-1, 1);
         if (bossImages[b.name] && bossImages[b.name].complete) { ctx.drawImage(bossImages[b.name], -size*1.5, -size*1.5, size*3, size*3); } 
         else { ctx.fillStyle = "#ef5350"; ctx.beginPath(); ctx.arc(0, 0, size, 0, Math.PI*2); ctx.fill(); }
@@ -3526,9 +3559,8 @@ function drawMulung() {
         } 
         ctx.restore();
         
-        // 체력바 위치도 보스가 올라간 만큼 보정
-        ctx.fillStyle = "#111"; ctx.fillRect(b.x - 30, b.y - 25 - size - 15, 60, 6);
-        ctx.fillStyle = "#ff1744"; ctx.fillRect(b.x - 30, b.y - 25 - size - 15, 60 * (b.hp / b.maxHp), 6);
+        ctx.fillStyle = "#111"; ctx.fillRect(b.x - 30, b.y - size - 15, 60, 6);
+        ctx.fillStyle = "#ff1744"; ctx.fillRect(b.x - 30, b.y - size - 15, 60 * (b.hp / b.maxHp), 6);
     }
 
     mulungState.dmgTexts.forEach(d => { ctx.save(); ctx.globalAlpha = Math.max(0, d.timer / 0.6); ctx.fillStyle = d.isCrit ? "#ffeb3b" : "#fff"; ctx.font = d.isCrit ? "800 20px NanumSquare" : "bold 14px NanumSquare"; ctx.shadowColor = d.isCrit ? "#c62828" : "#000"; ctx.shadowBlur = 4; ctx.fillText(d.val, d.x, d.y); ctx.restore(); });
