@@ -2112,9 +2112,9 @@ function pkLoop() {
         let dmg = (pkBaseDmg + equipStats.flatAtk) * u.grade.mult * cardMulti * rageMulti; 
         if (target.threatTimer > 0) dmg *= 1.3;
         let isCrit = Math.random() < sharpChance; if (isCrit) dmg *= (1.2 + (equipStats.cdmg / 100)); 
-        let isFinal = false; if (t.cls.type === '전사' && skillLevels.war_final > 0 && Math.random() < getSkillValue('war_final', skillLevels.war_final)) { isFinal = true; dmg *= 2; }
+        let isFinal = false; if (u.cls.type === '전사' && skillLevels.war_final > 0 && Math.random() < getSkillValue('war_final', skillLevels.war_final)) { isFinal = true; dmg *= 2; }
         pkState.projectiles.push({ type: u.cls.type, x: u.x, y: u.y, tx: target.x, ty: target.y, dmg: dmg, color: u.cls.color, angle: 0, gradeIdx: u.gradeIdx, isCrit: isCrit, isFinal: isFinal, baseDmgToPass: dmg });
-        if (t.cls.type === '도적' && skillLevels.thief_shadow > 0 && Math.random() < getSkillValue('thief_shadow', skillLevels.thief_shadow)) { projectiles.push({ type: u.cls.type, x: u.x, y: u.y, tx: target.x, ty: target.y, dmg: dmg, color: u.cls.color, angle: 0, gradeIdx: u.gradeIdx, isCrit: isCrit, isFinal: false, isShadow: true }); }
+        if (u.cls.type === '도적' && skillLevels.thief_shadow > 0 && Math.random() < getSkillValue('thief_shadow', skillLevels.thief_shadow)) { projectiles.push({ type: u.cls.type, x: u.x, y: u.y, tx: target.x, ty: target.y, dmg: dmg, color: u.cls.color, angle: 0, gradeIdx: u.gradeIdx, isCrit: isCrit, isFinal: false, isShadow: true }); }
         u.lastAttack += attackCd;
     }
 
