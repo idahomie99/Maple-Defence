@@ -3416,9 +3416,9 @@ let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equ
 
     let oppCardBonus = oppCardData ? Object.values(oppCardData).reduce((sum, c) => sum + (c.grade||0)*0.5, 0) : 0;
     let oppCardMulti = 1 + (oppCardBonus / 100); 
-    let oppRageMulti = 1 + ((oppSkillLevels.common_rage||0) * 0.01) + (oppEquipStats.atk * 0.01); 
-    let oppSharpChance = ((oppSkillLevels.common_sharp||0) * 0.05) + (oppEquipStats.crit * 0.01); 
-    let oppWindReduc = 1 + ((oppSkillLevels.common_wind||0) * 0.2) + (oppEquipStats.spd * 0.01);
+    let oppRageMulti = 1 + getSkillValue('common_rage', oppSkillLevels.common_rage) + (oppEquipStats.atk * 0.01);
+    let oppSharpChance = getSkillValue('common_sharp', oppSkillLevels.common_sharp) + (oppEquipStats.crit * 0.01); 
+    let oppWindReduc = 1 + getSkillValue('common_wind', oppSkillLevels.common_wind) + (oppEquipStats.spd * 0.01);
     let oppUnpen = oppEquipStats.unpenetratedRate;
     if (b.threatTimer > 0) oppUnpen *= 0.9;
     let oppAppliedArmor = b.armor * oppUnpen;
@@ -3491,7 +3491,7 @@ let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equ
                 let dmg = (CLASSES[u.cls.type].baseDmg + oppEquipStats.flatAtk) * GRADES[u.gradeIdx].mult * oppCardMulti * oppRageMulti; 
                 if (b.threatTimer > 0) dmg *= 1.3; 
                 let isCrit = Math.random() < oppSharpChance; if (isCrit) dmg *= (1.2 + (oppEquipStats.cdmg / 100)); 
-                let isFinal = false; if (u.cls.type === '전사' && (oppSkillLevels.war_final||0) > 0 && Math.random() < ((oppSkillLevels.war_final||0) * 0.03)) { isFinal = true; dmg *= 2; }
+                let isFinal = false; if (u.cls.type === '전사' && oppSkillLevels.war_final > 0 && Math.random() < getSkillValue('war_final', oppSkillLevels.war_final)) { isFinal = true; dmg *= 2; }
                 
                 mulungState.projectiles.push({ type: u.cls.type, x: u.x, y: u.y, tx: b.x, ty: b.y, dmg: dmg, color: CLASSES[u.cls.type].color, angle: 0, gradeIdx: u.gradeIdx, isCrit: isCrit, isFinal: isFinal, baseDmgToPass: dmg, isMine: false, appliedArmor: oppAppliedArmor });
                 if (u.cls.type === '도적' && (oppSkillLevels.thief_shadow||0) > 0 && Math.random() < ((oppSkillLevels.thief_shadow||0) * 0.03)) { mulungState.projectiles.push({ type: u.cls.type, x: u.x, y: u.y, tx: b.x, ty: b.y, dmg: dmg, color: CLASSES[u.cls.type].color, angle: 0, gradeIdx: u.gradeIdx, isCrit: isCrit, isFinal: false, baseDmgToPass: dmg, isMine: false, appliedArmor: oppAppliedArmor, isShadow: true }); }
@@ -3533,7 +3533,7 @@ let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equ
             mulungState.dmgTexts.push({ val: Math.floor(hitDmg), x: b.x + (Math.random()-0.5)*30, y: b.y - 40 + (Math.random()-0.5)*30, timer: 0.6, isCrit: p.isCrit });
             
             mulungState.projectiles.splice(i, 1);
-        } else { p.x += (dx/dist)*speed; p.y += (dy/dist)*speed; }
+        } else { let moveAmt = speed; if (p.isShadow) moveAmt *= 0.85; p.x += (dx/dist)*moveAmt; p.y += (dy/dist)*moveAmt; }
     }
     
     for (let i = mulungState.vfx.length - 1; i >= 0; i--) { 
