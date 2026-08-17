@@ -3001,7 +3001,7 @@ window.startMulungGame = (oppName, oppEquipData, oppCardTotal, oppStarTotal) => 
     
     monsters = []; towers = []; projectiles = []; hitEffects = []; visualEffects = []; fumaList = []; damageTexts = [];
     oppMonsters = []; oppTowers = []; oppProjectiles = []; oppVisualEffects = []; oppFumaList = []; oppDamageTexts = [];
-    selectedUnitIdx = -1; selectedOppUnitIdx = -1;
+selectedUnitIdx = -1; selectedOppUnitIdx = -1;
 
     if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (oppCtx) oppCtx.clearRect(0, 0, oppCanvas.width, oppCanvas.height);
