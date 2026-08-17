@@ -3002,18 +3002,6 @@ window.startMulungMatchmaking = async () => {
 };
 
 window.startMulungGame = (oppName, oppEquipData, oppCardTotal, oppStarTotal) => {
-    // 🔥 1. 기존 루프 및 상태 완벽 차단
-    state.status = 'MULUNG'; 
-    isMulungLoopRunning = false; 
-    cancelAnimationFrame(mainReqId);
-    if (typeof mulungReqId !== 'undefined') cancelAnimationFrame(mulungReqId);
-    
-    // 🔥 2. 글로벌 변수 강제 초기화 (이전 판 데이터 절대 못 넘어오게 막음)
-    state.wave = 1; 
-    waveTimer = 0;
-    spawnTimer = 0;
-    monsters = []; towers = []; projectiles = []; hitEffects = []; visualEffects = []; fumaList = []; damageTexts = [];
-    oppMonsters = []; oppTowers = [window.startMulungGame = (oppName, oppEquipData, oppCardTotal, oppStarTotal) => {
     state.status = 'MULUNG'; 
     isMulungLoopRunning = false; 
     cancelAnimationFrame(mainReqId);
