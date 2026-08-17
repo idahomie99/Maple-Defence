@@ -181,7 +181,7 @@ canvas { width: 100%; height: 100%; position: absolute; top: 0; left: 0; pointer
 .equip-slot.equip-rare { border: 2px solid #42a5f5; background: #e3f2fd; }
 .equip-slot.equip-epic { border: 2px solid #ab47bc; background: #f3e5f5; }
 .equip-slot.equip-unique { border: 2px solid #ffa726; background: #fff3e0; }
-.equip-slot.equip-legendary { border: 2px solid #ef5350; background: #ffebee; }
+.equip-slot.equip-legendary { border: 2px solid #76ff03; background: #f1f8e9; }
 
 .inv-item-box {
     background: #fff; border: 2px solid #b0bec5; border-radius: 8px;
@@ -195,4 +195,4 @@ canvas { width: 100%; height: 100%; position: absolute; top: 0; left: 0; pointer
 .inv-item-box.equip-rare { border-color: #42a5f5; background: #e3f2fd; }
 .inv-item-box.equip-epic { border-color: #ab47bc; background: #f3e5f5; }
 .inv-item-box.equip-unique { border-color: #ffa726; background: #fff3e0; }
-.inv-item-box.equip-legendary { border-color: #ef5350; background: #ffebee; }
+.inv-item-box.equip-legendary { border-color: #76ff03; background: #f1f8e9; }

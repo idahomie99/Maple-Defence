@@ -102,15 +102,62 @@ const DEFAULT_SKILLS = { common_wind: 0, common_sharp: 0, common_rage: 0, war_fi
 let skillLevels = JSON.parse(localStorage.getItem('mapleDefenseSkills')) || {};
 skillLevels = { ...DEFAULT_SKILLS, ...skillLevels };
 
+// 🔥 스킬 만렙(10) 확장용 헬퍼 함수
+const getSkillValue = (key, lv) => {
+    if (!lv) return 0;
+    if (key === 'common_wind') return lv <= 5 ? lv * 0.2 : 1.0 + (lv - 5) * 0.1;
+    if (key === 'common_sharp') return lv <= 5 ? lv * 0.05 : 0.25 + (lv - 5) * 0.025;
+    if (key === 'common_rage') return lv <= 5 ? lv * 0.01 : 0.05 + (lv - 5) * 0.005;
+    if (key === 'war_final') return lv <= 5 ? lv * 0.03 : 0.15 + (lv - 5) * 0.015;
+    if (key === 'thief_shadow') return lv <= 5 ? lv * 0.03 : 0.15 + (lv - 5) * 0.015;
+    return 0;
+};
+const getFreezeChance = (lv) => (!lv ? 0 : (lv <= 5 ? 0.1 + lv * 0.02 : 0.2 + (lv - 5) * 0.01));
+const getFreezeDmg = (lv) => [0, 0.02, 0.03, 0.03, 0.04, 0.05, 0.055, 0.06, 0.065, 0.07, 0.075][lv] || 0;
+
+// 🔥 모험 모드 UI 완벽 복구 함수
+window.restoreAdventureUI = () => {
+    let resourceRow = document.querySelector('.resource-row');
+    if (resourceRow) {
+        resourceRow.innerHTML = `
+            <div class="meso-box"><img src="image/meso.png" alt="Meso" style="height: 16px; vertical-align: middle; margin-right: 4px;">메소 <span id="ui-meso">${state.meso}</span></div>
+            <div class="mp-box"><img src="image/mepo.png" alt="Mepo" style="height: 16px; vertical-align: middle; margin-right: 4px;">메포 <span id="ui-mp">${state.mp}</span></div>
+        `;
+    }
+    let controlsPanel = document.getElementById('controls');
+    if (controlsPanel) {
+        controlsPanel.innerHTML = `
+            <div style="display: flex; gap: 4px; margin-bottom: 15px;">
+                <button id="btn-summon" class="ingame-btn premium-green" style="flex: 1.5; padding: 16px; font-size: 16px;" onclick="summonUnit()">소환 (10)</button>
+                <button class="ingame-btn premium-purple" style="flex: 1; font-size: 13px; padding: 0 5px;" onclick="autoMerge()">✨일괄합성</button>
+                <button id="btn-sell-single" class="ingame-btn premium-orange" style="flex: 0.8; font-size: 13px; padding: 0 5px;" onclick="sellSelectedUnit()" disabled>선택판매</button>
+                <button class="ingame-btn premium-dark" style="flex: 0.8; font-size: 13px; padding: 0 5px;" onclick="openBulkSellModal()">조건판매</button>
+            </div>
+            <div style="text-align:center; font-weight:bold; font-size:14px; color:#5a3c22; margin-bottom: 5px; border-top: 1px dashed #8b5a2b; padding-top: 5px;">
+                <img src="image/chaosscroll.png" style="height: 20px; vertical-align: middle;"> 혼돈의 주문서 강화 <img src="image/chaosscroll.png" style="height: 20px; vertical-align: middle;">
+            </div>
+            <div class="upgrade-container">
+                <div class="upgrade-box" id="upg-w-box" onclick="upgrade('전사')"><div class="job-title warrior">전사 (+<span id="upg-w-val">${state.upgrades['전사'].val}</span>)</div><div class="cost"><span id="upg-w-cost">${state.upgrades['전사'].cost}</span> 메포</div></div>
+                <div class="upgrade-box" id="upg-m-box" onclick="upgrade('법사')"><div class="job-title mage">법사 (+<span id="upg-m-val">${state.upgrades['법사'].val}</span>)</div><div class="cost"><span id="upg-m-cost">${state.upgrades['법사'].cost}</span> 메포</div></div>
+                <div class="upgrade-box" id="upg-t-box" onclick="upgrade('도적')"><div class="job-title thief">도적 (+<span id="upg-t-val">${state.upgrades['도적'].val}</span>)</div><div class="cost"><span id="upg-t-cost">${state.upgrades['도적'].cost}</span> 메포</div></div>
+            </div>
+            <div class="ticket-row" style="margin-top: 15px;">
+                <span>선택권: <span id="ui-tickets" class="highlight">${state.tickets.length}</span>장</span>
+                <button class="ingame-btn premium-blue" style="padding: 8px 15px;" onclick="openTicketModal()">사용하기</button>
+            </div>
+        `;
+    }
+};
+
 const SKILL_INFO = {
-    common_wind: { name: "윈드 부스트", max: 5, getDesc: (lv) => `공격 속도 ${lv * 20}%p 증가`, img: "image/windboost.png" },
-    common_sharp: { name: "샤프 아이즈", max: 5, getDesc: (lv) => `치명타 ${lv * 5}%p 증가 (1.2배 피해)`, img: "image/sharpeyes.png" },
-    common_rage: { name: "분노", max: 5, getDesc: (lv) => `최종 공격력 ${lv * 1}%p 증가`, img: "image/rage.png" },
-    war_final: { name: "파이널 어택", max: 5, getDesc: (lv) => `${lv * 3}%p 확률로 2배 피해 (전사)`, img: "image/finalattack.png" },
+    common_wind: { name: "윈드 부스트", max: 10, getDesc: (lv) => `공격 속도 ${lv <= 5 ? lv * 20 : 100 + (lv-5)*10}%p 증가`, img: "image/windboost.png" },
+    common_sharp: { name: "샤프 아이즈", max: 10, getDesc: (lv) => `치명타 ${lv <= 5 ? lv * 5 : 25 + (lv-5)*2.5}%p 증가 (1.2배 피해)`, img: "image/sharpeyes.png" },
+    common_rage: { name: "분노", max: 10, getDesc: (lv) => `최종 공격력 ${lv <= 5 ? lv * 1 : 5 + (lv-5)*0.5}%p 증가`, img: "image/rage.png" },
+    war_final: { name: "파이널 어택", max: 10, getDesc: (lv) => `${lv <= 5 ? lv * 3 : 15 + (lv-5)*1.5}%p 확률로 2배 피해 (전사)`, img: "image/finalattack.png" },
     war_death: { name: "데스폴트", max: 5, getDesc: (lv) => `60초마다 전역 피해 ${300 + lv * 150}% (전사 5차↑)`, img: "image/despolt.png" },
-    mage_freeze: { name: "프리즈", max: 5, getDesc: (lv) => `적 빙결 및 도트 피해 (${lv}단계)`, img: "image/freeze.png" },
+    mage_freeze: { name: "프리즈", max: 10, getDesc: (lv) => `적 빙결 및 도트 피해 (${lv}단계)`, img: "image/freeze.png" },
     mage_thunder: { name: "썬더 브레이크", max: 5, getDesc: (lv) => `60초마다 전역 피해 ${300 + lv * 150}% (법사 5차↑)`, img: "image/thunderbreak.png" },
-    thief_shadow: { name: "섀도 파트너", max: 5, getDesc: (lv) => `${lv * 3}%p 확률로 투사체 추가 (도적)`, img: "image/shadowpartner.png" },
+    thief_shadow: { name: "섀도 파트너", max: 10, getDesc: (lv) => `${lv <= 5 ? lv * 3 : 15 + (lv-5)*1.5}%p 확률로 투사체 추가 (도적)`, img: "image/shadowpartner.png" },
     thief_fuma: { name: "풍마 수리검", max: 5, getDesc: (lv) => `60초마다 맵 순회 수리검 ${300 + lv * 150}% (도적 5차↑)`, img: "image/fumashuriken.png" },
     war_threat: { name: "위협", max: 5, getDesc: (lv) => `25초마다 단일 적 위협. 최종 딜 1.3배 & 방관 10% 부여, ${lv * 2}초 유지 (제네시스↑)`, img: "image/threat.png" },
     mage_heal: { name: "힐", max: 5, getDesc: (lv) => `${70 - lv*10}초마다 주위 1칸 아군 체력 1 회복 (6차↑)`, img: "image/heal.png" },
@@ -187,7 +234,7 @@ window.showLootPopup = (drops) => {
         document.body.appendChild(mDiv); modal = mDiv;
     }
     let dropHtml = drops.map(d => {
-        if (d.type === 'equip') return `<div style="display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:10px; background:#f1f8e9; padding:10px; border-radius:8px; border:1px solid #c5e1a5;"><span style="font-size:24px;">🎁</span><span style="font-weight:bold; color:#2e7d32; font-size:15px;">장비 상자 1개</span></div>`;
+        if (d.type === 'equip') return `<div style="display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:10px; background:#f1f8e9; padding:10px; border-radius:8px; border:1px solid #c5e1a5;"><img src="image/equipbox.png" style="width:24px; height:24px;"><span style="font-weight:bold; color:#2e7d32; font-size:15px;">장비 상자 1개</span></div>`;
         else if (d.type === 'card') { let imgSrc = bossImages[d.name] ? bossImages[d.name].src : ''; return `<div style="display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:10px; background:#fff8e1; padding:10px; border-radius:8px; border:1px solid #ffe082;"><img src="${imgSrc}" style="width:30px; height:30px; object-fit:contain;"><span style="font-weight:bold; color:#f57f17; font-size:15px;">${d.name} 카드 1장</span></div>`; }
     }).join('');
     modal.innerHTML = `<h3 style="color:#e65100; margin-top:0;">✨ 전리품 획득!</h3><p style="font-size:13px; color:#555; margin-bottom:15px;">보스를 처치하고 다음 아이템을 얻었습니다.</p>${dropHtml}<button class="ingame-btn premium-blue" style="width:100%; padding:12px; margin-top:10px;" onclick="closeLootPopup()">확인</button>`;
@@ -499,6 +546,10 @@ window.startNewGame = () => {
     state = { status: 'PREP', meso: 25, mp: 0, mpTotal: 0, kills: 0, wave: 1, time: 5, speed: 1, isBoss: false, upgrades: { '전사': {val: 0, cost: 10}, '법사': {val: 0, cost: 10}, '도적': {val: 0, cost: 10} }, tickets: [], isRank: false };
     document.getElementById('best-wave-container').style.display = 'block'; document.getElementById('btn-speed').innerText = "1배속"; document.getElementById('btn-speed').style.display = 'block'; document.getElementById('btn-exit').style.display = 'block'; let surrenderBtn = document.getElementById('btn-rank-surrender'); if (surrenderBtn) surrenderBtn.style.display = 'none'; document.getElementById('opp-board-wrapper').style.display = 'none';
     monsters = []; projectiles = []; towers = []; hitEffects = []; visualEffects = []; fumaList = []; damageTexts = []; waveTimer = 0; spawnTimer = 0; selectedUnitIdx = -1; bestWave = parseInt(localStorage.getItem('mapleDefenseBestWave')) || 0;
+    
+    // 🔥 모험 모드 UI 강제 복구 호출
+    window.restoreAdventureUI();
+
     if (currentUserUid) window.syncToCloud(); renderGrid(); window.switchScreen('game-container'); lastTime = performance.now(); cancelAnimationFrame(mainReqId); window.updateUI(); mainReqId = requestAnimationFrame(window.loop);
 };
 
@@ -935,8 +986,17 @@ window.renderInventoryTab = (tab) => {
     let list = document.getElementById('inventory-list'); list.innerHTML = '';
     if (tab === 'consumable') {
         if(userInventory.coinPieces > 0) list.innerHTML += createInvBox('🧩', '코인 조각', userInventory.coinPieces, "combineCoinPieces()");
-        if(userInventory.equipBoxes > 0) list.innerHTML += createInvBox('🎁', '장비 상자', userInventory.equipBoxes, "openBox('equipBoxes')");
+        
+        // 🔥 장비상자를 이미지로 교체
+        if(userInventory.equipBoxes > 0) list.innerHTML += createInvBox('<img src="image/equipbox.png" style="width:24px; height:24px; object-fit:contain;">', '장비 상자', userInventory.equipBoxes, "openBox('equipBoxes')");
+        
         list.innerHTML += createInvBox('🌟', '별 기운', userInventory.starPieces || 0, ""); 
+        
+        if((userRankData.mulungCoins || 0) > 0) list.innerHTML += createInvBox('🐼', '무릉 코인', userRankData.mulungCoins, "openMulungShop()");
+        
+        // 🔥 인벤토리에 블랙 큐브 이미지와 함께 표시
+        if((userInventory.blackCubes || 0) > 0) list.innerHTML += createInvBox('<img src="image/blackcube.png" style="width:24px; height:24px; object-fit:contain;">', '블랙 큐브', userInventory.blackCubes, "");
+        
         ['브론즈', '실버', '골드', '플래티넘', '다이아몬드', '챌린저'].forEach(tier => { if (userInventory.boxes[tier] > 0) { list.innerHTML += createInvBox('🧰', `${tier} 상자`, userInventory.boxes[tier], `openBox('${tier}')`); } });
     } else if (tab === 'equip') {
         userEquips.forEach((eq, idx) => {
@@ -1003,7 +1063,7 @@ window.openEquipDetailModal = (eq, targetIdx, isEquipped) => {
         document.body.appendChild(mDiv); modal = mDiv;
     }
     modal.style.display = 'block';
-    let gradeColor = eq.grade === 'Rare' ? '#1e88e5' : (eq.grade === 'Epic' ? '#8e24aa' : (eq.grade === 'Unique' ? '#fb8c00' : '#d32f2f'));
+    let gradeColor = eq.grade === 'Rare' ? '#1e88e5' : (eq.grade === 'Epic' ? '#8e24aa' : (eq.grade === 'Unique' ? '#fb8c00' : '#76ff03'));
     let starStr = eq.star > 0 ? ` <span style="color:#fbc02d;">★${eq.star}</span>` : '';
     document.getElementById('modal-eq-title').innerHTML = `<span style="color:${gradeColor}">${eq.grade} ${eq.type}</span>${starStr}`;
     
@@ -1782,7 +1842,7 @@ function processOpponentTick(dt) {
                 let dmg = (t.cls.baseDmg + oppEquipStats.flatAtk) * t.grade.mult * cardMulti * rageMulti; 
                 if (target.threatTimer > 0) dmg *= 1.3;
                 let isCrit = Math.random() < sharpChance; if (isCrit) dmg *= (1.2 + (oppEquipStats.cdmg / 100)); 
-                let isFinal = false; if (t.cls.type === '전사' && oppSkillLevels.war_final > 0 && Math.random() < (oppSkillLevels.war_final * 0.03)) { isFinal = true; dmg *= 2; }
+                let isFinal = false; if (u.cls.type === '전사' && skillLevels.war_final > 0 && Math.random() < getSkillValue('war_final', skillLevels.war_final)) { isFinal = true; dmg *= 2; }
                 oppProjectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: isFinal, baseDmgToPass: dmg });
                 if (t.cls.type === '도적' && oppSkillLevels.thief_shadow > 0 && Math.random() < (oppSkillLevels.thief_shadow * 0.03)) { oppProjectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: false, isShadow: true }); }
                 t.lastAttack += attackCd;
@@ -2394,9 +2454,9 @@ window.loop = () => {
     if(!state.isRank && monsters.length >= 50) return gameOver("몬스터 50마리 초과! 게임 오버");
     
     let cardMulti = 1 + (getTotalCardBonus() / 100); 
-    let rageMulti = 1 + ((skillLevels.common_rage||0) * 0.01) + (equipStats.atk * 0.01); 
-    let sharpChance = ((skillLevels.common_sharp||0) * 0.05) + (equipStats.crit * 0.01); 
-    let windReduc = 1 + ((skillLevels.common_wind||0) * 0.2) + (equipStats.spd * 0.01);
+    let rageMulti = 1 + getSkillValue('common_rage', skillLevels.common_rage) + (equipStats.atk * 0.01); 
+let sharpChance = getSkillValue('common_sharp', skillLevels.common_sharp) + (equipStats.crit * 0.01); 
+let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equipStats.spd * 0.01);
 
     towers.forEach(t => {
         // 🔥 1. 상태 이상 및 쿨타임 계산 (기절 중에도 쿨타임은 흐름)
@@ -2495,10 +2555,10 @@ window.loop = () => {
                 let dmg = (t.cls.baseDmg + (state.upgrades[t.cls.type].val * 0.15) + equipStats.flatAtk) * t.grade.mult * cardMulti * rageMulti; 
                 if (target.threatTimer > 0) dmg *= 1.3; 
                 let isCrit = Math.random() < sharpChance; if (isCrit) dmg *= (1.2 + (equipStats.cdmg / 100)); 
-                let isFinal = false; if (t.cls.type === '전사' && (skillLevels.war_final||0) > 0 && Math.random() < ((skillLevels.war_final||0) * 0.03)) { isFinal = true; dmg *= 2; }
+                let isFinal = false; if (u.cls.type === '전사' && skillLevels.war_final > 0 && Math.random() < getSkillValue('war_final', skillLevels.war_final)) { isFinal = true; dmg *= 2; }
                 
                 projectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: isFinal, baseDmgToPass: dmg, sourceTower: t });
-                if (t.cls.type === '도적' && (skillLevels.thief_shadow||0) > 0 && Math.random() < ((skillLevels.thief_shadow||0) * 0.03)) { projectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: false, isShadow: true, sourceTower: t }); }
+                if (u.cls.type === '도적' && skillLevels.thief_shadow > 0 && Math.random() < getSkillValue('thief_shadow', skillLevels.thief_shadow)) { projectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: false, isShadow: true, sourceTower: t }); }
                 
                 t.lastAttack += attackCd;
             } else { t.lastAttack = 0; break; }
@@ -2553,7 +2613,7 @@ window.loop = () => {
                 if(state.isRank && p.target.isBoss) rankState.myBossDamage += hitDmg;
                 if (p.isCrit) damageTexts.push({ val: Math.floor(hitDmg), x: p.target.x, y: p.target.y - 35, timer: 0.8 });
                 if (p.type === '전사' && Math.random() < 0.2) p.target.stunTimer = 1;
-                if (p.type === '법사' && (skillLevels.mage_freeze||0) > 0 && Math.random() < ((10 + (skillLevels.mage_freeze||0) * 2) / 100)) { if (p.target.freezeTimer <= 0) { p.target.freezeTimer = 3; p.target.freezeTickTimer = 1; p.target.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][(skillLevels.mage_freeze||0) - 1]; } }
+                if (p.type === '법사' && skillLevels.mage_freeze > 0 && Math.random() < getFreezeChance(skillLevels.mage_freeze)) { if (p.target.freezeTimer <= 0) { p.target.freezeTimer = 3; p.target.freezeTickTimer = 1; p.target.freezeDmgVal = p.baseDmgToPass * getFreezeDmg(skillLevels.mage_freeze); } }
             }
             if(p.splash > 0) {
                 monsters.forEach(m => {
@@ -2575,7 +2635,7 @@ window.loop = () => {
                         if(state.isRank && m.isBoss) rankState.myBossDamage += splashDmg;
                         if (p.isCrit) damageTexts.push({ val: Math.floor(splashDmg), x: m.x, y: m.y - 35, timer: 0.8 });
                         if (p.type === '전사' && Math.random() < 0.2) m.stunTimer = 1;
-                        if (p.type === '법사' && (skillLevels.mage_freeze||0) > 0 && Math.random() < ((10 + (skillLevels.mage_freeze||0) * 2) / 100)) { if (m.freezeTimer <= 0) { m.freezeTimer = 3; m.freezeTickTimer = 1; m.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][(skillLevels.mage_freeze||0) - 1]; } }
+                        if (p.type === '법사' && skillLevels.mage_freeze > 0 && Math.random() < getFreezeChance(skillLevels.mage_freeze)) { if (p.target.freezeTimer <= 0) { p.target.freezeTimer = 3; p.target.freezeTickTimer = 1; p.target.freezeDmgVal = p.baseDmgToPass * getFreezeDmg(skillLevels.mage_freeze); } }
                     }
                 });
             }
@@ -2724,11 +2784,11 @@ window.openMulungShop = () => {
                         <button class="ingame-btn premium-dark" style="width:80px; padding:6px 0; font-size:12px;" onclick="buyMulungItem('star')">10 코인</button>
                     </div>
                     <div style="display:flex; justify-content:space-between; align-items:center; background:#e0f2f1; padding:10px; border-radius:6px; border:1px solid #b2dfdb;">
-                        <span style="font-weight:bold; font-size:14px;">🎁 장비 상자</span>
+                        <span style="font-weight:bold; font-size:14px;"><img src="image/equipbox.png" style="width:18px; vertical-align:middle; margin-right:4px;">장비 상자</span>
                         <button class="ingame-btn premium-dark" style="width:80px; padding:6px 0; font-size:12px;" onclick="buyMulungItem('equipBox')">100 코인</button>
                     </div>
                     <div style="display:flex; justify-content:space-between; align-items:center; background:#e0f2f1; padding:10px; border-radius:6px; border:1px solid #b2dfdb;">
-                        <span style="font-weight:bold; font-size:14px;">⬛ 블랙 큐브</span>
+                        <span style="font-weight:bold; font-size:14px;"><img src="image/blackcube.png" style="width:18px; vertical-align:middle; margin-right:4px;">블랙 큐브</span>
                         <button class="ingame-btn premium-dark" style="width:80px; padding:6px 0; font-size:12px;" onclick="buyMulungItem('cube')">200 코인</button>
                     </div>
                 </div>
@@ -2769,7 +2829,7 @@ window.openEquipDetailModal = (eq, targetIdx, isEquipped) => {
             cubeBtn.id = 'btn-black-cube';
             cubeBtn.className = "ingame-btn premium-dark";
             cubeBtn.style.cssText = "width:100%; padding:10px; font-size:13px; margin-bottom:5px;";
-            cubeBtn.innerHTML = `⬛ 블랙 큐브 사용 (보유: ${userInventory.blackCubes || 0}개)`;
+            cubeBtn.innerHTML = `<img src="image/blackcube.png" style="width:16px; vertical-align:middle; margin-right:4px;"> 블랙 큐브 사용 (보유: ${userInventory.blackCubes || 0}개)`;
             cubeBtn.onclick = () => window.useBlackCube(eq, targetIdx, isEquipped);
             btnContainer.insertBefore(cubeBtn, btnContainer.children[1]);
         }
@@ -2797,7 +2857,7 @@ window.useBlackCube = (eq, targetIdx, isEquipped) => {
     let afterHtml = cubeTempOptions.map(o => `${o.type === 'atk' ? '공' : (o.type === 'spd' ? '속' : (o.type === 'crit' ? '크' : (o.type === 'cdmg' ? '치피' : '방관')))}+${o.value}%`).join('<br>');
 
     modal.innerHTML = `
-        <h3 style="color:#212121; margin-top:0;">⬛ 블랙 큐브 결과</h3>
+        <h3 style="color:#212121; margin-top:0;"><img src="image/blackcube.png" style="width:24px; vertical-align:middle; margin-right:4px;"> 블랙 큐브 결과</h3>
         <div style="display:flex; justify-content:space-around; align-items:center; background:#eceff1; padding:10px; border-radius:6px; margin-bottom:15px;">
             <div style="text-align:center; flex:1;"><div style="font-size:11px; color:#777; margin-bottom:5px;">기존 옵션</div><div style="font-size:13px; font-weight:bold; color:#546e7a;">${beforeHtml}</div></div>
             <div style="font-size:20px; color:#424242;">➔</div>
@@ -2953,16 +3013,26 @@ window.startMulungGame = (oppName, oppEquipData, oppCardTotal, oppStarTotal) => 
     waveTimer = 0;
     spawnTimer = 0;
     monsters = []; towers = []; projectiles = []; hitEffects = []; visualEffects = []; fumaList = []; damageTexts = [];
+    oppMonsters = []; oppTowers = [window.startMulungGame = (oppName, oppEquipData, oppCardTotal, oppStarTotal) => {
+    state.status = 'MULUNG'; 
+    isMulungLoopRunning = false; 
+    cancelAnimationFrame(mainReqId);
+    if (typeof mulungReqId !== 'undefined') cancelAnimationFrame(mulungReqId);
+    
+    // 🔥 글로벌 데이터까지 완벽 초기화 (전판 데이터 간섭 100% 차단)
+    state.wave = 1;
+    waveTimer = 0;
+    spawnTimer = 0;
+    
+    monsters = []; towers = []; projectiles = []; hitEffects = []; visualEffects = []; fumaList = []; damageTexts = [];
     oppMonsters = []; oppTowers = []; oppProjectiles = []; oppVisualEffects = []; oppFumaList = []; oppDamageTexts = [];
     selectedUnitIdx = -1; selectedOppUnitIdx = -1;
 
-    // 🔥 3. 캔버스 화면 지우기
     if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (oppCtx) oppCtx.clearRect(0, 0, oppCanvas.width, oppCanvas.height);
 
     window.switchScreen('game-container');
     
-    // 🔥 4. 그리드 완전히 새로 깔기
     setGridMode('MULUNG');
     document.getElementById('grid-container').style.display = 'grid';
     
@@ -2979,7 +3049,7 @@ window.startMulungGame = (oppName, oppEquipData, oppCardTotal, oppStarTotal) => 
     let speedBtn = document.getElementById('btn-speed');
     if (speedBtn) { speedBtn.style.display = 'block'; state.speed = 1; speedBtn.innerText = "1배속"; }
     
-    // 🔥 5. 텍스트 강제 고정 (30층 등 이전 텍스트 덮어씌움)
+    // 🔥 텍스트 강제 고정 (30층 등 이전 텍스트 덮어씌움)
     document.getElementById('ui-wave').innerText = "준비 중...";
     let timerEl = document.getElementById('ui-timer');
     if (timerEl) { timerEl.innerText = "10"; if (timerEl.nextSibling && timerEl.nextSibling.nodeType === 3 && !timerEl.nextSibling.textContent.includes('초')) { timerEl.nextSibling.textContent = '초'; } }
@@ -3004,7 +3074,6 @@ window.startMulungGame = (oppName, oppEquipData, oppCardTotal, oppStarTotal) => 
         controlsPanel.innerHTML = `<div style="text-align:center; font-weight:bold; font-size:14px; color:#004d40; margin-bottom: 5px; border-top: 1px dashed #00796b; padding-top: 5px;">🐼 무릉도장 유닛 승급 🐼</div><div class="upgrade-container" id="mulung-upgrade-buttons" style="display:flex; justify-content:center; gap:5px; padding-bottom: 10px;"></div>`;
     }
 
-    // 🔥 6. 무릉도장 전용 상태 완벽 초기화
     mulungState = {
         active: true, status: 'SELECTING', prepTime: 10, wave: 1, coins: 0, oppCoins: 0,
         boss: null, lastTime: performance.now(),
@@ -3014,7 +3083,7 @@ window.startMulungGame = (oppName, oppEquipData, oppCardTotal, oppStarTotal) => 
 
     window.showMulungClassSelect();
     
-    // 🔥 7. 루프 재가동
+    // 🔥 철벽 가드: 새로 진입할 때 무조건 루프 재가동
     isMulungLoopRunning = true;
     mulungReqId = requestAnimationFrame(mulungLoop);
 };
@@ -3249,9 +3318,9 @@ function mulungLoop() {
     }
 
     let cardMulti = 1 + (getTotalCardBonus() / 100); 
-    let rageMulti = 1 + ((skillLevels.common_rage||0) * 0.01) + (equipStats.atk * 0.01); 
-    let sharpChance = ((skillLevels.common_sharp||0) * 0.05) + (equipStats.crit * 0.01); 
-    let windReduc = 1 + ((skillLevels.common_wind||0) * 0.2) + (equipStats.spd * 0.01);
+    let rageMulti = 1 + getSkillValue('common_rage', skillLevels.common_rage) + (equipStats.atk * 0.01); 
+let sharpChance = getSkillValue('common_sharp', skillLevels.common_sharp) + (equipStats.crit * 0.01); 
+let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equipStats.spd * 0.01);
     let myUnpen = equipStats.unpenetratedRate;
     if (b.threatTimer > 0) myUnpen *= 0.9;
     let appliedArmor = b.armor * myUnpen;
@@ -3708,7 +3777,7 @@ window.closeMulungResult = () => {
     document.getElementById('mulung-result-modal').style.display = 'none';
     document.getElementById('overlay').style.display = 'none';
     
-    // 🔥 게임 종료 시 확실하게 상태값 초기화
+    // 🔥 게임 종료 시 확실하게 상태값 완전 초기화 (루프 꼬임 방지)
     state.status = 'TITLE';
     state.wave = 1;
     waveTimer = 0;
@@ -3716,6 +3785,8 @@ window.closeMulungResult = () => {
     isMulungLoopRunning = false;
     cancelAnimationFrame(mulungReqId);
 
+    // 🔥 모험 모드 UI 강제 복구 (무릉 UI 찌꺼기 방지)
+    window.restoreAdventureUI();
     window.switchScreen('start-screen');
 };
 
@@ -3919,9 +3990,9 @@ window.loop = () => {
     if(!state.isRank && monsters.length >= 50) return gameOver("몬스터 50마리 초과! 게임 오버");
     
     let cardMulti = 1 + (getTotalCardBonus() / 100); 
-    let rageMulti = 1 + ((skillLevels.common_rage||0) * 0.01) + (equipStats.atk * 0.01); 
-    let sharpChance = ((skillLevels.common_sharp||0) * 0.05) + (equipStats.crit * 0.01); 
-    let windReduc = 1 + ((skillLevels.common_wind||0) * 0.2) + (equipStats.spd * 0.01);
+    let rageMulti = 1 + getSkillValue('common_rage', skillLevels.common_rage) + (equipStats.atk * 0.01); 
+let sharpChance = getSkillValue('common_sharp', skillLevels.common_sharp) + (equipStats.crit * 0.01); 
+let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equipStats.spd * 0.01);
 
     towers.forEach(t => {
         let overloadMult = 1;
@@ -4018,10 +4089,10 @@ window.loop = () => {
                 let dmg = (t.cls.baseDmg + (state.upgrades[t.cls.type].val * 0.15) + equipStats.flatAtk) * t.grade.mult * cardMulti * rageMulti; 
                 if (target.threatTimer > 0) dmg *= 1.3; 
                 let isCrit = Math.random() < sharpChance; if (isCrit) dmg *= (1.2 + (equipStats.cdmg / 100)); 
-                let isFinal = false; if (t.cls.type === '전사' && (skillLevels.war_final||0) > 0 && Math.random() < ((skillLevels.war_final||0) * 0.03)) { isFinal = true; dmg *= 2; }
+                let isFinal = false; if (u.cls.type === '전사' && skillLevels.war_final > 0 && Math.random() < getSkillValue('war_final', skillLevels.war_final)) { isFinal = true; dmg *= 2; }
                 
                 projectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: isFinal, baseDmgToPass: dmg, sourceTower: t });
-                if (t.cls.type === '도적' && (skillLevels.thief_shadow||0) > 0 && Math.random() < ((skillLevels.thief_shadow||0) * 0.03)) { projectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: false, isShadow: true, sourceTower: t }); }
+                if (u.cls.type === '도적' && skillLevels.thief_shadow > 0 && Math.random() < getSkillValue('thief_shadow', skillLevels.thief_shadow)) { projectiles.push({ type: t.cls.type, x: t.x, y: t.y, tx: target.x, ty: target.y, dmg: dmg, splash: t.grade.splash ? (t.cls.splash || 100) : t.cls.splash, color: t.cls.color, target: target, angle: 0, gradeIdx: t.gradeIdx, isCrit: isCrit, isFinal: false, isShadow: true, sourceTower: t }); }
                 
                 t.lastAttack += attackCd;
             } else { t.lastAttack = 0; break; }
@@ -4076,7 +4147,7 @@ window.loop = () => {
                 if(state.isRank && p.target.isBoss) rankState.myBossDamage += hitDmg;
                 if (p.isCrit) damageTexts.push({ val: Math.floor(hitDmg), x: p.target.x, y: p.target.y - 35, timer: 0.8 });
                 if (p.type === '전사' && Math.random() < 0.2) p.target.stunTimer = 1;
-                if (p.type === '법사' && (skillLevels.mage_freeze||0) > 0 && Math.random() < ((10 + (skillLevels.mage_freeze||0) * 2) / 100)) { if (p.target.freezeTimer <= 0) { p.target.freezeTimer = 3; p.target.freezeTickTimer = 1; p.target.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][(skillLevels.mage_freeze||0) - 1]; } }
+                if (p.type === '법사' && skillLevels.mage_freeze > 0 && Math.random() < getFreezeChance(skillLevels.mage_freeze)) { if (p.target.freezeTimer <= 0) { p.target.freezeTimer = 3; p.target.freezeTickTimer = 1; p.target.freezeDmgVal = p.baseDmgToPass * getFreezeDmg(skillLevels.mage_freeze); } }
             }
             if(p.splash > 0) {
                 monsters.forEach(m => {
@@ -4098,7 +4169,7 @@ window.loop = () => {
                         if(state.isRank && m.isBoss) rankState.myBossDamage += splashDmg;
                         if (p.isCrit) damageTexts.push({ val: Math.floor(splashDmg), x: m.x, y: m.y - 35, timer: 0.8 });
                         if (p.type === '전사' && Math.random() < 0.2) m.stunTimer = 1;
-                        if (p.type === '법사' && (skillLevels.mage_freeze||0) > 0 && Math.random() < ((10 + (skillLevels.mage_freeze||0) * 2) / 100)) { if (m.freezeTimer <= 0) { m.freezeTimer = 3; m.freezeTickTimer = 1; m.freezeDmgVal = p.baseDmgToPass * [0.02, 0.03, 0.03, 0.04, 0.05][(skillLevels.mage_freeze||0) - 1]; } }
+                        if (p.type === '법사' && skillLevels.mage_freeze > 0 && Math.random() < getFreezeChance(skillLevels.mage_freeze)) { if (p.target.freezeTimer <= 0) { p.target.freezeTimer = 3; p.target.freezeTickTimer = 1; p.target.freezeDmgVal = p.baseDmgToPass * getFreezeDmg(skillLevels.mage_freeze); } }
                     }
                 });
             }
