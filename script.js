@@ -425,10 +425,12 @@ window.distributeBossRankRewards = async () => {
                     rank: i + 1, tier: rTier
                 });
             }
+            
+            // 🔥 핵심 추가: 보상 분배가 모두 끝나면 랭킹판을 통째로 삭제(초기화)하여 새 보스 경쟁을 시작합니다!
+            await remove(ref(database, `worldBoss_rankings`));
         }
     } catch(e) { console.warn("랭킹 보상 분배 오류:", e); }
 };
-
 function getBossInfo(w) {
     if (w < 100 && BOSS_WAVES[w]) return BOSS_WAVES[w];
     if (w >= 100 && w % 5 === 0) { 
