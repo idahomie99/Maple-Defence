@@ -37,6 +37,21 @@ let userEquipped = { '뱃지': null, '엠블럼': null, '링': null };
 let equipStats = { atk: 0, spd: 0, crit: 0, cdmg: 0, pen: 0, flatAtk: 0, unpenetratedRate: 1.0 }; 
 const STARFORCE_BONUS = { 'Rare': 2, 'Epic': 4, 'Unique': 6, 'Legendary': 8 };
 
+// 🔥 [신규] 코어 젬스톤 시스템 전역 변수 및 슬롯 계산 함수
+let highestMulungFloor = 0; // 무릉 최고 층수 캐싱
+let userCores = { 
+    gemstones: 0, // 미개봉 코어 젬스톤 갯수
+    items: {},    // 보유 및 강화 중인 코어 데이터 (예: { war_final: { level: 1, dupes: 0 } })
+    equipped: []  // 현재 장착 중인 코어 리스트
+};
+
+window.getUnlockedCoreSlots = () => {
+    let maxFloor = highestMulungFloor || 0;
+    // 기본 4칸 + 무릉 60층마다 2칸씩 추가 해금 (최대 9칸)
+    let unlockedSlots = 4 + Math.floor(maxFloor / 60) * 2;
+    return Math.min(unlockedSlots, 9); 
+};
+
 const OPTION_RANGES = {
     'Rare': { atk: [1, 3], spd: [1, 3], crit: [1, 3], pen: [2, 5], cdmg: [1, 3] },
     'Epic': { atk: [4, 8], spd: [4, 8], crit: [4, 8], pen: [6, 12], cdmg: [3, 6] },
@@ -236,6 +251,8 @@ window.showLootPopup = (drops) => {
     let dropHtml = drops.map(d => {
         if (d.type === 'equip') return `<div style="display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:10px; background:#f1f8e9; padding:10px; border-radius:8px; border:1px solid #c5e1a5;"><img src="image/equipbox.png" style="width:24px; height:24px;"><span style="font-weight:bold; color:#2e7d32; font-size:15px;">장비 상자 1개</span></div>`;
         else if (d.type === 'card') { let imgSrc = bossImages[d.name] ? bossImages[d.name].src : ''; return `<div style="display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:10px; background:#fff8e1; padding:10px; border-radius:8px; border:1px solid #ffe082;"><img src="${imgSrc}" style="width:30px; height:30px; object-fit:contain;"><span style="font-weight:bold; color:#f57f17; font-size:15px;">${d.name} 카드 1장</span></div>`; }
+        // 🔥 신규 추가: 코어 젬스톤 획득 팝업 UI
+        else if (d.type === 'gemstone') { return `<div style="display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:10px; background:#f3e5f5; padding:10px; border-radius:8px; border:1px solid #ce93d8;"><div style="font-size:24px;">💎</div><span style="font-weight:bold; color:#6a1b9a; font-size:15px;">코어 젬스톤 ${d.count}개</span></div>`; }
     }).join('');
     modal.innerHTML = `<h3 style="color:#e65100; margin-top:0;">✨ 전리품 획득!</h3><p style="font-size:13px; color:#555; margin-bottom:15px;">보스를 처치하고 다음 아이템을 얻었습니다.</p>${dropHtml}<button class="ingame-btn premium-blue" style="width:100%; padding:12px; margin-top:10px;" onclick="closeLootPopup()">확인</button>`;
     modal.style.display = 'block';
@@ -308,6 +325,10 @@ onAuthStateChanged(auth, async (user) => {
         if (nickSnap.exists()) { currentUserName = nickSnap.val(); document.getElementById('current-user-name').innerText = currentUserName; const changeSnap = await get(child(dbRef, `users/${currentUserUid}/lastNicknameChange`)); if (changeSnap.exists()) lastNicknameChange = changeSnap.val(); } 
         else { document.getElementById('nickname-overlay').style.display = 'block'; document.getElementById('nickname-modal').style.display = 'block'; }
 
+        // 🔥 신규 추가: 로그인 시 무릉도장 최고 층수를 불러와서 코어 슬롯 계산에 활용
+        const mulungSnap = await get(child(dbRef, `mulung_rankings/${currentUserUid}/floor`));
+        if (mulungSnap.exists()) highestMulungFloor = mulungSnap.val();
+
         const cloudSnap = await get(child(dbRef, `users/${currentUserUid}/cloudData`));
         if (cloudSnap.exists()) {
             let cloud = cloudSnap.val();
@@ -335,6 +356,10 @@ onAuthStateChanged(auth, async (user) => {
             if (cloud.equips) { let equipsArr = Array.isArray(cloud.equips) ? cloud.equips : Object.values(cloud.equips); userEquips = equipsArr.filter(eq => eq !== null && eq !== undefined).map(eq => { if(eq.type === 'badge') eq.type = '뱃지'; if(eq.type === 'emblem') eq.type = '엠블럼'; if(eq.type === 'ring') eq.type = '링'; return eq; }); } else { userEquips = []; }
 
             if (cloud.raidDate) localStorage.setItem('mapleDefenseRaidDate', cloud.raidDate);
+            
+            // 🔥 신규 추가: 클라우드에서 내 코어 젬스톤 및 장착 정보 불러오기
+            userCores = cloud.coreData || { gemstones: 0, items: {}, equipped: [] };
+
             calculateEquipStats();
 
             if (cloud.skills) { localStorage.setItem('mapleDefenseSkills', cloud.skills); skillLevels = { ...DEFAULT_SKILLS, ...JSON.parse(cloud.skills) }; }
@@ -1301,6 +1326,13 @@ setInterval(() => {
     }
 }, 1000);
 
+// 🔥 [코어 도우미 함수] 장착된 코어의 레벨을 가져옵니다.
+window.getCoreLv = (key) => {
+    if (!userCores || !userCores.equipped || !userCores.equipped.includes(key)) return 0;
+    if (!userCores.items || !userCores.items[key]) return 0;
+    return userCores.items[key].level;
+};
+
 function raidLoop() {
     if (!raidState.active) return;
     let now = performance.now(); let dtReal = (now - raidState.lastTime) / 1000; if (dtReal > 0.1) dtReal = 0.1; raidState.lastTime = now;
@@ -1323,6 +1355,13 @@ function raidLoop() {
     let cardMulti = 1 + (getTotalCardBonus() / 100); 
     let rageMulti = 1 + ((skillLevels.common_rage || 0) * 0.01) + (equipStats.atk * 0.01); 
     let sharpChance = ((skillLevels.common_sharp || 0) * 0.05) + (equipStats.crit * 0.01); 
+    
+    // ✨ [코어 적용] 전사 2번: 위협 코어 (위협 상태 시 파티 전체 크확 보정)
+    let threatCoreLv = window.getCoreLv('war_threat');
+    if (raidState.bossThreatTimer > 0 && threatCoreLv > 0) {
+        sharpChance += (threatCoreLv * 0.01); // 레벨당 1% 증가
+    }
+
     let windReduc = 1 + ((skillLevels.common_wind || 0) * 0.2) + (equipStats.spd * 0.01);
     let bx = 250, by = 150;
 
@@ -1333,17 +1372,31 @@ function raidLoop() {
     raidState.units.forEach((u, idx) => {
         if(!u) return; 
 
+        // ✨ [코어 적용] 도적 8번: 레디투다이 코어 (오버로드 지속 중 크피 증가)
         let overloadMult = 1;
-        let unitBox = document.getElementById(`raid-unit-box-${idx}`);
+        let thiefCdmgBonus = 0;
         if (u.overloadTimer > 0) {
             u.overloadTimer -= dt; overloadMult = 2;
+            let overloadCoreLv = window.getCoreLv('thief_overload');
+            if (overloadCoreLv > 0) thiefCdmgBonus = (overloadCoreLv * 0.02); // 레벨당 2% 증가
+            
+            let unitBox = document.getElementById(`raid-unit-box-${idx}`);
             if (unitBox) { unitBox.style.border = "2px solid #ff1744"; unitBox.style.boxShadow = "0 0 8px #ff1744"; }
             if (u.overloadTimer <= 0) u.unitStunTimer = skillLevels.thief_overload === 1 ? 6 : 5;
         } else {
+            let unitBox = document.getElementById(`raid-unit-box-${idx}`);
             if (unitBox) { unitBox.style.border = ""; unitBox.style.boxShadow = ""; }
         }
+        
         if (u.unitStunTimer > 0) u.unitStunTimer -= dt;
         let isStunned = (u.unitStunTimer > 0);
+
+        // ✨ [코어 적용] 법사 4번: 힐 코어 (버프를 받은 유닛의 공격속도 펌핑)
+        let localWindReduc = windReduc;
+        if (u.healCoreBuffTimer > 0) {
+            u.healCoreBuffTimer -= dtReal;
+            localWindReduc += u.healCoreBuffAmt;
+        }
 
         if (u.gradeIdx >= 6) {
             if (u.cls.type === '법사' && skillLevels.mage_heal > 0) {
@@ -1356,6 +1409,15 @@ function raidLoop() {
                 if (u.healCooldown <= 0 && !isStunned) {
                     u.healCooldown += maxHealCd;
                     raidState.vfx.push({ type: 'heal', x: 150 + (idx * 100), y: 360, timer: 1.0 });
+
+                    // 힐 코어 발동: 가장 강한 유닛(등급이 높은 유닛)을 찾아 공속 버프 부여
+                    let healCoreLv = window.getCoreLv('mage_heal');
+                    if (healCoreLv > 0) {
+                        let bestUnit = u; let bestScore = -1;
+                        raidState.units.forEach(tu => { if (tu && tu.gradeIdx > bestScore) { bestScore = tu.gradeIdx; bestUnit = tu; } });
+                        bestUnit.healCoreBuffTimer = 3.0; // 3초 지속
+                        bestUnit.healCoreBuffAmt = (healCoreLv * 0.02); // 레벨당 공속 2% 증가
+                    }
                 }
             }
         }
@@ -1398,40 +1460,84 @@ function raidLoop() {
                 if (raidState.bossThreatTimer > 0) baseDmg *= 1.3; 
 
                 let gdmg = 0;
-                if (u.cls.type === '전사' && (skillLevels.war_death || 0) > 0) { gdmg = baseDmg * (1.5 + (skillLevels.war_death || 0) * 1.5); raidState.vfx.push({ type: 'death', timer: 1.2, dmg: gdmg }); }
-                else if (u.cls.type === '법사' && (skillLevels.mage_thunder || 0) > 0) { gdmg = baseDmg * (1.5 + (skillLevels.mage_thunder || 0) * 1.5); raidState.vfx.push({ type: 'thunder', timer: 0.5, dmg: gdmg }); }
-                else if (u.cls.type === '도적' && (skillLevels.thief_fuma || 0) > 0) { gdmg = baseDmg * (1.5 + (skillLevels.thief_fuma || 0) * 1.5); raidState.vfx.push({ type: 'fuma', timer: 0.5 }); }
+                let trueDmg = 0; // 코어용 고정 피해(트루뎀)
+
+                if (u.cls.type === '전사' && (skillLevels.war_death || 0) > 0) { 
+                    gdmg = baseDmg * (1.5 + (skillLevels.war_death || 0) * 1.5); 
+                    let dLv = window.getCoreLv('war_death'); // ✨ 전사 3번: 데스폴트 코어
+                    if (dLv > 0) trueDmg = gdmg * (dLv * 0.02);
+                    raidState.vfx.push({ type: 'death', timer: 1.2, dmg: gdmg + trueDmg }); 
+                }
+                else if (u.cls.type === '법사' && (skillLevels.mage_thunder || 0) > 0) { 
+                    gdmg = baseDmg * (1.5 + (skillLevels.mage_thunder || 0) * 1.5); 
+                    let tLv = window.getCoreLv('mage_thunder'); // ✨ 법사 5번: 썬더 코어
+                    if (tLv > 0) trueDmg = gdmg * (tLv * 0.02);
+                    raidState.vfx.push({ type: 'thunder', timer: 0.5, dmg: gdmg + trueDmg }); 
+                }
+                else if (u.cls.type === '도적' && (skillLevels.thief_fuma || 0) > 0) { 
+                    gdmg = baseDmg * (1.5 + (skillLevels.thief_fuma || 0) * 1.5); 
+                    let fLv = window.getCoreLv('thief_fuma'); // ✨ 도적 9번: 풍마수리검 코어 (처형)
+                    if (fLv > 0) {
+                        let lostHpPercent = ((raidState.maxHp - raidState.bossHp) / raidState.maxHp) * 100;
+                        let ampMultiplier = lostHpPercent * (fLv * 0.0003); // 레벨당 0.03% 증폭
+                        gdmg *= (1 + ampMultiplier);
+                    }
+                    raidState.vfx.push({ type: 'fuma', timer: 0.5 }); 
+                }
                 
-                if (gdmg > 0 && !isNaN(gdmg)) {
-                    raidState.totalDmg += gdmg; raidState.pendingDmg += gdmg;
+                let totalHit = gdmg + trueDmg;
+                if (totalHit > 0 && !isNaN(totalHit)) {
+                    raidState.totalDmg += totalHit; raidState.pendingDmg += totalHit;
                     document.getElementById('raid-total-dmg').innerText = Math.round(raidState.totalDmg).toLocaleString();
                     
-                    raidState.bossHp = Math.max(0, raidState.bossHp - gdmg);
+                    raidState.bossHp = Math.max(0, raidState.bossHp - totalHit);
                     let percent = (raidState.bossHp / raidState.maxHp) * 100;
                     document.getElementById('raid-boss-hp-bar').style.width = `${Math.max(0, percent)}%`;
                     document.getElementById('raid-boss-hp-text').innerText = `${Math.max(0, Math.round(raidState.bossHp)).toLocaleString()} / ${raidState.maxHp.toLocaleString()}`;
 
                     let ox = (Math.random() - 0.5) * 50; let oy = (Math.random() - 0.5) * 50;
-                    raidState.dmgTexts.push({ val: Math.round(gdmg), x: bx + ox, y: by - 80 + oy, timer: 0.8, isCrit: true });
+                    raidState.dmgTexts.push({ val: Math.round(totalHit), x: bx + ox, y: by - 80 + oy, timer: 0.8, isCrit: true });
                 }
                 u.globalCooldown += 60000;
             }
         }
 
         u.lastAttack -= dt * 1000;
-        let attackCd = (1000 * (u.grade.speedMul || 1)) / (windReduc * overloadMult);
+        let attackCd = (1000 * (u.grade.speedMul || 1)) / (localWindReduc * overloadMult);
         while (u.lastAttack <= 0) {
             if (isStunned) { u.lastAttack = 0; break; }
             let dmg = (20 + equipStats.flatAtk) * u.grade.mult * cardMulti * rageMulti; 
             if (raidState.bossThreatTimer > 0) dmg *= 1.3;
-            let isCrit = Math.random() < sharpChance; if (isCrit) dmg *= (1.2 + (equipStats.cdmg / 100));
+            let isCrit = Math.random() < sharpChance; 
+            if (isCrit) dmg *= (1.2 + (equipStats.cdmg / 100) + thiefCdmgBonus);
             dmg *= (1 - appliedArmor);
 
             let isFinal = false; 
-            if (u.cls.type === '전사' && (skillLevels.war_final || 0) > 0 && Math.random() < ((skillLevels.war_final || 0) * 0.03)) { isFinal = true; dmg *= 2; }
+            if (u.cls.type === '전사' && (skillLevels.war_final || 0) > 0 && Math.random() < ((skillLevels.war_final || 0) * 0.03)) { 
+                isFinal = true; dmg *= 2; 
+            }
+
+            // ✨ [코어 적용] 전사 1번: 파이널 어택 코어 (더블 어택 발동)
+            if (isFinal) {
+                let faLv = window.getCoreLv('war_final');
+                if (faLv > 0 && Math.random() < (faLv * 0.02)) {
+                    raidState.projectiles.push({ type: u.cls.type, x: 150 + (idx * 100), y: 360, tx: bx, ty: by, dmg: dmg, color: u.cls.color, angle: 0, isCrit: isCrit, gradeIdx: u.gradeIdx, isFinal: true }); 
+                }
+            }
 
             raidState.projectiles.push({ type: u.cls.type, x: 150 + (idx * 100), y: 360, tx: bx, ty: by, dmg: dmg, color: u.cls.color, angle: 0, isCrit: isCrit, gradeIdx: u.gradeIdx, isFinal: isFinal }); 
-            if (u.cls.type === '도적' && (skillLevels.thief_shadow || 0) > 0 && Math.random() < ((skillLevels.thief_shadow || 0) * 0.03)) { raidState.projectiles.push({ type: u.cls.type, x: 150 + (idx * 100), y: 360, tx: bx, ty: by, dmg: dmg, color: u.cls.color, angle: 0, isCrit: isCrit, gradeIdx: u.gradeIdx, isShadow: true }); }
+            
+            // ✨ [코어 적용] 도적 7번: 섀도 파트너 코어 (추가 방관 부여)
+            if (u.cls.type === '도적' && (skillLevels.thief_shadow || 0) > 0 && Math.random() < ((skillLevels.thief_shadow || 0) * 0.03)) { 
+                let shadowDmg = dmg;
+                let spLv = window.getCoreLv('thief_shadow');
+                if (spLv > 0) {
+                    let extraPen = spLv * 0.02; // 레벨당 2% 방관 추가
+                    let newArmor = 0.50 * Math.max(0, myUnpen - extraPen); 
+                    shadowDmg = (dmg / (1 - appliedArmor)) * (1 - newArmor); // 깎인 방어력만큼 데미지 복구
+                }
+                raidState.projectiles.push({ type: u.cls.type, x: 150 + (idx * 100), y: 360, tx: bx, ty: by, dmg: shadowDmg, color: u.cls.color, angle: 0, isCrit: isCrit, gradeIdx: u.gradeIdx, isShadow: true }); 
+            }
             u.lastAttack += attackCd;
         }
     });
@@ -2734,7 +2840,8 @@ window.syncToCloud = async () => {
         rp: userRankData.rp, 
         rankMoney: userRankData.rankMoney, 
         bonusCoins: userRankData.bonusCoins, 
-        mulungCoins: userRankData.mulungCoins || 0, // 🔥 누락되었던 무릉 코인 서버 저장 추가!
+        mulungCoins: userRankData.mulungCoins || 0, 
+        coreData: userCores, // 🔥 신규 추가: 유저의 코어 인벤토리 및 장착 정보 저장
         raidDate: localStorage.getItem('mapleDefenseRaidDate') || null, 
         inventory: userInventory, 
         equips: userEquips, 
@@ -2793,6 +2900,10 @@ window.openMulungShop = () => {
                         <span style="font-weight:bold; font-size:14px;"><img src="image/blackcube.png" style="width:18px; vertical-align:middle; margin-right:4px;">블랙 큐브</span>
                         <button class="ingame-btn premium-dark" style="width:80px; padding:6px 0; font-size:12px;" onclick="buyMulungItem('cube')">200 코인</button>
                     </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:#f3e5f5; padding:10px; border-radius:6px; border:1px solid #ce93d8;">
+                        <span style="font-weight:bold; font-size:14px;">💎 코어 젬스톤</span>
+                        <button class="ingame-btn premium-dark" style="width:80px; padding:6px 0; font-size:12px;" onclick="buyMulungItem('gemstone')">500 코인</button>
+                    </div>
                 </div>
                 <button class="ingame-btn premium-white" style="width:100%; padding:10px; margin-top:10px;" onclick="closeMulungShop()">닫기</button>`;
     modal.innerHTML = html;
@@ -2810,13 +2921,14 @@ window.closeMulungShop = () => {
 };
 
 window.buyMulungItem = (type) => {
-    let cost = { 'piece': 20, 'star': 10, 'equipBox': 100, 'cube': 200 }[type];
+    let cost = { 'piece': 20, 'star': 10, 'equipBox': 100, 'cube': 200, 'gemstone': 500 }[type];
     if (userRankData.mulungCoins < cost) return window.showMessage("무릉 코인이 부족합니다.");
     userRankData.mulungCoins -= cost;
     if (type === 'piece') userInventory.coinPieces += 1;
     else if (type === 'star') userInventory.starPieces = (userInventory.starPieces || 0) + 1;
     else if (type === 'equipBox') userInventory.equipBoxes += 1;
     else if (type === 'cube') userInventory.blackCubes += 1;
+    else if (type === 'gemstone') userCores.gemstones += 1; // 🔥 젬스톤 구매
     window.syncToCloud(); window.openMulungShop(); window.showMessage("구매를 완료했습니다!");
 };
 
@@ -4184,6 +4296,16 @@ let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equ
                     let drops = [];
                     if (Math.random() * 100 <= 5) { userInventory.equipBoxes = (userInventory.equipBoxes || 0) + 1; drops.push({ type: 'equip' }); }
                     if (Math.random() * 100 <= 20) { cardData[bInfo.name] = cardData[bInfo.name] || { owned: 0, grade: 0 }; cardData[bInfo.name].owned++; localStorage.setItem('mapleDefenseCards', JSON.stringify(cardData)); if (currentUserUid) window.syncToCloud(); drops.push({ type: 'card', name: bInfo.name }); }
+                    
+                    // 🔥 신규 추가: 150층 이상에서 50% 확률로 젬스톤 드랍 (90% 1개, 9% 2개, 1% 3개)
+                    if (state.wave >= 150 && Math.random() < 0.5) {
+                        let r = Math.random(); let gCount = 1;
+                        if (r > 0.99) gCount = 3; else if (r > 0.90) gCount = 2;
+                        userCores.gemstones += gCount;
+                        if (currentUserUid) window.syncToCloud();
+                        drops.push({ type: 'gemstone', count: gCount });
+                    }
+
                     if (drops.length > 0) { window.showLootPopup(drops); } else { window.showMessage(`${state.wave}라운드 보스 처치!`); }
                 }
             }
@@ -4238,3 +4360,169 @@ let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equ
     window.draw(); if(state.isRank) window.drawOpp(); 
     mainReqId = requestAnimationFrame(window.loop);
 };
+
+// ==========================================
+// 🔥 [3단계 신규] V 매트릭스 (코어 젬스톤) 시스템 UI 및 로직
+// ==========================================
+const CORE_INFO = {
+    'war_final': { name: '파이널 어택 코어', icon: '🗡️', desc: (lv) => `파이널 어택 발동 시 ${lv * 2}% 확률로 한 번 더 타격(더블어택)` },
+    'war_threat': { name: '위협 코어', icon: '💢', desc: (lv) => `위협 상태 적 타격 시 파티 전체 크리티컬 확률 ${lv * 1}% 증가` },
+    'war_death': { name: '데스폴트 코어', icon: '⚔️', desc: (lv) => `적중 시 데미지의 ${lv * 2}%만큼 방어력 무시 추가 타격` },
+    'mage_heal': { name: '힐 코어', icon: '💚', desc: (lv) => `힐 대상(메인딜러 우선)의 공격 속도 ${lv * 2}% 증가 (3초)` },
+    'mage_thunder': { name: '썬더 브레이크 코어', icon: '⚡', desc: (lv) => `적중 시 데미지의 ${lv * 2}%만큼 방어력 무시 추가 타격` },
+    'mage_freeze': { name: '빙결(마비) 코어', icon: '❄️', desc: (lv) => `빙결 상태 적 타격 시 해당 타격 데미지 ${lv * 3}% 증폭` },
+    'thief_shadow': { name: '섀도 파트너 코어', icon: '👤', desc: (lv) => `섀도 파트너 투사체에 방어력 관통 ${lv * 2}% 부여` },
+    'thief_overload': { name: '레디 투 다이 코어', icon: '☠️', desc: (lv) => `스킬 지속(공속 2배) 중 크리티컬 피해량 ${lv * 2}% 증가` },
+    'thief_fuma': { name: '풍마수리검 코어', icon: '🌀', desc: (lv) => `적이 잃은 체력 1%당 데미지 ${+(lv * 0.03).toFixed(2)}% 증폭` }
+};
+
+window.openVMatrixModal = () => {
+    document.getElementById('overlay').style.display = 'block';
+    let modal = document.getElementById('vmatrix-modal');
+    if (!modal) {
+        let mDiv = document.createElement('div'); mDiv.id = 'vmatrix-modal'; mDiv.className = 'maple-modal';
+        mDiv.style.cssText = "display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:5000; width:90%; max-width:340px; background:#fff; border:2px solid #6a1b9a; padding:15px; border-radius:10px; text-align:center; box-shadow: 0 10px 30px rgba(0,0,0,0.6); max-height:85vh; overflow-y:auto;";
+        document.body.appendChild(mDiv); modal = mDiv;
+    }
+    window.renderVMatrix();
+    modal.style.display = 'block';
+};
+
+window.closeVMatrixModal = () => {
+    let modal = document.getElementById('vmatrix-modal'); if(modal) modal.style.display = 'none';
+    document.getElementById('overlay').style.display = 'none';
+};
+
+window.renderVMatrix = () => {
+    let modal = document.getElementById('vmatrix-modal');
+    if(!modal) return;
+    
+    let maxSlots = window.getUnlockedCoreSlots();
+    let currentMaxFloor = highestMulungFloor || 0;
+    
+    // 🔥 슬롯 영역 HTML 그리기
+    let slotsHtml = `<div style="font-size:12px; color:#555; margin-bottom:5px; text-align:left;">장착 슬롯 <span style="color:#6a1b9a; font-weight:bold;">(${userCores.equipped.length} / ${maxSlots})</span> <span style="font-size:10px; color:#888; float:right;">무릉 ${currentMaxFloor}층 기록</span></div>`;
+    slotsHtml += `<div style="display:flex; justify-content:center; flex-wrap:wrap; gap:8px; margin-bottom:15px; background:#f5f5f5; padding:10px; border-radius:8px;">`;
+    for(let i=0; i<maxSlots; i++) {
+        if (i < userCores.equipped.length) {
+            let coreKey = userCores.equipped[i];
+            let info = CORE_INFO[coreKey];
+            let lv = userCores.items[coreKey].level;
+            slotsHtml += `<div style="width:50px; height:50px; background:#f3e5f5; border:2px solid #ab47bc; border-radius:8px; display:flex; flex-direction:column; justify-content:center; align-items:center; cursor:pointer; box-shadow:0 2px 4px rgba(0,0,0,0.2);" onclick="toggleEquipCore('${coreKey}')"><div style="font-size:20px;">${info.icon}</div><div style="font-size:10px; color:#6a1b9a; font-weight:bold; margin-top:2px;">Lv.${lv}</div></div>`;
+        } else {
+            slotsHtml += `<div style="width:50px; height:50px; background:#eceff1; border:2px dashed #90a4ae; border-radius:8px; display:flex; justify-content:center; align-items:center; color:#90a4ae; font-size:10px;">빈 칸</div>`;
+        }
+    }
+    for(let i=maxSlots; i<9; i++) {
+        slotsHtml += `<div style="width:50px; height:50px; background:#cfd8dc; border:2px solid #b0bec5; border-radius:8px; display:flex; justify-content:center; align-items:center; color:#78909c; font-size:20px;">🔒</div>`;
+    }
+    slotsHtml += `</div>`;
+
+    // 🔥 보유 코어 리스트 HTML 그리기 (장착 중인 것을 위로 정렬)
+    let invHtml = `<div style="text-align:left; font-size:12px; font-weight:bold; color:#4a148c; margin-bottom:5px;">보유 중인 코어 <span style="font-size:10px; font-weight:normal; color:#666;">(클릭하여 장착/해제)</span></div><div style="display:flex; flex-direction:column; gap:6px;">`;
+    let hasCore = false;
+    
+    let sortedKeys = Object.keys(userCores.items).sort((a,b) => {
+        let equipA = userCores.equipped.includes(a) ? 1 : 0;
+        let equipB = userCores.equipped.includes(b) ? 1 : 0;
+        if(equipA !== equipB) return equipB - equipA;
+        return userCores.items[b].level - userCores.items[a].level;
+    });
+
+    for(let key of sortedKeys) {
+        hasCore = true;
+        let item = userCores.items[key];
+        let info = CORE_INFO[key];
+        let isEquipped = userCores.equipped.includes(key);
+        let reqDupes = item.level * 2; // 1->2렙 2개, 2->3렙 4개, 3->4렙 6개...
+let canUpgrade = item.level < 10 && item.dupes >= reqDupes;
+        
+        let btnAction = isEquipped ? `<button class="ingame-btn premium-dark" style="padding:5px 8px; font-size:11px;" onclick="toggleEquipCore('${key}')">장착 해제</button>` : `<button class="ingame-btn premium-blue" style="padding:5px 8px; font-size:11px;" onclick="toggleEquipCore('${key}')">장착 하기</button>`;
+        let btnUpgrade = item.level < 10 ? `<button class="ingame-btn ${canUpgrade ? 'premium-purple' : 'premium-white'}" style="padding:5px 8px; font-size:11px; margin-left:4px; width:70px;" ${canUpgrade?'':'disabled'} onclick="upgradeCore('${key}')">강화<br>(${item.dupes}/${reqDupes})</button>` : `<button class="ingame-btn premium-dark" style="padding:5px 8px; font-size:11px; margin-left:4px; width:70px;" disabled>MAX</button>`;
+
+        invHtml += `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:${isEquipped ? '#f3e5f5' : '#fff'}; border:2px solid ${isEquipped ? '#ab47bc' : '#cfd8dc'}; padding:8px; border-radius:8px;">
+                <div style="display:flex; align-items:center; gap:8px; width:65%;">
+                    <div style="font-size:26px;">${info.icon}</div>
+                    <div style="text-align:left;">
+                        <div style="font-size:12px; font-weight:bold; color:#212121;">${info.name} <span style="color:#6a1b9a;">Lv.${item.level}</span></div>
+                        <div style="font-size:10px; color:#555; margin-top:2px; line-height:1.2;">${info.desc(item.level)}</div>
+                    </div>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:4px; align-items:center;">
+                    ${btnAction}
+                    ${btnUpgrade}
+                </div>
+            </div>
+        `;
+    }
+    if(!hasCore) invHtml += `<div style="text-align:center; color:#999; padding:20px; font-size:12px; border:1px dashed #ccc; border-radius:8px;">보유한 코어가 없습니다.<br>젬스톤을 개봉하여 코어를 획득하세요!</div>`;
+    invHtml += `</div>`;
+
+    modal.innerHTML = `
+        <h3 style="color:#4a148c; margin-top:0; font-size:22px; margin-bottom:10px; text-shadow:1px 1px 0px rgba(0,0,0,0.1);">💎 V 매트릭스</h3>
+        <div style="background:#fff3e0; padding:12px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border:2px solid #ce93d8;">
+            <div style="font-size:12px; font-weight:bold; color:#6a1b9a;">보유 젬스톤: <span style="font-size:16px; color:#d32f2f;">${userCores.gemstones}</span>개</div>
+            <button class="ingame-btn premium-orange" style="padding:8px 12px; font-size:12px;" onclick="openGemstone()">✨ 1개 개봉</button>
+        </div>
+        ${slotsHtml}
+        ${invHtml}
+        <button class="ingame-btn premium-white" style="width:100%; padding:12px; margin-top:15px; font-size:14px;" onclick="closeVMatrixModal()">닫기</button>
+    `;
+};
+
+window.openGemstone = () => {
+    if (userCores.gemstones <= 0) return window.showMessage("보유한 코어 젬스톤이 없습니다.");
+    userCores.gemstones--;
+    let keys = Object.keys(CORE_INFO);
+    let getCore = keys[Math.floor(Math.random() * keys.length)];
+    
+    if (!userCores.items[getCore]) { userCores.items[getCore] = { level: 1, dupes: 0 }; } 
+    else { userCores.items[getCore].dupes++; }
+    
+    window.syncToCloud(); window.renderVMatrix();
+    
+    let info = CORE_INFO[getCore];
+    let msg = userCores.items[getCore].dupes === 0 
+        ? `🎉 신규 코어 획득: [${info.name}]!` 
+        : `💎 코어 조각 획득: [${info.name}] (보유: ${userCores.items[getCore].dupes}개)`;
+    window.showMessage(msg);
+};
+
+window.toggleEquipCore = (key) => {
+    let idx = userCores.equipped.indexOf(key);
+    if (idx > -1) { userCores.equipped.splice(idx, 1); } 
+    else {
+        let maxSlots = window.getUnlockedCoreSlots();
+        if (userCores.equipped.length >= maxSlots) return window.showMessage("더 이상 장착할 슬롯이 없습니다. 무릉도장 기록을 갱신하세요!");
+        userCores.equipped.push(key);
+    }
+    window.syncToCloud(); window.renderVMatrix();
+};
+
+window.upgradeCore = (key) => {
+    let item = userCores.items[key];
+    if (!item || item.level >= 10) return;
+    
+    let reqDupes = item.level * 2; // 1->2렙 2개, 2->3렙 4개, 3->4렙 6개...
+    
+    if (item.dupes >= reqDupes) {
+        item.dupes -= reqDupes; item.level++;
+        window.syncToCloud(); window.renderVMatrix();
+        window.showMessage(`🌟 [${CORE_INFO[key].name}] Lv.${item.level} 달성!`);
+    }
+};
+
+// 🔥 로비 화면(start-screen)에 자동으로 V 매트릭스 진입 버튼 생성
+setInterval(() => {
+    let startScreen = document.getElementById('start-screen');
+    if (startScreen && startScreen.style.display !== 'none' && !document.getElementById('btn-vmatrix-floating')) {
+        let vBtn = document.createElement('button');
+        vBtn.id = 'btn-vmatrix-floating';
+        vBtn.className = 'ingame-btn premium-purple';
+        vBtn.innerHTML = '<span style="font-size:18px;">💎</span><br>V 매트릭스';
+        vBtn.style.cssText = "position:absolute; top:80px; left:20px; padding:10px 15px; font-size:14px; font-weight:bold; box-shadow:0 4px 15px rgba(171, 71, 188, 0.6); z-index:100; border-radius:10px; line-height:1.4;";
+        vBtn.onclick = window.openVMatrixModal;
+        startScreen.appendChild(vBtn);
+    }
+}, 1000);
