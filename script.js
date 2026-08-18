@@ -1,3 +1,5 @@
+let isDataLoaded = false;
+
 // 🔥 1.0.77 버전 - 레디투다이 45초 쿨타임, 신규 이펙트 추가, 보스 반격 로직 수정 및 힐 스킬 6차 조정
 const GAME_VERSION = "1.0.77"; 
 
@@ -293,6 +295,7 @@ function calculateEquipStats() {
 }
 
 window.syncToCloud = async () => {
+    if (!isDataLoaded) return;
     if (!currentUserUid) return;
     let cloudProfile = { save: localStorage.getItem('mapleDefenseSave') || null, cards: localStorage.getItem('mapleDefenseCards') || null, skills: localStorage.getItem('mapleDefenseSkills') || null, coins: localStorage.getItem('mapleDefenseSpentCoins') || null, bestWave: localStorage.getItem('mapleDefenseBestWave') || null, rp: userRankData.rp, rankMoney: userRankData.rankMoney, bonusCoins: userRankData.bonusCoins, raidDate: localStorage.getItem('mapleDefenseRaidDate') || null, inventory: userInventory, equips: userEquips, equipped: userEquipped };
     await set(ref(database, `users/${currentUserUid}/cloudData`), cloudProfile);
@@ -409,6 +412,7 @@ onAuthStateChanged(auth, async (user) => {
         });
 
     } else { currentUserUid = null; window.switchScreen('login-screen'); }
+    isDataLoaded = true;
 });
 
 window.submitNickname = async () => { let input = document.getElementById('nickname-input').value.trim(); if (!input) { window.showMessage("닉네임을 입력해주세요."); return; } if (input.length > 10) { window.showMessage("닉네임은 10자 이하로 해주세요."); return; } try { const now = Date.now(); await update(ref(database, `users/${currentUserUid}`), { nickname: input, lastNicknameChange: now }); currentUserName = input; lastNicknameChange = now; document.getElementById('current-user-name').innerText = currentUserName; document.getElementById('nickname-overlay').style.display = 'none'; document.getElementById('nickname-modal').style.display = 'none'; window.switchScreen('start-screen'); } catch (e) { window.showMessage("닉네임 저장 중 오류가 발생했습니다."); } };
