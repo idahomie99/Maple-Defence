@@ -1022,19 +1022,18 @@ window.renderInventoryTab = (tab) => {
     let list = document.getElementById('inventory-list'); list.innerHTML = '';
     if (tab === 'consumable') {
         if(userInventory.coinPieces > 0) list.innerHTML += createInvBox('🧩', '코인 조각', userInventory.coinPieces, "combineCoinPieces()");
-        
-        // 🔥 장비상자를 이미지로 교체
         if(userInventory.equipBoxes > 0) list.innerHTML += createInvBox('<img src="image/equipbox.png" style="width:24px; height:24px; object-fit:contain;">', '장비 상자', userInventory.equipBoxes, "openBox('equipBoxes')");
-        
         list.innerHTML += createInvBox('🌟', '별 기운', userInventory.starPieces || 0, ""); 
-        
         if((userRankData.mulungCoins || 0) > 0) list.innerHTML += createInvBox('🐼', '무릉 코인', userRankData.mulungCoins, "openMulungShop()");
-        
-        // 🔥 인벤토리에 블랙 큐브 이미지와 함께 표시
         if((userInventory.blackCubes || 0) > 0) list.innerHTML += createInvBox('<img src="image/blackcube.png" style="width:24px; height:24px; object-fit:contain;">', '블랙 큐브', userInventory.blackCubes, "");
-        
         ['브론즈', '실버', '골드', '플래티넘', '다이아몬드', '챌린저'].forEach(tier => { if (userInventory.boxes[tier] > 0) { list.innerHTML += createInvBox('🧰', `${tier} 상자`, userInventory.boxes[tier], `openBox('${tier}')`); } });
     } else if (tab === 'equip') {
+        // 🔥 신규 추가: 일괄 분해 버튼 생성
+        let btnWrapper = document.createElement('div');
+        btnWrapper.style.cssText = "grid-column: 1 / -1; width: 100%; display:flex; justify-content:flex-end; margin-bottom:10px;";
+        btnWrapper.innerHTML = `<button class="ingame-btn premium-red" style="padding:6px 12px; font-size:12px; box-shadow:0 2px 4px rgba(0,0,0,0.3);" onclick="openBulkDisassembleModal()">🗑️ 일괄 분해</button>`;
+        list.appendChild(btnWrapper);
+
         userEquips.forEach((eq, idx) => {
             let el = document.createElement('div'); el.className = `inv-item-box equip-${eq.grade.toLowerCase()}`;
             let statStr = "";
@@ -4554,3 +4553,71 @@ setInterval(() => {
         startScreen.appendChild(vBtn);
     }
 }, 1000);
+
+// ==========================================
+// 🔥 장비 일괄 분해 시스템
+// ==========================================
+window.openBulkDisassembleModal = () => {
+    let modal = document.getElementById('bulk-disassemble-modal');
+    if (!modal) {
+        let mDiv = document.createElement('div'); mDiv.id = 'bulk-disassemble-modal'; mDiv.className = 'maple-modal';
+        mDiv.style.cssText = "display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:4000; width:85%; max-width:320px; background:#fff; border:2px solid #b71c1c; padding:15px; border-radius:8px; text-align:center;";
+        document.body.appendChild(mDiv); modal = mDiv;
+    }
+    
+    let html = `
+        <h3 style="color:#b71c1c; margin-top:0;">🗑️ 장비 일괄 분해</h3>
+        <div style="font-size:12px; color:#555; margin-bottom:15px; line-height:1.4;">조건에 맞는 <b>장착 해제된 장비</b>를 모두 분해합니다.<br><span style="color:#d32f2f;">(※ 분해된 장비는 복구할 수 없습니다!)</span></div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+            <button class="ingame-btn premium-blue" style="padding:10px; font-size:13px;" onclick="executeBulkDisassemble('Rare')">레어(Rare) 등급만 모두 분해</button>
+            <button class="ingame-btn premium-purple" style="padding:10px; font-size:13px;" onclick="executeBulkDisassemble('Epic')">에픽(Epic) 이하 모두 분해</button>
+            <button class="ingame-btn premium-orange" style="padding:10px; font-size:13px;" onclick="executeBulkDisassemble('Unique')">유니크(Unique) 이하 모두 분해</button>
+        </div>
+        <button class="ingame-btn premium-white" style="width:100%; padding:10px; margin-top:15px;" onclick="closeBulkDisassembleModal()">닫기</button>
+    `;
+    modal.innerHTML = html;
+    modal.style.display = 'block';
+};
+
+window.closeBulkDisassembleModal = () => {
+    let modal = document.getElementById('bulk-disassemble-modal');
+    if (modal) modal.style.display = 'none';
+};
+
+window.executeBulkDisassemble = (targetGrade) => {
+    let gradeValues = { 'Rare': 1, 'Epic': 2, 'Unique': 3, 'Legendary': 4 };
+    let limitVal = gradeValues[targetGrade];
+    
+    let totalGet = 0;
+    let count = 0;
+    let newEquips = [];
+
+    // 인벤토리에 있는 장비만 검사 (장착 중인 장비는 userEquipped에 있으므로 안전함)
+    for (let i = 0; i < userEquips.length; i++) {
+        let eq = userEquips[i];
+        if (gradeValues[eq.grade] <= limitVal) {
+            // 조건 충족: 분해 진행
+            let baseReward = eq.grade === 'Rare' ? 5 : (eq.grade === 'Epic' ? 10 : (eq.grade === 'Unique' ? 15 : 20)); 
+            let refundReward = Math.round((eq.totalStarSpent || eq.totalSpentStar || 0) * 0.7); 
+            totalGet += (baseReward + refundReward);
+            count++;
+        } else {
+            // 조건 미달: 장비 유지
+            newEquips.push(eq);
+        }
+    }
+
+    if (count > 0) {
+        if (confirm(`정말로 ${count}개의 장비를 일괄 분해하시겠습니까?\n🎁 예상 획득 별의 기운: ${totalGet}개`)) {
+            userEquips = newEquips; // 분해 안된 장비들로 인벤토리 덮어쓰기
+            userInventory.starPieces = (userInventory.starPieces || 0) + totalGet;
+            
+            window.syncToCloud();
+            window.renderInventoryTab('equip');
+            window.closeBulkDisassembleModal();
+            window.showMessage(`장비 ${count}개 일괄 분해 완료!\n별의 기운 +${totalGet}개 획득`);
+        }
+    } else {
+        window.showMessage("해당 조건에 맞는 장비가 인벤토리에 없습니다.");
+    }
+};
