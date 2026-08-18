@@ -50,7 +50,7 @@ let userCores = {
 window.getUnlockedCoreSlots = () => {
     let maxFloor = highestMulungFloor || 0;
     // 기본 4칸 + 무릉 60층마다 2칸씩 추가 해금 (최대 9칸)
-    let unlockedSlots = 4 + Math.floor(maxFloor / 60) * 2;
+    let unlockedSlots = 3 + Math.floor(maxFloor / 60) * 2;
     return Math.min(unlockedSlots, 9); 
 };
 
