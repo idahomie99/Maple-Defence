@@ -4517,27 +4517,22 @@ window.upgradeCore = (key) => {
 setInterval(() => {
     let startScreen = document.getElementById('start-screen');
     
-    // 1. 기존의 로고를 가리던 둥둥 떠다니는 버튼은 찾아서 삭제합니다.
-    let oldBtn = document.getElementById('btn-vmatrix-floating');
-    if(oldBtn) oldBtn.remove();
+    // 1. 아까 아래쪽에 억지로 넣었던 큰 메뉴 버튼이 있다면 찾아서 지웁니다.
+    let mainBtn = document.getElementById('btn-vmatrix-main');
+    if(mainBtn) mainBtn.remove();
 
-    // 2. 다른 메인 버튼들과 동일한 규격의 정식 버튼을 만듭니다.
-    if (startScreen && startScreen.style.display !== 'none' && !document.getElementById('btn-vmatrix-main')) {
+    // 2. 왼쪽 구름 빈 공간에 예쁜 연하늘색 미니 아이콘을 띄웁니다.
+    if (startScreen && startScreen.style.display !== 'none' && !document.getElementById('btn-vmatrix-floating')) {
         let vBtn = document.createElement('button');
-        vBtn.id = 'btn-vmatrix-main';
-        vBtn.className = 'ingame-btn premium-purple';
-        vBtn.innerHTML = '💎 V 매트릭스'; // 줄바꿈을 없애고 한 줄로 깔끔하게!
+        vBtn.id = 'btn-vmatrix-floating';
         
-        // 플로팅(absolute) 속성을 빼고, 너비 100%의 기본 메뉴 스타일 적용
-        vBtn.style.cssText = "width: 100%; padding: 18px 0; font-size: 16px; font-weight: bold; margin-top: 10px; border-radius: 8px; box-shadow: 0 4px 15px rgba(171, 71, 188, 0.4); display: block;";
+        // 문구는 깔끔하게 V 하나만!
+        vBtn.innerHTML = 'V'; 
+        
+        // 연하늘색 그라데이션 + 둥근 사각형(앱 아이콘 스타일)
+        vBtn.style.cssText = "position: absolute; top: 90px; left: 25px; width: 45px; height: 45px; font-size: 24px; font-weight: 900; color: #0277bd; background: linear-gradient(135deg, #e1f5fe, #81d4fa); border: 2px solid #4fc3f7; border-radius: 12px; box-shadow: 0 4px 10px rgba(3, 169, 244, 0.4); z-index: 100; display: flex; justify-content: center; align-items: center; cursor: pointer; text-shadow: 1px 1px 0px #fff; font-family: Arial, sans-serif;";
+        
         vBtn.onclick = window.openVMatrixModal;
-
-        // 3. 기존 메뉴 버튼들이 모여있는 부모 영역을 찾아서 맨 아래에 살포시 추가합니다.
-        let onlineBtn = document.querySelector('button[onclick*="openOnlineMenu"]');
-        if (onlineBtn && onlineBtn.parentNode) {
-            onlineBtn.parentNode.appendChild(vBtn); // [월드보스/인벤토리] 바로 아래에 찰칵!
-        } else {
-            startScreen.appendChild(vBtn);
-        }
+        startScreen.appendChild(vBtn);
     }
 }, 1000);
