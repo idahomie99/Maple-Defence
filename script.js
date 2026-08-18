@@ -2904,7 +2904,7 @@ window.openMulungShop = () => {
                     </div>
                     <div style="display:flex; justify-content:space-between; align-items:center; background:#f3e5f5; padding:10px; border-radius:6px; border:1px solid #ce93d8;">
                         <span style="font-weight:bold; font-size:14px;">💎 코어 젬스톤</span>
-                        <button class="ingame-btn premium-dark" style="width:80px; padding:6px 0; font-size:12px;" onclick="buyMulungItem('gemstone')">500 코인</button>
+                        <button class="ingame-btn premium-dark" style="width:80px; padding:6px 0; font-size:12px;" onclick="buyMulungItem('gemstone')">1,000 코인</button>
                     </div>
                 </div>
                 <button class="ingame-btn premium-white" style="width:100%; padding:10px; margin-top:10px;" onclick="closeMulungShop()">닫기</button>`;
@@ -2923,7 +2923,7 @@ window.closeMulungShop = () => {
 };
 
 window.buyMulungItem = (type) => {
-    let cost = { 'piece': 20, 'star': 10, 'equipBox': 100, 'cube': 200, 'gemstone': 500 }[type];
+    let cost = { 'piece': 20, 'star': 10, 'equipBox': 100, 'cube': 200, 'gemstone': 1000 }[type];
     if (userRankData.mulungCoins < cost) return window.showMessage("무릉 코인이 부족합니다.");
     userRankData.mulungCoins -= cost;
     if (type === 'piece') userInventory.coinPieces += 1;
