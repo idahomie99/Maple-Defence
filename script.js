@@ -342,7 +342,18 @@ onAuthStateChanged(auth, async (user) => {
             let parsedRankMoney = parseInt(cloud.rankMoney); userRankData.rankMoney = isNaN(parsedRankMoney) ? 0 : parsedRankMoney;
             let parsedBonusCoins = parseInt(cloud.bonusCoins); userRankData.bonusCoins = isNaN(parsedBonusCoins) ? 0 : parsedBonusCoins;
 
-            userRankData.mulungCoins = cloud.mulungCoins || 0;     
+            userRankData.mulungCoins = cloud.mulungCoins || 0;
+            if (!localStorage.getItem('receivedPatchBonus_v1')) {
+    userRankData.mulungCoins += 3100;
+    userInventory.coinPieces = (userInventory.coinPieces || 0) + 80;
+    
+    // 서버에 보상 지급 표시를 남기되, 서버 데이터 전체를 건드리지 않음
+    localStorage.setItem('receivedPatchBonus_v1', 'true');
+    
+    // 상태 동기화
+    window.syncToCloud(); 
+    window.showMessage("패치 기념 보상이 지급되었습니다!");
+}     
 
             userInventory = cloud.inventory || {}; 
             userInventory.coinPieces = userInventory.coinPieces || 0; userInventory.equipBoxes = userInventory.equipBoxes || 0; userInventory.starPieces = userInventory.starPieces || 0; 
