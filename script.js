@@ -2494,7 +2494,6 @@ window.drawOpp = () => {
 };
 
 window.loop = () => {
-    // 🔥 모험 모드의 메인 루프에 무릉도장 진입 시 동작 금지 예외처리 100% 추가!!
     if(state.status === 'GAMEOVER' || state.status === 'TITLE' || state.status === 'MULUNG') return;
     let now = performance.now(); if (!lastTime) lastTime = now; let dtReal = (now - lastTime) / 1000; if (dtReal > 0.1) dtReal = 0.1; if (dtReal < 0) dtReal = 0.016; 
     let dt = dtReal * (state.speed || 1); lastTime = now;
@@ -2537,7 +2536,6 @@ window.loop = () => {
         let m = monsters[i];
         if (m.freezeTimer > 0) { m.freezeTimer -= dt; m.freezeTickTimer -= dt; if (m.freezeTickTimer <= 0) { m.hp -= m.freezeDmgVal; m.freezeTickTimer = 1; } }
 
-        // 🔥 반격 로직을 바인드/기절 체크 '위'로 이동!
         if (state.wave >= 160 && m.isBoss && m.name !== "어둠의 늑대" && !state.isRank) {
             if (m.counterTimer === undefined) m.counterTimer = 5; 
             m.counterTimer -= dt;
@@ -2558,8 +2556,8 @@ window.loop = () => {
             }
         }
 
-        if (m.bindTimer > 0) { m.bindTimer -= dt; continue; }  // 바인드면 이동 중지
-        if (m.stunTimer > 0) { m.stunTimer -= dt; continue; }  // 스턴이면 이동 중지
+        if (m.bindTimer > 0) { m.bindTimer -= dt; continue; } 
+        if (m.stunTimer > 0) { m.stunTimer -= dt; continue; }  
         if (m.threatTimer > 0) { m.threatTimer -= dt; }
 
         let t = currentPath[m.targetNode]; let dx = t.x - m.x, dy = t.y - m.y; let dist = Math.hypot(dx, dy); let currentSpeed = m.speed; if (m.freezeTimer > 0) currentSpeed *= 0.5; let move = currentSpeed * dt;
@@ -2571,11 +2569,17 @@ window.loop = () => {
     
     let cardMulti = 1 + (getTotalCardBonus() / 100); 
     let rageMulti = 1 + getSkillValue('common_rage', skillLevels.common_rage) + (equipStats.atk * 0.01); 
-let sharpChance = getSkillValue('common_sharp', skillLevels.common_sharp) + (equipStats.crit * 0.01); 
-let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equipStats.spd * 0.01);
+    let sharpChance = getSkillValue('common_sharp', skillLevels.common_sharp) + (equipStats.crit * 0.01); 
+    let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equipStats.spd * 0.01);
 
     towers.forEach(t => {
-        // 🔥 1. 상태 이상 및 쿨타임 계산 (기절 중에도 쿨타임은 흐름)
+        // 🔥 코어 버프 타이머 적용 (공속 증가)
+        let localWindReduc = windReduc;
+        if (t.healCoreBuffTimer > 0) {
+            t.healCoreBuffTimer -= dtReal;
+            localWindReduc += t.healCoreBuffAmt;
+        }
+
         let overloadMult = 1;
         if (t.overloadTimer > 0) {
             t.overloadTimer -= dt; overloadMult = 2;
@@ -2584,7 +2588,6 @@ let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equ
         if (t.unitStunTimer > 0) t.unitStunTimer -= dt;
         let isStunned = (t.unitStunTimer > 0);
 
-        // 🔥 2. 스킬 발동 로직 (!isStunned 일 때만 스킬이 나감)
         if (t.gradeIdx >= 6 && t.cls.type === '법사' && skillLevels.mage_heal > 0) {
             if (t.healCooldown === undefined) t.healCooldown = 0;
             t.healCooldown -= dt * 1000;
@@ -2596,11 +2599,31 @@ let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equ
                 let gridWidth = state.isRank ? 5 : 5;
                 let tCol = t.idx % gridWidth; let tRow = Math.floor(t.idx / gridWidth);
                 let injured = towers.filter(u => u.hp < u.maxHp && Math.abs((u.idx % gridWidth) - tCol) <= 1 && Math.abs(Math.floor(u.idx / gridWidth) - tRow) <= 1);
-                if (injured.length > 0) {
-                    injured.forEach(u => { u.hp = Math.min(u.maxHp, u.hp + 1); visualEffects.push({ type: 'heal', x: u.x, y: u.y, timer: 1.0 }); });
+                
+                let healCoreLv = typeof window.getCoreLv === 'function' ? window.getCoreLv('mage_heal') : 0;
+
+                // 🔥 풀피여도 코어가 있으면 무조건 발동
+                if (injured.length > 0 || healCoreLv > 0) {
+                    let targets = injured.length > 0 ? injured : towers.filter(u => Math.abs((u.idx % gridWidth) - tCol) <= 1 && Math.abs(Math.floor(u.idx / gridWidth) - tRow) <= 1);
+                    
+                    targets.forEach(u => { 
+                        u.hp = Math.min(u.maxHp, u.hp + 1); 
+                        visualEffects.push({ type: 'heal', x: u.x, y: u.y, timer: 1.0 }); 
+                    });
                     t.healCooldown += maxHealCd;
                     visualEffects.push({ type: 'heal', x: t.x, y: t.y, timer: 1.0 });
-                } else { t.healCooldown = 0; }
+
+                    // 🔥 메인 딜러에게 버프 부여
+                    if (healCoreLv > 0) {
+                        let bestUnit = t; let bestScore = -1;
+                        towers.forEach(tu => { if (tu.gradeIdx > bestScore) { bestScore = tu.gradeIdx; bestUnit = tu; } });
+                        bestUnit.healCoreBuffTimer = 3.0;
+                        bestUnit.healCoreBuffAmt = (healCoreLv * 0.02);
+                        damageTexts.push({ val: "공속 UP!", x: bestUnit.x, y: bestUnit.y - 35, timer: 0.8, isCrit: true });
+                    }
+                } else { 
+                    t.healCooldown = 0; 
+                }
             }
         }
 
@@ -2662,9 +2685,10 @@ let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equ
         }
         
         t.lastAttack -= dt * 1000; 
-        let attackCd = (t.cls.cd * (t.grade.speedMul || 1)) / (windReduc * overloadMult); 
+        // 🔥 버프가 적용된 localWindReduc 로 공격 속도 계산
+        let attackCd = (t.cls.cd * (t.grade.speedMul || 1)) / (localWindReduc * overloadMult); 
         while(t.lastAttack <= 0) {
-            if (isStunned) { t.lastAttack = 0; break; } // 스턴 중이면 공격 무시
+            if (isStunned) { t.lastAttack = 0; break; } 
             let range = t.cls.range * t.grade.rangeMul; let target = null;
             for(let m of monsters) { let d = Math.hypot(m.x - t.x, m.y - t.y); if(d <= range) { target = m; break; } }
             if(target) {
@@ -2776,6 +2800,13 @@ let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equ
                     let drops = [];
                     if (Math.random() * 100 <= 5) { userInventory.equipBoxes = (userInventory.equipBoxes || 0) + 1; drops.push({ type: 'equip' }); }
                     if (Math.random() * 100 <= 20) { cardData[bInfo.name] = cardData[bInfo.name] || { owned: 0, grade: 0 }; cardData[bInfo.name].owned++; localStorage.setItem('mapleDefenseCards', JSON.stringify(cardData)); if (currentUserUid) window.syncToCloud(); drops.push({ type: 'card', name: bInfo.name }); }
+                    if (state.wave >= 160 && Math.random() < 0.10) {
+                        let r = Math.random(); let gCount = 1;
+                        if (r > 0.95) gCount = 2; // 5% 확률로 2개 대박!
+                        userCores.gemstones += gCount;
+                        if (currentUserUid) window.syncToCloud();
+                        drops.push({ type: 'gemstone', count: gCount });
+                    }
                     if (drops.length > 0) { window.showLootPopup(drops); } else { window.showMessage(`${state.wave}라운드 보스 처치!`); }
                 }
             }
@@ -3344,7 +3375,6 @@ window.upgradeMulungUnit = (clsName) => {
 };
 
 function mulungLoop() {
-    // 🔥 게임 종료 시 확실하게 무릉 루프를 죽이는 구조
     if (!mulungState.active) {
         isMulungLoopRunning = false;
         return;
@@ -3430,8 +3460,8 @@ function mulungLoop() {
 
     let cardMulti = 1 + (getTotalCardBonus() / 100); 
     let rageMulti = 1 + getSkillValue('common_rage', skillLevels.common_rage) + (equipStats.atk * 0.01); 
-let sharpChance = getSkillValue('common_sharp', skillLevels.common_sharp) + (equipStats.crit * 0.01); 
-let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equipStats.spd * 0.01);
+    let sharpChance = getSkillValue('common_sharp', skillLevels.common_sharp) + (equipStats.crit * 0.01); 
+    let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equipStats.spd * 0.01);
     let myUnpen = equipStats.unpenetratedRate;
     if (b.threatTimer > 0) myUnpen *= 0.9;
     let appliedArmor = b.armor * myUnpen;
@@ -3439,6 +3469,13 @@ let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equ
     grid.forEach((u) => {
         if (!u) return; 
         
+        // 🔥 코어 버프 타이머 적용 (공속 증가)
+        let localWindReduc = windReduc;
+        if (u.healCoreBuffTimer > 0) {
+            u.healCoreBuffTimer -= dtReal;
+            localWindReduc += u.healCoreBuffAmt;
+        }
+
         if (u.globalCooldown === undefined) u.globalCooldown = 0;
         if (u.bindCooldown === undefined) u.bindCooldown = 0;
         if (u.healCooldown === undefined) u.healCooldown = 0;
@@ -3454,12 +3491,16 @@ let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equ
         let isStunned = (u.unitStunTimer > 0);
 
         if (u.gradeIdx >= 6 && u.cls.type === '법사' && skillLevels.mage_heal > 0) {
+            if (u.healCooldown === undefined) u.healCooldown = 0;
             u.healCooldown -= dt * 1000;
             let maxHealCd = (70 - skillLevels.mage_heal * 10) * 1000;
             let hbar = document.getElementById(`heal-bar-${u.idx}`);
             if (hbar) hbar.style.width = Math.max(0, Math.min(100, ((maxHealCd - u.healCooldown) / maxHealCd) * 100)) + '%';
             
             if (u.healCooldown <= 0 && !isStunned) {
+                let healCoreLv = typeof window.getCoreLv === 'function' ? window.getCoreLv('mage_heal') : 0;
+                
+                // 🔥 무조건 발동
                 grid.forEach(tu => { 
                     if(!tu) return;
                     tu.hp = Math.min(tu.maxHp, tu.hp + 1); 
@@ -3468,10 +3509,20 @@ let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equ
                     if (hpBar) hpBar.style.width = Math.max(0, (tu.hp / tu.maxHp) * 100) + '%';
                 });
                 u.healCooldown += maxHealCd;
+
+                // 🔥 메인 딜러에게 버프 부여
+                if (healCoreLv > 0) {
+                    let bestUnit = u; let bestScore = -1;
+                    grid.forEach(tu => { if (tu && tu.gradeIdx > bestScore) { bestScore = tu.gradeIdx; bestUnit = tu; } });
+                    bestUnit.healCoreBuffTimer = 3.0;
+                    bestUnit.healCoreBuffAmt = (healCoreLv * 0.02);
+                    mulungState.dmgTexts.push({ val: "공속 UP!", x: bestUnit.x, y: bestUnit.y - 35, timer: 0.8, isCrit: true });
+                }
             }
         }
         if (u.gradeIdx >= 7) {
             if (u.cls.type === '전사' && skillLevels.war_threat > 0) {
+                if (u.threatCooldown === undefined) u.threatCooldown = 0;
                 u.threatCooldown -= dt * 1000;
                 let tbar = document.getElementById(`threat-bar-${u.idx}`);
                 if (tbar) tbar.style.width = Math.max(0, Math.min(100, ((25000 - u.threatCooldown) / 25000) * 100)) + '%';
@@ -3479,6 +3530,7 @@ let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equ
                 if (u.threatCooldown <= 0 && !isStunned) { b.threatTimer = skillLevels.war_threat * 2; u.threatCooldown += 25000; mulungState.vfx.push({ type: 'threat1', x: u.x, y: u.y, timer: 1.0 }); }
             }
             if (u.cls.type === '도적' && skillLevels.thief_overload > 0) {
+                if (u.rtdCooldown === undefined) u.rtdCooldown = 0;
                 u.rtdCooldown -= dt * 1000;
                 let rbar = document.getElementById(`rtd-bar-${u.idx}`);
                 if (rbar) rbar.style.width = Math.max(0, Math.min(100, ((45000 - u.rtdCooldown) / 45000) * 100)) + '%';
@@ -3488,6 +3540,7 @@ let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equ
         }
         
         if (u.gradeIdx === 6 && u.cls.type !== '법사') {
+            if (u.bindCooldown === undefined) u.bindCooldown = 0;
             u.bindCooldown -= dt * 1000;
             let bar = document.getElementById(`bind-bar-${u.idx}`); 
             if (bar) bar.style.width = Math.max(0, Math.min(100, ((75000 - u.bindCooldown) / 75000) * 100)) + '%';
@@ -3497,6 +3550,7 @@ let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equ
 
         if (u.gradeIdx >= 5) {
             if ((u.cls.type === '전사' && (skillLevels.war_death||0) > 0) || (u.cls.type === '법사' && (skillLevels.mage_thunder||0) > 0) || (u.cls.type === '도적' && (skillLevels.thief_fuma||0) > 0)) {
+                if (u.globalCooldown === undefined) u.globalCooldown = 0;
                 u.globalCooldown -= dt * 1000;
                 let gbar = document.getElementById(`global-bar-${u.idx}`);
                 if (gbar) gbar.style.width = Math.max(0, Math.min(100, ((60000 - u.globalCooldown) / 60000) * 100)) + '%';
@@ -3507,7 +3561,6 @@ let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equ
                     else if (u.cls.type === '법사' && (skillLevels.mage_thunder||0) > 0) { let gdmg = baseDmg * (1.5 + (skillLevels.mage_thunder||0) * 1.5); mulungState.vfx.push({ type: 'thunder', timer: 0.5, dmg: gdmg, isOpp: false }); u.globalCooldown += 60000; }
                     else if (u.cls.type === '도적' && (skillLevels.thief_fuma||0) > 0) { 
                         let gdmg = baseDmg * (1.5 + (skillLevels.thief_fuma||0) * 1.5); 
-                        // 🔥 풍마수리검 Y좌표도 225로 동기화
                         mulungState.fumaList.push({ x: u.x, y: 225, dmg: gdmg, hitSet: new Set(), angle: 0, isOpp: false }); 
                         u.globalCooldown += 60000; 
                     }
@@ -3516,7 +3569,8 @@ let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equ
         }
         
         u.lastAttack -= dt * 1000; 
-        let attackCd = (CLASSES[u.cls.type].cd * (GRADES[u.gradeIdx].speedMul || 1)) / (windReduc * overloadMult); 
+        // 🔥 버프가 적용된 localWindReduc 로 공격 속도 계산
+        let attackCd = (CLASSES[u.cls.type].cd * (GRADES[u.gradeIdx].speedMul || 1)) / (localWindReduc * overloadMult); 
         while(u.lastAttack <= 0) {
             if (isStunned) { u.lastAttack = 0; break; }
             let attackRange = (CLASSES[u.cls.type].range || 150) * u.grade.rangeMul * 1.5; 
@@ -4106,6 +4160,13 @@ let sharpChance = getSkillValue('common_sharp', skillLevels.common_sharp) + (equ
 let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equipStats.spd * 0.01);
 
     towers.forEach(t => {
+        // [추가] 힐 코어 버프를 개별 유닛에게 적용하기 위한 변수
+        let localWindReduc = windReduc;
+        if (t.healCoreBuffTimer > 0) {
+            t.healCoreBuffTimer -= dtReal;
+            localWindReduc += t.healCoreBuffAmt;
+        }
+
         let overloadMult = 1;
         if (t.overloadTimer > 0) {
             t.overloadTimer -= dt; overloadMult = 2;
