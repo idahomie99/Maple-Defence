@@ -4376,15 +4376,15 @@ if (state.wave >= 160 && Math.random() < 0.10) {
 // 🔥 [3단계 신규] V 매트릭스 (코어 젬스톤) 시스템 UI 및 로직
 // ==========================================
 const CORE_INFO = {
-    'war_final': { name: '파이널 어택 코어', icon: '🗡️', desc: (lv) => `파이널 어택 발동 시 ${lv * 2}% 확률로 한 번 더 타격(더블어택)` },
-    'war_threat': { name: '위협 코어', icon: '💢', desc: (lv) => `위협 상태 적 타격 시 파티 전체 크리티컬 확률 ${lv * 1}% 증가` },
-    'war_death': { name: '데스폴트 코어', icon: '⚔️', desc: (lv) => `적중 시 데미지의 ${lv * 2}%만큼 방어력 무시 추가 타격` },
-    'mage_heal': { name: '힐 코어', icon: '💚', desc: (lv) => `힐 대상(메인딜러 우선)의 공격 속도 ${lv * 2}% 증가 (3초)` },
-    'mage_thunder': { name: '썬더 브레이크 코어', icon: '⚡', desc: (lv) => `적중 시 데미지의 ${lv * 2}%만큼 방어력 무시 추가 타격` },
-    'mage_freeze': { name: '빙결(마비) 코어', icon: '❄️', desc: (lv) => `빙결 상태 적 타격 시 해당 타격 데미지 ${lv * 3}% 증폭` },
-    'thief_shadow': { name: '섀도 파트너 코어', icon: '👤', desc: (lv) => `섀도 파트너 투사체에 방어력 관통 ${lv * 2}% 부여` },
-    'thief_overload': { name: '레디 투 다이 코어', icon: '☠️', desc: (lv) => `스킬 지속(공속 2배) 중 크리티컬 피해량 ${lv * 2}% 증가` },
-    'thief_fuma': { name: '풍마수리검 코어', icon: '🌀', desc: (lv) => `적이 잃은 체력 1%당 데미지 ${+(lv * 0.03).toFixed(2)}% 증폭` }
+    'war_final': { name: '파이널 어택 코어', img: 'image/finalattack.png', desc: (lv) => `파이널 어택 발동 시 ${lv * 2}% 확률로 한 번 더 타격(더블어택)` },
+    'war_threat': { name: '위협 코어', img: 'image/threat.png', desc: (lv) => `위협 상태 적 타격 시 파티 전체 크리티컬 확률 ${lv * 1}% 증가` },
+    'war_death': { name: '데스폴트 코어', img: 'image/despolt.png', desc: (lv) => `적중 시 데미지의 ${lv * 2}%만큼 방어력 무시 추가 타격` },
+    'mage_heal': { name: '힐 코어', img: 'image/heal.png', desc: (lv) => `힐 대상(메인딜러 우선)의 공격 속도 ${lv * 2}% 증가 (3초)` },
+    'mage_thunder': { name: '썬더 브레이크 코어', img: 'image/thunderbreak.png', desc: (lv) => `적중 시 데미지의 ${lv * 2}%만큼 방어력 무시 추가 타격` },
+    'mage_freeze': { name: '빙결(마비) 코어', img: 'image/freeze.png', desc: (lv) => `빙결 상태 적 타격 시 해당 타격 데미지 ${lv * 3}% 증폭` },
+    'thief_shadow': { name: '섀도 파트너 코어', img: 'image/shadowpartner.png', desc: (lv) => `섀도 파트너 투사체에 방어력 관통 ${lv * 2}% 부여` },
+    'thief_overload': { name: '레디 투 다이 코어', img: 'image/readytodie.png', desc: (lv) => `스킬 지속(공속 2배) 중 크리티컬 피해량 ${lv * 2}% 증가` },
+    'thief_fuma': { name: '풍마수리검 코어', img: 'image/fumashuriken.png', desc: (lv) => `적이 잃은 체력 1%당 데미지 ${+(lv * 0.03).toFixed(2)}% 증폭` }
 };
 
 window.openVMatrixModal = () => {
@@ -4419,7 +4419,11 @@ window.renderVMatrix = () => {
             let coreKey = userCores.equipped[i];
             let info = CORE_INFO[coreKey];
             let lv = userCores.items[coreKey].level;
-            slotsHtml += `<div style="width:50px; height:50px; background:#f3e5f5; border:2px solid #ab47bc; border-radius:8px; display:flex; flex-direction:column; justify-content:center; align-items:center; cursor:pointer; box-shadow:0 2px 4px rgba(0,0,0,0.2);" onclick="toggleEquipCore('${coreKey}')"><div style="font-size:20px;">${info.icon}</div><div style="font-size:10px; color:#6a1b9a; font-weight:bold; margin-top:2px;">Lv.${lv}</div></div>`;
+            // 🔥 이모지 대신 스킬 이미지 렌더링
+            slotsHtml += `<div style="width:50px; height:50px; background:#f3e5f5; border:2px solid #ab47bc; border-radius:8px; display:flex; flex-direction:column; justify-content:center; align-items:center; cursor:pointer; box-shadow:0 2px 4px rgba(0,0,0,0.2);" onclick="toggleEquipCore('${coreKey}')">
+                            <img src="${info.img}" style="width:24px; height:24px; object-fit:contain; filter:drop-shadow(1px 1px 2px rgba(0,0,0,0.3));">
+                            <div style="font-size:10px; color:#6a1b9a; font-weight:bold; margin-top:2px;">Lv.${lv}</div>
+                          </div>`;
         } else {
             slotsHtml += `<div style="width:50px; height:50px; background:#eceff1; border:2px dashed #90a4ae; border-radius:8px; display:flex; justify-content:center; align-items:center; color:#90a4ae; font-size:10px;">빈 칸</div>`;
         }
@@ -4429,7 +4433,7 @@ window.renderVMatrix = () => {
     }
     slotsHtml += `</div>`;
 
-    // 🔥 보유 코어 리스트 HTML 그리기 (장착 중인 것을 위로 정렬)
+    // 🔥 보유 코어 리스트 HTML 그리기
     let invHtml = `<div style="text-align:left; font-size:12px; font-weight:bold; color:#4a148c; margin-bottom:5px;">보유 중인 코어 <span style="font-size:10px; font-weight:normal; color:#666;">(클릭하여 장착/해제)</span></div><div style="display:flex; flex-direction:column; gap:6px;">`;
     let hasCore = false;
     
@@ -4445,18 +4449,21 @@ window.renderVMatrix = () => {
         let item = userCores.items[key];
         let info = CORE_INFO[key];
         let isEquipped = userCores.equipped.includes(key);
-        let reqDupes = item.level * 2; // 1->2렙 2개, 2->3렙 4개, 3->4렙 6개...
-let canUpgrade = item.level < 10 && item.dupes >= reqDupes;
+        let reqDupes = item.level * 2; 
+        let canUpgrade = item.level < 10 && item.dupes >= reqDupes;
         
         let btnAction = isEquipped ? `<button class="ingame-btn premium-dark" style="padding:5px 8px; font-size:11px;" onclick="toggleEquipCore('${key}')">장착 해제</button>` : `<button class="ingame-btn premium-blue" style="padding:5px 8px; font-size:11px;" onclick="toggleEquipCore('${key}')">장착 하기</button>`;
         let btnUpgrade = item.level < 10 ? `<button class="ingame-btn ${canUpgrade ? 'premium-purple' : 'premium-white'}" style="padding:5px 8px; font-size:11px; margin-left:4px; width:70px;" ${canUpgrade?'':'disabled'} onclick="upgradeCore('${key}')">강화<br>(${item.dupes}/${reqDupes})</button>` : `<button class="ingame-btn premium-dark" style="padding:5px 8px; font-size:11px; margin-left:4px; width:70px;" disabled>MAX</button>`;
 
         invHtml += `
             <div style="display:flex; justify-content:space-between; align-items:center; background:${isEquipped ? '#f3e5f5' : '#fff'}; border:2px solid ${isEquipped ? '#ab47bc' : '#cfd8dc'}; padding:8px; border-radius:8px;">
-                <div style="display:flex; align-items:center; gap:8px; width:65%;">
-                    <div style="font-size:26px;">${info.icon}</div>
+                <div style="display:flex; align-items:center; gap:10px; width:65%;">
+                    <!-- 🔥 리스트 쪽에도 스킬 이미지 적용 -->
+                    <div style="width:36px; height:36px; border-radius:6px; background:#f5f5f5; display:flex; justify-content:center; align-items:center; flex-shrink:0; border:1px solid #ddd;">
+                        <img src="${info.img}" style="max-width:28px; max-height:28px; object-fit:contain;">
+                    </div>
                     <div style="text-align:left;">
-                        <div style="font-size:12px; font-weight:bold; color:#212121;">${info.name} <span style="color:#6a1b9a;">Lv.${item.level}</span></div>
+                        <div style="font-size:13px; font-weight:bold; color:#212121; letter-spacing:-0.5px;">${info.name} <span style="color:#c62828;">Lv.${item.level}</span></div>
                         <div style="font-size:10px; color:#555; margin-top:2px; line-height:1.2;">${info.desc(item.level)}</div>
                     </div>
                 </div>
