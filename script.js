@@ -4300,13 +4300,14 @@ let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equ
                     if (Math.random() * 100 <= 20) { cardData[bInfo.name] = cardData[bInfo.name] || { owned: 0, grade: 0 }; cardData[bInfo.name].owned++; localStorage.setItem('mapleDefenseCards', JSON.stringify(cardData)); if (currentUserUid) window.syncToCloud(); drops.push({ type: 'card', name: bInfo.name }); }
                     
                     // 🔥 신규 추가: 150층 이상에서 50% 확률로 젬스톤 드랍 (90% 1개, 9% 2개, 1% 3개)
-                    if (state.wave >= 150 && Math.random() < 0.5) {
-                        let r = Math.random(); let gCount = 1;
-                        if (r > 0.99) gCount = 3; else if (r > 0.90) gCount = 2;
-                        userCores.gemstones += gCount;
-                        if (currentUserUid) window.syncToCloud();
-                        drops.push({ type: 'gemstone', count: gCount });
-                    }
+                    // 🔥 밸런스 패치: 160층 이상 심연의 보스부터 10% 확률로 드랍 (95% 1개, 5% 2개)
+if (state.wave >= 160 && Math.random() < 0.10) {
+    let r = Math.random(); let gCount = 1;
+    if (r > 0.95) gCount = 2; // 5% 확률로 2개 대박!
+    userCores.gemstones += gCount;
+    if (currentUserUid) window.syncToCloud();
+    drops.push({ type: 'gemstone', count: gCount });
+}
 
                     if (drops.length > 0) { window.showLootPopup(drops); } else { window.showMessage(`${state.wave}라운드 보스 처치!`); }
                 }
