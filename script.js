@@ -343,18 +343,7 @@ onAuthStateChanged(auth, async (user) => {
             let parsedBonusCoins = parseInt(cloud.bonusCoins); userRankData.bonusCoins = isNaN(parsedBonusCoins) ? 0 : parsedBonusCoins;
 
             userRankData.mulungCoins = cloud.mulungCoins || 0;
-            if (!localStorage.getItem('receivedPatchBonus_v1')) {
-    userRankData.mulungCoins += 3100;
-    userInventory.coinPieces = (userInventory.coinPieces || 0) + 80;
-    
-    // 서버에 보상 지급 표시를 남기되, 서버 데이터 전체를 건드리지 않음
-    localStorage.setItem('receivedPatchBonus_v1', 'true');
-    
-    // 상태 동기화
-    window.syncToCloud(); 
-    window.showMessage("패치 기념 보상이 지급되었습니다!");
-}     
-
+            
             userInventory = cloud.inventory || {}; 
             userInventory.coinPieces = userInventory.coinPieces || 0; userInventory.equipBoxes = userInventory.equipBoxes || 0; userInventory.starPieces = userInventory.starPieces || 0; 
             userInventory.boxes = userInventory.boxes || { '브론즈': 0, '실버': 0, '골드': 0, '플래티넘': 0, '다이아몬드': 0, '챌린저': 0 };
@@ -374,7 +363,10 @@ onAuthStateChanged(auth, async (user) => {
             if (cloud.raidDate) localStorage.setItem('mapleDefenseRaidDate', cloud.raidDate);
             
             // 🔥 신규 추가: 클라우드에서 내 코어 젬스톤 및 장착 정보 불러오기
-            userCores = cloud.coreData || { gemstones: 0, items: {}, equipped: [] };
+            userCores = cloud.coreData || {};
+userCores.gemstones = userCores.gemstones || 0;
+userCores.items = userCores.items || {};
+userCores.equipped = userCores.equipped || [];
 
             calculateEquipStats();
 
@@ -2847,6 +2839,7 @@ let windReduc = 1 + getSkillValue('common_wind', skillLevels.common_wind) + (equ
 // 🔥 서버 저장 로직 오버라이드 (무릉 코인이 증발하지 않고 영구 저장됨!)
 let originalSyncToCloud = window.syncToCloud;
 window.syncToCloud = async () => {
+    if (!isDataLoaded) return; // 🔥 (추가) 두 번째 저장 함수에도 자물쇠를 꼭 달아주세요!
     if (!currentUserUid) return;
     let cloudProfile = { 
         save: localStorage.getItem('mapleDefenseSave') || null, 
