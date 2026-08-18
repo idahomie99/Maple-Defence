@@ -316,7 +316,7 @@ window.closeAllModals = () => {
     if (sfModal && sfModal.style.display === 'block') { sfModal.style.display = 'none'; let eqModal = document.getElementById('equip-detail-modal'); if (eqModal) eqModal.style.display = 'block'; return; }
     let eqModal = document.getElementById('equip-detail-modal');
     if (eqModal && eqModal.style.display === 'block') { eqModal.style.display = 'none'; return; }
-    ['overlay', 'bulk-sell-modal', 'ticket-modal', 'book-modal', 'shop-modal', 'skill-detail-modal', 'active-skills-modal', 'inventory-modal', 'equip-detail-modal', 'starforce-modal', 'loot-popup-modal', 'raid-lobby-overlay'].forEach(id => { let el = document.getElementById(id); if(el) el.style.display = 'none'; }); 
+    ['overlay', 'bulk-sell-modal', 'ticket-modal', 'book-modal', 'shop-modal', 'skill-detail-modal', 'active-skills-modal', 'inventory-modal', 'equip-detail-modal', 'starforce-modal', 'loot-popup-modal', 'raid-lobby-overlay', 'vmatrix-modal'].forEach(id => { let el = document.getElementById(id); if(el) el.style.display = 'none'; }); 
 };
 
 function gameOver(msg) { state.status = 'GAMEOVER'; localStorage.removeItem('mapleDefenseSave'); document.getElementById('gameover-msg').innerText = msg; document.getElementById('overlay').style.display = 'block'; document.getElementById('gameover-modal').style.display = 'block'; if (currentUserUid) window.syncToCloud(); }
