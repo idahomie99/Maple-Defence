@@ -4516,13 +4516,28 @@ window.upgradeCore = (key) => {
 // 🔥 로비 화면(start-screen)에 자동으로 V 매트릭스 진입 버튼 생성
 setInterval(() => {
     let startScreen = document.getElementById('start-screen');
-    if (startScreen && startScreen.style.display !== 'none' && !document.getElementById('btn-vmatrix-floating')) {
+    
+    // 1. 기존의 로고를 가리던 둥둥 떠다니는 버튼은 찾아서 삭제합니다.
+    let oldBtn = document.getElementById('btn-vmatrix-floating');
+    if(oldBtn) oldBtn.remove();
+
+    // 2. 다른 메인 버튼들과 동일한 규격의 정식 버튼을 만듭니다.
+    if (startScreen && startScreen.style.display !== 'none' && !document.getElementById('btn-vmatrix-main')) {
         let vBtn = document.createElement('button');
-        vBtn.id = 'btn-vmatrix-floating';
+        vBtn.id = 'btn-vmatrix-main';
         vBtn.className = 'ingame-btn premium-purple';
-        vBtn.innerHTML = '<span style="font-size:18px;">💎</span><br>V 매트릭스';
-        vBtn.style.cssText = "position:absolute; top:80px; left:20px; padding:10px 15px; font-size:14px; font-weight:bold; box-shadow:0 4px 15px rgba(171, 71, 188, 0.6); z-index:100; border-radius:10px; line-height:1.4;";
+        vBtn.innerHTML = '💎 V 매트릭스'; // 줄바꿈을 없애고 한 줄로 깔끔하게!
+        
+        // 플로팅(absolute) 속성을 빼고, 너비 100%의 기본 메뉴 스타일 적용
+        vBtn.style.cssText = "width: 100%; padding: 18px 0; font-size: 16px; font-weight: bold; margin-top: 10px; border-radius: 8px; box-shadow: 0 4px 15px rgba(171, 71, 188, 0.4); display: block;";
         vBtn.onclick = window.openVMatrixModal;
-        startScreen.appendChild(vBtn);
+
+        // 3. 기존 메뉴 버튼들이 모여있는 부모 영역을 찾아서 맨 아래에 살포시 추가합니다.
+        let onlineBtn = document.querySelector('button[onclick*="openOnlineMenu"]');
+        if (onlineBtn && onlineBtn.parentNode) {
+            onlineBtn.parentNode.appendChild(vBtn); // [월드보스/인벤토리] 바로 아래에 찰칵!
+        } else {
+            startScreen.appendChild(vBtn);
+        }
     }
 }, 1000);
