@@ -343,6 +343,19 @@ onAuthStateChanged(auth, async (user) => {
             let parsedBonusCoins = parseInt(cloud.bonusCoins); userRankData.bonusCoins = isNaN(parsedBonusCoins) ? 0 : parsedBonusCoins;
 
             userRankData.mulungCoins = cloud.mulungCoins || 0;
+            
+            // 🔥 [신규 추가] 보상 지급 로직 (1회성)
+if (!cloud.receivedPatchBonus) {
+    userRankData.mulungCoins += 3100; // 무릉 코인 3100 지급
+    userInventory.coinPieces = (userInventory.coinPieces || 0) + 80; // 코인 조각 80 지급
+    
+    // 보상을 지급했다는 플래그를 cloud 데이터에 남겨서 중복 지급 방지
+    cloud.receivedPatchBonus = true; 
+    
+    // 강제로 서버에 즉시 저장
+    window.syncToCloud(); 
+    window.showMessage("패치 기념 보상이 지급되었습니다! (무릉 코인 3,100개, 코인 조각 80개)");
+}
 
             userInventory = cloud.inventory || {}; 
             userInventory.coinPieces = userInventory.coinPieces || 0; userInventory.equipBoxes = userInventory.equipBoxes || 0; userInventory.starPieces = userInventory.starPieces || 0; 
