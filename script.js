@@ -339,6 +339,8 @@ onAuthStateChanged(auth, async (user) => {
             let parsedRankMoney = parseInt(cloud.rankMoney); userRankData.rankMoney = isNaN(parsedRankMoney) ? 0 : parsedRankMoney;
             let parsedBonusCoins = parseInt(cloud.bonusCoins); userRankData.bonusCoins = isNaN(parsedBonusCoins) ? 0 : parsedBonusCoins;
 
+            userRankData.mulungCoins = cloud.mulungCoins || 0;
+
             userInventory = cloud.inventory || {}; 
             userInventory.coinPieces = userInventory.coinPieces || 0; userInventory.equipBoxes = userInventory.equipBoxes || 0; userInventory.starPieces = userInventory.starPieces || 0; 
             userInventory.boxes = userInventory.boxes || { '브론즈': 0, '실버': 0, '골드': 0, '플래티넘': 0, '다이아몬드': 0, '챌린저': 0 };
