@@ -2,242 +2,556 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#F8FAFC" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#0F172A" media="(prefers-color-scheme: dark)">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>메이플 디펜스</title>
     
-    <title>Triplan</title>
-    
-    <meta name="apple-mobile-web-app-title" content="Triplan">
-    <meta name="application-name" content="Triplan">
+    <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="메이플 디펜스">
+    <link rel="apple-touch-icon" href="image/appicon.png">
     
-    <link rel="icon" type="image/png" href="image/triplanappimg.png">
-    <link rel="apple-touch-icon" href="image/triplanappimg.png">
-    
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,600,1,0" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="style.css">
+    <style>
+        @keyframes mild-shake {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            20% { transform: translate(-2px, 0px) rotate(0.5deg); }
+            40% { transform: translate(1px, -1px) rotate(0.5deg); }
+            60% { transform: translate(-2px, 1px) rotate(0deg); }
+            80% { transform: translate(-1px, -1px) rotate(0.5deg); }
+        }
+        .mild-shake-active { animation: mild-shake 0.3s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        .premium-btn {
+            box-sizing: border-box; white-space: nowrap; width: 100%;
+            padding: 14px 18px; border-radius: 12px; font-size: 17px; font-weight: 900;
+            color: #ffffff; text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
+            display: flex; align-items: center; justify-content: space-between;
+            cursor: pointer; border: none;
+            box-shadow: 0 6px 10px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.4);
+            transition: transform 0.1s, filter 0.1s; margin-bottom: 2px;
+        }
+        .premium-btn:active {
+            transform: translateY(2px) scale(0.98);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.2);
+        }
+        .premium-btn .btn-left { display: flex; align-items: center; gap: 12px; white-space: nowrap; }
+        .premium-btn .btn-icon { font-size: 22px; filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.5)); }
+        .premium-btn .btn-arrow { font-size: 16px; color: rgba(255,255,255,0.7); font-weight: bold; }
+
+        .ingame-btn {
+            box-sizing: border-box; white-space: nowrap; padding: 12px 15px; border-radius: 10px;
+            font-size: 15px; font-weight: 900; color: #ffffff; text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
+            display: flex; align-items: center; justify-content: center; gap: 5px;
+            cursor: pointer; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.3); transition: transform 0.1s;
+        }
+        .ingame-btn:active:not(:disabled) { transform: translateY(2px) scale(0.98); box-shadow: 0 1px 2px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.1); }
+        .ingame-btn:disabled { filter: grayscale(100%) brightness(0.7); cursor: not-allowed; box-shadow: 0 2px 4px rgba(0,0,0,0.4); }
+
+        .premium-orange { background: linear-gradient(to bottom, #f59e0b, #b45309); border-bottom: 4px solid #78350f; }
+        .premium-green { background: linear-gradient(to bottom, #4ade80, #166534); border-bottom: 4px solid #14532d; }
+        .premium-blue { background: linear-gradient(to bottom, #3b82f6, #1d4ed8); border-bottom: 4px solid #1e3a8a; }
+        .premium-purple { background: linear-gradient(to bottom, #a855f7, #6b21a8); border-bottom: 4px solid #4c1d95; }
+        .premium-dark { background: linear-gradient(to bottom, #334155, #0f172a); border-bottom: 4px solid #020617; }
+        .premium-red { background: linear-gradient(to bottom, #ef4444, #b91c1c); border-bottom: 4px solid #7f1d1d; }
+        .premium-white { background: linear-gradient(to bottom, #ffffff, #d1d5db); border-bottom: 4px solid #9ca3af; color: #1f2937; text-shadow: none; }
+    </style>
 </head>
 <body>
-    <div id="app-container">
-        <div id="splash-screen"><div class="splash-logo">Triplan.</div></div>
-
-        <header class="top-header" id="top-header">
-            <div class="logo">Triplan.</div>
-            <div class="profile-pic" id="btn-top-profile"></div>
-        </header>
-
-        <main id="main-content">
-            <section class="hero-section">
-                <h1 class="greeting">어디로 떠나시나요?</h1>
-                <p class="sub-greeting">단 1분 만에 완성되는 완벽한 여행 플랜</p>
-            </section>
-
-            <section class="main-action-group">
-                <button class="pill-btn ripple-btn" id="btn-ai-standard">
-                    <div class="pill-icon" style="color: #8B5CF6; background: rgba(139, 92, 246, 0.1);"><span class="material-symbols-rounded">auto_awesome</span></div>
-                    <div class="pill-text"><h3>AI 맞춤 일정 짜기</h3><p>취향저격 완벽한 플랜</p></div>
-                    <div class="pill-arrow"><span class="material-symbols-rounded">chevron_right</span></div>
-                </button>
-                <button class="pill-btn ripple-btn" id="btn-ai-tension">
-                    <div class="pill-icon" style="color: #3B82F6; background: rgba(59, 130, 246, 0.1);"><span class="material-symbols-rounded">handshake</span></div>
-                    <div class="pill-text"><h3>AI 동행 믹스매치</h3><p>네 취향 반, 내 취향 반. 평화로운 일정</p></div>
-                    <div class="pill-arrow"><span class="material-symbols-rounded">chevron_right</span></div>
-                </button>
-            </section>
-
-            <section class="recommend-section">
-                <h2 class="section-title">여행 영감 찾기</h2>
-                <div class="rec-list-item ripple-btn" id="rec-month">
-                    <div class="rec-icon"><span class="material-symbols-rounded">travel_explore</span></div>
-                    <div class="rec-text"><h3 id="month-title">월별·국가별 추천 여행지</h3><p>현재 시즌, 지금 위치 기준 베스트 스팟</p></div>
-                    <div class="arrow"><span class="material-symbols-rounded">chevron_right</span></div>
-                </div>
-                <div class="rec-list-item ripple-btn" id="rec-sns">
-                    <div class="rec-icon"><span class="material-symbols-rounded">photo_camera</span></div>
-                    <div class="rec-text"><h3>SNS에서 핫한 글로벌 명소</h3><p>전 세계 여행자들의 인생샷 성지 탐색</p></div>
-                    <div class="arrow"><span class="material-symbols-rounded">chevron_right</span></div>
-                </div>
-            </section>
-        </main>
-
-        <nav id="bottom-nav">
-            <div class="nav-item active small-ripple-btn" id="nav-home"><div class="nav-icon"><span class="material-symbols-rounded">home</span></div><span>홈</span></div>
-            <div class="nav-item small-ripple-btn" id="nav-account"><div class="nav-icon"><span class="material-symbols-rounded">person</span></div><span>마이</span></div>
-        </nav>
-
-        <div id="calendar-modal" class="bottom-sheet">
-            <div class="sheet-header"><h3>날짜 선택</h3><button class="icon-btn" id="btn-close-calendar"><span class="material-symbols-rounded">close</span></button></div>
-            <div class="sheet-content" id="calendar-scroll-area">
-                <div class="week-days"><span style="color:#DC2626;">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span style="color:#2563EB;">토</span></div>
-                <div id="calendar-grid-container"></div>
-            </div>
-            <div class="sheet-footer"><button class="search-btn ripple-btn" id="btn-confirm-date">선택 완료</button></div>
+    <div id="login-screen" style="display:none; flex-direction:column; justify-content:center; align-items:center; position:fixed; top:0; left:0; width:100%; height:100%; z-index:950; background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.8)), url('image/wallpaper.png') no-repeat center center; background-size: cover;">
+        <img src="image/titlelogo.png" alt="메이플 디펜스" style="width: 80%; max-width: 400px; margin-bottom: 40px; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.6));">
+        <div style="background: rgba(0,0,0,0.6); padding: 30px; border-radius: 12px; border: 2px solid #8d6e63; text-align: center;">
+            <h3 style="color:#fff; margin-top:0;">서버 접속</h3>
+            <button class="ingame-btn premium-white" style="width:100%; padding: 12px 20px;" onclick="loginWithGoogle()">
+                <img src="https://developers.google.com/identity/images/g-logo.png" style="width: 20px;"> 구글 계정으로 로그인
+            </button>
+            <p style="color:#aaa; font-size:12px; margin-top:15px; margin-bottom:0;">※ 온라인 모드 및 데이터 연동을 위해 로그인이 필요합니다.</p>
         </div>
-
-        <!-- 🚀 추가됨: 국가 선택 모달 (대륙 -> 국가) -->
-        <div id="country-modal" class="bottom-sheet">
-            <div class="sheet-header">
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <button class="icon-btn" id="btn-country-back" style="display:none; width:auto;"><span class="material-symbols-rounded">arrow_back</span></button>
-                    <h3 id="country-modal-title">대륙 선택</h3>
-                </div>
-                <button class="icon-btn" id="btn-close-country"><span class="material-symbols-rounded">close</span></button>
-            </div>
-            <div class="sheet-content" id="country-list-container" style="padding-top: 10px;">
-                <!-- JS 동적 생성 -->
-            </div>
-        </div>
-        <div id="calendar-overlay"></div>
-
-        <div id="ai-screen" class="sub-screen">
-            <header class="sub-header">
-                <div class="header-left"><button class="icon-btn" id="btn-back-ai"><span class="material-symbols-rounded">close</span></button></div>
-                <div class="progress-bar-container"><div class="progress-bar" id="ai-progress-bar"></div></div>
-                <div class="header-right"></div>
-            </header>
-            <div class="ai-content">
-                
-                <!-- 🚀 스텝 순서 변경: 일정(날짜)이 1번으로 옴 -->
-                <div class="ai-step active" id="ai-step-1">
-                    <h2 class="ai-question">여행 일정이<br>어떻게 되시나요?</h2><p class="ai-desc">일정에 맞춰 최적의 동선을 짜드려요.</p>
-                    <div class="ai-date-select-card ripple-btn" id="btn-open-calendar-ai">
-                        <span class="material-symbols-rounded icon-purple">calendar_month</span>
-                        <div class="ai-date-texts"><span class="label">전체 여행 기간</span><span class="value" id="ai-date-text">날짜를 선택해주세요</span></div>
-                        <span class="material-symbols-rounded arrow">chevron_right</span>
-                    </div>
-                </div>
-
-                <!-- 🚀 2번 스텝: 다중 여행지(Multi-city) 입력 폼 -->
-                <div class="ai-step" id="ai-step-2">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-end;">
-                        <div><h2 class="ai-question">어느 도시로<br>여행을 떠나시나요?</h2><p class="ai-desc">여러 곳을 간다면 추가 버튼을 눌러주세요.</p></div>
-                        <!-- 최적 동선 재배치 버튼 (기본 숨김) -->
-                        <button id="btn-optimize-route" class="auto-sort-btn" style="display:none;"><span class="material-symbols-rounded">sync</span> AI 최적 순서</button>
-                    </div>
-                    
-                    <div id="dest-form-container">
-                        <!-- 첫 번째 여행지 폼 뼈대 -->
-                        <div class="dest-item" data-index="0">
-                            <div class="dest-num" style="display:none;">1</div>
-                            <div class="dest-inputs">
-                                <div class="dest-row">
-                                    <button class="country-select-btn ripple-btn">국가를 선택하세요<span class="material-symbols-rounded">expand_more</span></button>
-                                </div>
-                                <div class="dest-row">
-                                    <input type="text" class="city-input" placeholder="도시 / 랜드마크 자유 입력">
-                                    <div class="stay-days-box" style="display:none;">
-                                        <input type="number" class="stay-days-input" placeholder="체류 일수"><span>일</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <button class="icon-btn remove-dest-btn" style="display:none; color:#EF4444;"><span class="material-symbols-rounded">do_not_disturb_on</span></button>
-                        </div>
-                    </div>
-                    
-                    <button class="add-dest-btn ripple-btn" id="btn-add-dest"><span class="material-symbols-rounded">add</span> 여행지 추가하기</button>
-                </div>
-
-                <div class="ai-step" id="ai-step-3"><h2 class="ai-question">항공편 시간이<br>정해져 있나요?</h2><p class="ai-desc">정확한 일정 계산을 위해 필요해요. (선택사항)</p>
-                    <div class="ai-time-group"><label>도착지 공항 <b>도착</b> 시간 <span id="label-arr-date" class="highlight-date"></span></label><input type="time" class="ai-text-input" id="ai-input-arr-time"></div>
-                    <div class="ai-time-group" style="margin-top: 16px;"><label>귀국행 비행기 <b>출발</b> 시간 <span id="label-dep-date" class="highlight-date"></span></label><input type="time" class="ai-text-input" id="ai-input-dep-time"></div>
-                </div>
-                <div class="ai-step" id="ai-step-4"><h2 class="ai-question">머무르실 숙소가<br>정해져 있나요?</h2><p class="ai-desc">숙소를 중심으로 동선을 최적화합니다. (선택사항)</p>
-                    <div class="map-input-group"><input type="text" class="ai-text-input" id="ai-input-accom" placeholder="예: 신주쿠 워싱턴 호텔, 미정"><button class="map-open-btn ripple-btn" id="btn-open-map"><span class="material-symbols-rounded">map</span></button></div>
-                </div>
-                <div class="ai-step" id="ai-step-5"><h2 class="ai-question">누구와 함께<br>여행하시나요?</h2><p class="ai-desc">동행자에 맞춰 식당과 스팟을 추천해 드려요.</p>
-                    <div class="ai-options-grid">
-                        <div class="ai-option-card" data-val="혼자서"><div class="circle-icon" style="background: rgba(37, 99, 235, 0.1); color: #2563EB;"><span class="material-symbols-rounded">person</span></div><span class="text">혼자서</span></div><div class="ai-option-card" data-val="연인과"><div class="circle-icon" style="background: rgba(220, 38, 38, 0.1); color: #DC2626;"><span class="material-symbols-rounded">favorite</span></div><span class="text">연인과</span></div><div class="ai-option-card" data-val="친구들과"><div class="circle-icon" style="background: rgba(16, 185, 129, 0.1); color: #10B981;"><span class="material-symbols-rounded">diversity_3</span></div><span class="text">친구들과</span></div><div class="ai-option-card" data-val="가족과"><div class="circle-icon" style="background: rgba(245, 158, 11, 0.1); color: #F59E0B;"><span class="material-symbols-rounded">family_restroom</span></div><span class="text">가족과</span></div><div class="ai-option-card" data-val="부모님과"><div class="circle-icon" style="background: rgba(139, 92, 246, 0.1); color: #8B5CF6;"><span class="material-symbols-rounded">elderly</span></div><span class="text">부모님과</span></div><div class="ai-option-card" data-val="아이와"><div class="circle-icon" style="background: rgba(236, 72, 153, 0.1); color: #EC4899;"><span class="material-symbols-rounded">child_care</span></div><span class="text">아이와</span></div>
-                    </div>
-                </div>
-                <div class="ai-step" id="ai-step-6"><h2 class="ai-question">여행자 정보를<br>알려주세요</h2><p class="ai-desc">총 인원과 연령대를 모두 선택해 주세요.</p>
-                    <div class="people-counter-box"><span style="font-size: 16px; font-weight: 800; color: var(--text-main);">총 인원</span><div class="counter-controls"><button id="btn-minus-people" class="counter-btn"><span class="material-symbols-rounded">remove</span></button><span id="people-count">1명</span><button id="btn-plus-people" class="counter-btn"><span class="material-symbols-rounded">add</span></button></div></div>
-                    <p style="font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 12px; margin-top: 24px;">동행자 연령대 (다중 선택 가능)</p>
-                    <div class="ai-chips-container" id="age-chips-container"><div class="ai-chip age-chip" data-val="10대">10대 이하</div><div class="ai-chip age-chip" data-val="20대">20대</div><div class="ai-chip age-chip" data-val="30대">30대</div><div class="ai-chip age-chip" data-val="40대">40대</div><div class="ai-chip age-chip" data-val="50대">50대</div><div class="ai-chip age-chip" data-val="60대 이상">60대 이상</div></div>
-                </div>
-                
-                <div class="ai-step" id="ai-step-7">
-                    <div id="step-7-standard"><h2 class="ai-question">어떤 스타일의<br>여행을 원하시나요?</h2><p class="ai-desc">최대 3개까지 선택할 수 있어요.</p>
-                        <div class="ai-chips-container" id="style-chips-container-std"><div class="ai-chip style-chip std-chip" data-val="힐링"><span class="material-symbols-rounded" style="font-size:18px;">spa</span> 여유로운 힐링</div><div class="ai-chip style-chip std-chip" data-val="먹방"><span class="material-symbols-rounded" style="font-size:18px;">restaurant</span> 맛집 탐방</div><div class="ai-chip style-chip std-chip" data-val="관광"><span class="material-symbols-rounded" style="font-size:18px;">photo_camera</span> 랜드마크 </div><div class="ai-chip style-chip std-chip" data-val="쇼핑"><span class="material-symbols-rounded" style="font-size:18px;">shopping_bag</span> 폭풍 쇼핑</div><div class="ai-chip style-chip std-chip" data-val="액티비티"><span class="material-symbols-rounded" style="font-size:18px;">hiking</span> 액티비티</div><div class="ai-chip style-chip std-chip" data-val="자연"><span class="material-symbols-rounded" style="font-size:18px;">landscape</span> 대자연 </div><div class="ai-chip style-chip std-chip" data-val="예술"><span class="material-symbols-rounded" style="font-size:18px;">palette</span> 로컬 예술</div><div class="ai-chip style-chip std-chip" data-val="호캉스"><span class="material-symbols-rounded" style="font-size:18px;">hotel</span> 호캉스</div></div>
-                    </div>
-                    <div id="step-7-tension" style="display: none;"><h2 class="ai-question">서로의 최애 스타일을<br>알려주세요</h2><p class="ai-desc">AI가 두 분의 취향을 완벽하게 섞어드려요.</p>
-                        <h4 style="font-size: 14px; font-weight: 800; color:#2563EB; margin: 16px 0 8px 0;">나의 스타일 (최대 2개)</h4>
-                        <div class="ai-chips-container"><div class="ai-chip style-chip my-chip" data-val="나: 힐링">힐링</div><div class="ai-chip style-chip my-chip" data-val="나: 먹방">먹방</div><div class="ai-chip style-chip my-chip" data-val="나: 관광">관광</div><div class="ai-chip style-chip my-chip" data-val="나: 쇼핑">쇼핑</div></div>
-                        <h4 style="font-size: 14px; font-weight: 800; color:#DC2626; margin: 24px 0 8px 0;">동행자의 스타일 (최대 2개)</h4>
-                        <div class="ai-chips-container"><div class="ai-chip style-chip pt-chip" data-val="동행: 힐링">힐링</div><div class="ai-chip style-chip pt-chip" data-val="동행: 먹방">먹방</div><div class="ai-chip style-chip pt-chip" data-val="동행: 관광">관광</div><div class="ai-chip style-chip pt-chip" data-val="동행: 쇼핑">쇼핑</div></div>
-                    </div>
-                </div>
-
-                <div class="ai-step" id="ai-step-8">
-                    <h2 class="ai-question">하루 기본 체력은<br>어느 정도인가요?</h2><p class="ai-desc">체력에 맞춰 도보 이동과 휴식 빈도를 조절합니다.</p>
-                    <div class="stamina-box">
-                        <div class="stamina-icon" id="stamina-emoji"><span class="material-symbols-rounded" style="font-size: 48px; color: #10B981; transition: 0.3s;">battery_5_bar</span></div>
-                        <input type="range" min="1" max="5" value="3" class="stamina-slider" id="ai-input-stamina">
-                        <div class="stamina-labels"><span>저질<br>(1만보)</span><span>조금<br>(1.5만)</span><span>보통<br>(2만보)</span><span>에너자이저<br>(2.5만)</span><span>강철<br>(무한)</span></div>
-                    </div>
-                </div>
-            </div>
-            <div class="ai-footer"><button class="search-btn ripple-btn" id="btn-ai-next" disabled>다음으로</button></div>
-        </div>
-
-        <div id="map-modal" class="bottom-sheet"><div class="sheet-header"><h3>지도에서 숙소 찾기</h3><button class="icon-btn" id="btn-close-map"><span class="material-symbols-rounded">close</span></button></div><div class="sheet-content" style="padding: 0; position: relative;"><div id="map-container" style="width: 100%; height: 350px; z-index: 1;"></div><div style="padding: 20px; background: var(--card-bg);"><p style="font-size: 13px; color: var(--text-sub); font-weight: 700; margin-bottom: 4px;">선택된 위치</p><h4 id="map-selected-address" style="font-size: 16px; color: var(--text-main); font-weight: 800;">지도를 탭하여 위치를 선택하세요</h4></div></div><div class="sheet-footer"><button class="search-btn ripple-btn" id="btn-confirm-map">이 위치로 설정</button></div></div>
-
-        <div id="ai-loading-overlay"><div class="magic-spinner"></div><h3 class="magic-text">AI가 완벽한 일정을<br>그려내고 있어요✨</h3><p>동선, 체력, 취향을 모두 계산 중...</p></div>
-
-        <div id="account-screen" class="sub-screen">
-            <header class="sub-header"><div class="header-left"><button class="icon-btn" id="btn-back-account"><span class="material-symbols-rounded">arrow_back_ios_new</span></button></div><h2>내 정보</h2><div class="header-right"></div></header>
-            <div class="account-content"><div class="profile-header"><div class="profile-pic-large" id="account-profile-pic"></div><div class="profile-info"><h3 id="account-name">로그인이 필요합니다</h3><p id="account-email">이메일 정보 없음</p></div></div><div class="account-menu-section"><h4 class="menu-title">나의 여행</h4><div class="menu-list"><div class="menu-item ripple-btn"><span class="material-symbols-rounded" style="color:#8B5CF6;">auto_awesome</span><span>저장된 플랜</span><span class="material-symbols-rounded arrow">chevron_right</span></div><div class="menu-item ripple-btn"><span class="material-symbols-rounded" style="color:#2563EB;">bookmark</span><span>찜한 스팟</span><span class="material-symbols-rounded arrow">chevron_right</span></div></div></div><div class="account-menu-section"><h4 class="menu-title">설정</h4><div class="menu-list"><div class="menu-item ripple-btn"><span class="material-symbols-rounded" style="color:#64748B;">settings</span><span>앱 설정</span><span class="material-symbols-rounded arrow">chevron_right</span></div><div class="menu-item ripple-btn" id="btn-logout"><span class="material-symbols-rounded" style="color:#64748B;">logout</span><span style="color:var(--text-sub);">로그아웃</span></div></div></div></div>
-        </div>
-
-        <div id="ai-result-screen" class="sub-screen" style="z-index: 130; overflow: hidden; background: var(--bg-body);">
-            <header class="sub-header" style="background: var(--bg-app); border-bottom: 1px solid var(--card-border); z-index: 20;">
-                <div class="header-left"><button class="icon-btn" id="btn-back-ai-result"><span class="material-symbols-rounded">arrow_back_ios_new</span></button></div>
-                <div class="result-header-info">
-                    <h2 id="ai-result-title" style="font-size: 18px;">여행 일정</h2>
-                    <p id="ai-result-subtitle" style="font-size: 12px; color: var(--text-sub);">AI가 완성한 최적의 동선</p>
-                </div>
-                <div class="header-right" style="display: flex; width: auto; gap: 4px; justify-content: flex-end;">
-                    <button class="icon-btn" id="btn-toggle-map-top"><span class="material-symbols-rounded" id="top-map-icon">map</span></button>
-                    <button class="icon-btn"><span class="material-symbols-rounded">share</span></button>
-                </div>
-            </header>
-            
-            <div class="day-tabs-container" id="ai-result-tabs"></div>
-            
-            <div class="explore-chips-container">
-                <div class="explore-chip active" data-type="timeline"><span class="material-symbols-rounded chip-icon">format_list_bulleted</span>일정표 보기</div>
-                <div class="explore-chip" data-type="food"><span class="material-symbols-rounded chip-icon">restaurant</span>식사/맛집</div>
-                <div class="explore-chip" data-type="tour"><span class="material-symbols-rounded chip-icon">photo_camera</span>관광/명소</div>
-                <div class="explore-chip" data-type="cafe"><span class="material-symbols-rounded chip-icon">local_cafe</span>카페/휴식</div>
-            </div>
-            
-            <div class="timeline-bg" id="ai-timeline-container"></div>
-            <div class="explore-bg" id="ai-explore-container" style="display: none;"></div>
-
-            <div id="ai-result-map" style="display: none; flex: 1; width: 100%; z-index: 1; position: relative;">
-                <div id="map-info-card" class="map-info-card">
-                    <div class="map-info-img" id="map-info-img"></div>
-                    <div class="map-info-texts">
-                        <div class="map-info-badge" id="map-info-badge">관광</div>
-                        <h4 id="map-info-title">장소 이름</h4>
-                        <p id="map-info-desc">여기에 간단한 설명이 들어갑니다.</p>
-                    </div>
-                    <button class="icon-btn close-info-card" id="btn-close-map-info"><span class="material-symbols-rounded" style="font-size: 20px;">close</span></button>
-                </div>
-            </div>
-            
-            <div class="result-action-area">
-                <button class="floating-save-btn ripple-btn">
-                    <span class="material-symbols-rounded">bookmark</span> 내 일정에 저장하기
-                </button>
-            </div>
-        </div>
-
-        <script type="module" src="firebase-config.js"></script>
-        <script type="module" src="script.js"></script>
     </div>
+
+    <!-- 처음 닉네임 설정 모달 -->
+    <div id="nickname-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:2150;"></div>
+    <div id="nickname-modal" class="maple-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:2200; width:80%; max-width:300px;">
+        <h3 style="color:#1565c0; margin-top:0;">닉네임 설정</h3>
+        <p style="font-size:12px; color:#555; margin-bottom:15px; font-weight:bold;">랭크 게임에 등록될<br>멋진 닉네임을 정해주세요!</p>
+        <input type="text" id="nickname-input" style="width:90%; padding:10px; margin-bottom:15px; border:2px solid #8d6e63; border-radius:4px; font-weight:bold; text-align:center; font-size:16px;" maxlength="10" placeholder="최대 10자">
+        <button class="ingame-btn premium-blue" style="width:100%;" onclick="submitNickname()">결정</button>
+    </div>
+
+    <!-- 닉네임 변경 30일 제한 모달 -->
+    <div id="nickname-change-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:2150;"></div>
+    <div id="nickname-change-modal" class="maple-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:2200; width:80%; max-width:300px;">
+        <h3 style="color:#1565c0; margin-top:0;">닉네임 변경</h3>
+        <p style="font-size:12px; color:#ef4444; margin-bottom:15px; font-weight:bold; line-height: 1.4;">※ 닉네임은 30일에 한 번만<br>변경할 수 있습니다.</p>
+        <input type="text" id="nickname-change-input" style="width:90%; padding:10px; margin-bottom:15px; border:2px solid #8d6e63; border-radius:4px; font-weight:bold; text-align:center; font-size:16px;" maxlength="10" placeholder="새로운 닉네임">
+        <div style="display:flex; gap:10px;">
+            <button class="ingame-btn premium-white" style="flex:1;" onclick="closeNicknameChangeModal()">취소</button>
+            <button class="ingame-btn premium-blue" style="flex:1;" onclick="submitNicknameChange()">변경</button>
+        </div>
+    </div>
+
+    <div id="start-screen" style="display:none; flex-direction:column; justify-content:center; align-items:center; position:fixed; top:0; left:0; width:100%; height:100%; z-index:900; background: linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.5)), url('image/wallpaper.png') no-repeat center center; background-size: cover;">
+        
+        <!-- 유저 닉네임 표시 및 닉네임 변경 ✏️ 버튼 추가 -->
+        <div style="position:absolute; top: max(env(safe-area-inset-top, 15px), 15px); right: 15px; z-index: 100; background: rgba(15, 23, 42, 0.85); border: 1px solid #1e3a8a; border-radius: 20px; padding: 6px 15px; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.5); white-space: nowrap;">
+            <span style="color:#e2e8f0; font-size: 14px; font-weight: bold; letter-spacing: -0.5px;">접속중: <span id="current-user-name" style="color:#fbbf24;">용사님</span></span>
+            <button style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px 6px; transition: background 0.2s;" onclick="openNicknameChangeModal()" title="닉네임 변경">✏️</button>
+            <button style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #e2e8f0; padding: 6px 10px; border-radius: 12px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: background 0.2s; white-space: nowrap; margin-left: 4px;" onclick="logout()">
+                🚪 로그아웃
+            </button>
+        </div>
+        
+        <img src="image/titlelogo.png" alt="메이플 디펜스" style="width: 75%; max-width: 320px; margin-top: 50px; margin-bottom: 25px; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.6)); position: relative; z-index: 5;">
+
+        <div style="display:flex; flex-direction:column; gap:10px; width: 85%; max-width: 300px;">
+            <button id="btn-continue" class="premium-btn premium-orange" style="display:none;" onclick="loadAndStartGame()">
+                <div class="btn-left"><span class="btn-icon">🗡️</span> 이어하기</div><span class="btn-arrow">〉</span>
+            </button>
+            <button class="premium-btn premium-green" onclick="startNewGame()">
+                <div class="btn-left"><span class="btn-icon">🚩</span> 모험 모드</div><span class="btn-arrow">〉</span>
+            </button>
+            <div style="display:flex; gap:10px;">
+                <button class="premium-btn premium-blue" style="flex:1; padding: 14px 15px;" onclick="openBookModal()">
+                    <div class="btn-left"><span class="btn-icon" style="font-size: 20px;">📖</span> 도감</div><span class="btn-arrow">〉</span>
+                </button>
+                <button class="premium-btn premium-purple" style="flex:1; padding: 14px 15px;" onclick="openShopModal()">
+                    <div class="btn-left"><span class="btn-icon" style="font-size: 20px;">🏪</span> 상점</div><span class="btn-arrow">〉</span>
+                </button>
+            </div>
+            <button class="premium-btn premium-dark" onclick="openOnlineMenu()">
+                <div class="btn-left"><span class="btn-icon">🌐</span> 온라인 모드</div><span class="btn-arrow">〉</span>
+            </button>
+            <div style="display:flex; gap:10px; width: 100%;">
+                <button class="premium-btn premium-red" style="flex:1; padding: 14px 15px;" onclick="openRaidLobby()">
+                    <div class="btn-left"><img src="image/worldboss.png" style="height: 24px; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.5));"> 월드 보스</div>
+                </button>
+                <button class="premium-btn premium-white" style="flex:1; padding: 14px 15px;" onclick="openInventoryModal()">
+                    <div class="btn-left"><span class="btn-icon" style="font-size: 20px;">🎒</span> 인벤토리</div>
+                </button>
+            </div>
+        </div>
+        <div id="version-display" style="margin-top: 20px; color: rgba(255,255,255,0.4); font-size: 11px; font-weight: bold; pointer-events: none;"></div>
+    </div>
+
+    <!-- 온라인 모드 선택 화면 -->
+    <!-- 온라인 모드 선택 화면 & 무릉도장 로비 -->
+    <div id="online-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:1900; flex-direction:column; align-items:center;">
+        
+        <!-- 메인 온라인 메뉴 -->
+        <div id="online-menu-modal" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 20vh; width: 85%; max-width: 320px;">
+            <h3 style="color:#60a5fa;">🌐 온라인 모드 🌐</h3>
+            <p style="font-size:14px; font-weight:bold; color:#4e342e; margin-bottom:15px;">다른 용사들과 실력을 겨뤄보세요!</p>
+            <button class="ingame-btn premium-dark" style="width:100%; height:50px; margin-bottom:8px; font-size:15px;" onclick="openPkMenuFromOnline()">🏆 월드 펀치킹</button>
+            <button class="ingame-btn premium-red" style="width:100%; height:50px; margin-bottom:8px; font-size:15px;" onclick="openRankLobbyFromOnline()">⚔️ 랭크 게임</button>
+            <button class="ingame-btn premium-orange" style="width:100%; height:50px; margin-bottom:15px; font-size:15px;" onclick="openMulungLobby()">🐼 협동 무릉도장</button>
+            <button class="ingame-btn premium-white" style="width:100%; padding: 10px;" onclick="closeOnlineMenu()">로비로 돌아가기</button>
+        </div>
+
+        <!-- 무릉도장 로비 팝업 -->
+        <div id="mulung-lobby-modal" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 15vh; width: 85%; max-width: 320px;">
+            <h3 style="color:#004d40;">🐼 협동 무릉도장 🐼</h3>
+            <p style="font-size:13px; font-weight:bold; color:#4e342e; margin-bottom:15px; text-align:center;">
+                AI 동료와 함께<br>끝없이 등장하는 보스를 처치하세요!
+            </p>
+            
+            <!-- 무릉 랭킹 뷰 -->
+            <div style="background:rgba(0,0,0,0.7); padding:10px; border-radius:8px; margin-bottom:15px; border: 1px solid #b2dfdb;">
+                <h4 style="color: #ffeb3b; margin: 0 0 10px 0; text-align: center; font-size: 14px; font-weight:900;">🏆 명예의 전당 (Top 10)</h4>
+                <div id="mulung-live-ranking-list" style="display:flex; flex-direction:column; gap:5px; font-size:13px; max-height: 140px; overflow-y: auto; text-align:left;">
+                    <div style="text-align:center; color:#ccc;">랭킹을 불러오는 중...</div>
+                </div>
+            </div>
+
+            <button class="ingame-btn premium-orange" style="width:100%; height:50px; margin-bottom:8px; font-size:16px;" onclick="startMulungMatchmaking()">⚔️ 도전하기</button>
+            <button class="ingame-btn premium-dark" style="width:100%; height:45px; margin-bottom:15px; font-size:14px;" onclick="openMulungShopFromLobby()">🛒 무릉 코인 상점</button>
+            <button class="ingame-btn premium-white" style="width:100%; padding: 10px;" onclick="closeMulungLobby()">뒤로 가기</button>
+        </div>
+    </div>
+
+    <!-- 월드보스 로비 모달 추가 -->
+    <div id="raid-lobby-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:1900; flex-direction:column; align-items:center;">
+        <div id="raid-lobby-modal" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 25vh; width: 85%; max-width: 320px;">
+            <h3 style="color:#ef4444;">🐉 월드 보스 레이드 🐉</h3>
+            <p style="font-size:13px; font-weight:bold; color:#4e342e; margin-bottom:15px; text-align:center;">
+                전 서버 유저들이 힘을 합쳐<br>강력한 보스를 처치하세요!
+            </p>
+            
+            <!-- 🔥 수정된 로비 팝업 체력 바 UI -->
+            <div style="background:rgba(0,0,0,0.7); padding:15px; border-radius:8px; margin-bottom:15px; border: 1px solid #b91c1c; text-align:center;">
+                <div style="color:#ddd; font-size:14px; margin-bottom:5px;">현재 보스 체력</div>
+                <div style="width: 100%; background: #333; height: 16px; border-radius: 8px; border: 2px solid #111; overflow: hidden; margin-bottom: 5px;">
+                    <div id="lobby-raid-boss-hp-bar" style="width: 100%; height: 100%; background: linear-gradient(to right, #ef4444, #b91c1c); transition: width 0.2s ease;"></div>
+                </div>
+                <div id="lobby-raid-boss-hp-text" style="color:#ff5252; font-size:14px; font-weight:900;">불러오는 중...</div>
+            </div>
+
+            <button class="ingame-btn premium-red" style="width:100%; height:55px; margin-bottom:10px; font-size:16px;" onclick="startRaidGame()">⚔️ 도전하기 (1일 1회)</button>
+            <button class="ingame-btn premium-orange" style="width:100%; height:55px; margin-bottom:15px; font-size:16px;" onclick="showRaidRanking()">🏆 누적 데미지 순위</button>
+            <button class="ingame-btn premium-white" style="width:100%; padding: 10px;" onclick="closeRaidLobby()">로비로 돌아가기</button>
+        </div>
+        
+        <div id="raid-ranking-modal" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 10vh; width:90%; max-width:360px; max-height: 80vh; flex-direction:column;">
+            <h3>🏆 월드 보스 랭킹 🏆</h3>
+            <div style="background: rgba(0,0,0,0.8); border-radius: 8px; padding: 10px; flex:1; display:flex; flex-direction:column; overflow:hidden; margin-bottom:15px;">
+                <div id="raid-ranking-list" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:8px; padding-right:5px;"></div>
+            </div>
+            <button class="ingame-btn premium-dark" style="width:100%;" onclick="closeRaidRanking()">뒤로 가기</button>
+        </div>
+    </div>
+
+    <!-- 랭크 로비 -->
+    <div id="rank-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:2000; flex-direction:column; align-items:center;">
+        <div id="rank-lobby-modal" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 15vh; width: 85%; max-width: 320px;">
+            <h3 style="color:#ffd54f;">🏆 AI 랭크 게임 🏆</h3>
+            <div style="background:rgba(0,0,0,0.7); padding:12px; border-radius:8px; margin-bottom:15px; border: 1px solid #6d4c41; text-align:center;">
+                <div style="color:#69f0ae; font-size:14px; font-weight:900; margin-bottom:5px;">[ AI 자동 매칭 ]</div>
+                <div style="color:#eee; font-size:12px; line-height:1.6; word-break:keep-all;">시작 재화 100메소 • 추가 획득 불가<br><span style="color:#ffb74d;">15배속 고정</span> • 몹 25마리 초과 시 패배</div>
+            </div>
+            <div style="background:rgba(0,0,0,0.7); padding:15px; border-radius:8px; margin-bottom:15px; border: 1px solid #6d4c41;">
+                <div style="font-size:14px; font-weight:bold; display:flex; justify-content:space-between; margin-bottom:10px; border-bottom:1px dashed #777; padding-bottom:8px;">
+                    <span style="color:#ddd;">오늘 남은 횟수</span> <span id="ui-rank-remains" style="color:#ff8a80;">10 / 10</span>
+                </div>
+                <div style="font-size:14px; font-weight:bold; display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <span style="color:#ddd;">내 랭크 점수</span> <span id="ui-rank-rp" style="color:#b9f6ca;">1000 점</span>
+                </div>
+                <div style="font-size:14px; font-weight:bold; display:flex; justify-content:space-between;">
+                    <span style="color:#ddd;">보유 랭크 머니</span> <span id="ui-rank-money" style="color:#ffe082;">0 원</span>
+                </div>
+            </div>
+            <button class="ingame-btn premium-blue" style="width:100%; height:55px; margin-bottom:10px; font-size:18px;" onclick="startRankMatchmaking()">⚔️ AI 랭크 매칭 시작</button>
+            <button class="ingame-btn premium-purple" style="width:100%; height:50px; margin-bottom:15px;" onclick="openRankShop()">🛒 랭크 전용 상점</button>
+            <button class="ingame-btn premium-dark" style="width:100%; padding: 10px;" onclick="closeRankMenu()">온라인 메뉴로 돌아가기</button>
+        </div>
+
+        <!-- 랭크 전용 상점 -->
+        <div id="rank-shop-modal" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 15vh; width: 85%; max-width: 320px;">
+            <h3 style="color:#6b21a8;">🛒 랭크 전용 상점</h3>
+            <div style="background:rgba(0,0,0,0.7); padding:15px; border-radius:8px; margin-bottom:15px; border: 1px solid #6d4c41;">
+                <div style="font-size:14px; font-weight:bold; display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <span style="color:#ddd;">보유 랭크 머니</span> <span id="ui-shop-rank-money" style="color:#ffe082;">0</span>
+                </div>
+                <div style="font-size:14px; font-weight:bold; display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <span style="color:#ddd;">보유 코인 조각</span> <span id="ui-shop-pieces" style="color:#81c784;">0</span>
+                </div>
+                <div style="font-size:14px; font-weight:bold; display:flex; justify-content:space-between;">
+                    <span style="color:#ddd;">보유 별의 기운</span> <span id="ui-shop-star-pieces" style="color:#ffeb3b;">0</span>
+                </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;">
+                <button class="ingame-btn premium-orange" style="width:100%;" onclick="buyMonsterPiece()">조각 1개 구매 (100 머니)</button>
+                <button class="ingame-btn premium-blue" style="width:100%;" onclick="buyStarPiece()">별의 기운 1개 구매 (50 머니)</button>
+            </div>
+            <button class="ingame-btn premium-dark" style="width:100%; padding: 10px;" onclick="closeRankShop()">랭크 로비로 돌아가기</button>
+        </div>
+
+        <div id="match-intro-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:4000; flex-direction:column; justify-content:center; align-items:center; opacity:0; transition: opacity 0.5s ease-in-out;">
+            <h2 style="color:#ffeb3b; font-size:36px; margin-bottom: 30px; text-shadow: 2px 2px 5px #000;">⚔️ 매칭 성사! ⚔️</h2>
+            <div style="font-size: 22px; color:#fff; font-weight:bold; text-align:center; line-height: 1.8; background: rgba(255,255,255,0.1); padding: 20px 40px; border-radius: 12px; border: 2px solid #555; width: 80%; max-width: 320px;">
+                <div style="color:#b9f6ca; text-shadow: 1px 1px 3px #000;" id="intro-player">나 (1000 RP)</div>
+                <div style="font-size:28px; color:#ef4444; margin: 15px 0;">VS</div>
+                <div style="color:#ffe082; text-shadow: 1px 1px 3px #000;" id="intro-opp">상대방 (1000 RP)</div>
+            </div>
+        </div>
+
+        <div id="rank-waiting-modal" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 30vh; width: 85%; max-width: 320px; text-align:center;">
+            <div style="margin-bottom: 20px; width: 40px; height: 40px; border: 4px solid rgba(0,0,0,0.1); border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; display:inline-block;"></div>
+            <h3 style="color:#1e3a8a; border:none; padding:0;">상대방을 찾는 중...</h3>
+            <p style="font-size:13px; color:#555; margin-bottom:20px;">자신과 비슷한 실력의 용사님(AI)을<br>수색하고 있습니다.</p>
+        </div>
+    </div>
+
+    <div id="pk-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:2000; flex-direction:column; align-items:center;">
+        <div id="pk-menu" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 20vh;">
+            <h3>월드 펀치킹</h3>
+            <p style="font-size:12px; color:#555; margin-bottom:15px;">혼줌/보스추뎀 제외, 전 직업 기본공격 완전 동일!<br>순수 도감과 스킬 내실로 승부합니다. (1분)</p>
+            <button class="ingame-btn premium-blue" style="width:100%; height:55px; margin-bottom:10px;" onclick="showPkClassSelect()">시작하기</button>
+            <button class="ingame-btn premium-orange" style="width:100%; height:55px; margin-bottom:15px;" onclick="showPkRanking()">🏆 서버 랭킹 보드</button>
+            <button class="ingame-btn premium-dark" style="width:100%; padding: 8px; font-size: 14px;" onclick="closePk()">온라인 메뉴로 돌아가기</button>
+        </div>
+        <div id="pk-class-select" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 20vh;">
+            <h3>직업 선택 (데스티니)</h3>
+            <div style="display:flex; gap:10px; margin-bottom:15px;">
+                <button class="ingame-btn premium-red" style="flex:1;" onclick="startPkGame('전사')">전사</button>
+                <button class="ingame-btn premium-blue" style="flex:1;" onclick="startPkGame('법사')">법사</button>
+                <button class="ingame-btn premium-purple" style="flex:1;" onclick="startPkGame('도적')">도적</button>
+            </div>
+            <button class="ingame-btn premium-dark" style="width:100%;" onclick="openPkMenu()">뒤로</button>
+        </div>
+        <div id="pk-ranking" class="maple-modal" style="display:none; position:relative; top:auto; left:auto; transform:none; margin-top: 10vh; width:90%; max-width:360px; max-height: 80vh; flex-direction:column;">
+            <h3>🏆 서버 펀치킹 랭킹 🏆</h3>
+            <div style="background: rgba(0,0,0,0.8); border-radius: 8px; padding: 10px; flex:1; display:flex; flex-direction:column; overflow:hidden; margin-bottom:15px;">
+                <div id="pk-ranking-list" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:8px; padding-right:5px;"></div>
+            </div>
+            <button class="ingame-btn premium-dark" style="width:100%;" onclick="openPkMenu()">뒤로</button>
+        </div>
+    </div>
+
+    <!-- 메인 인게임 -->
+    <div id="game-container" style="display:none;">
+        <div id="opp-board-wrapper" style="display:none; width: 90%; max-width: 400px; margin: 15px auto 10px auto; background-color: rgba(55, 71, 79, 0.9); border: 3px solid #ef4444; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.7); flex-direction: column;">
+            <div style="width:100%; background:rgba(239, 68, 68, 0.9); color:#fff; font-size:12px; font-weight:bold; display:flex; justify-content:space-between; padding:4px 8px; z-index:20; box-sizing:border-box; border-bottom: 2px solid #b91c1c;">
+                <span id="opp-name">적 AI</span><span>W:<span id="opp-wave" style="color:#ffeb3b; margin-right:4px;">1</span> 몹:<span id="opp-mobs">0</span></span>
+            </div>
+            <div style="position: relative; width: 100%; aspect-ratio: 500/290;">
+                <canvas id="oppCanvas" width="500" height="290" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; pointer-events: none; z-index: 10;"></canvas>
+                <div id="opp-grid-container" style="position: absolute; top: 25.86%; left: 15%; width: 70%; height: 48.27%; display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(2, 1fr); gap: 0; pointer-events: none; background-color: rgba(220, 190, 170, 0.85); border: 3px solid rgba(120, 80, 60, 0.9); z-index: 5; border-radius: 4px;"></div>
+            </div>
+        </div>
+
+        <div id="header" class="maple-panel">
+            <div id="best-wave-container" style="text-align:center; font-weight:bold; font-size:13px; color:#1e3a8a; margin-bottom: 8px; border-bottom: 1px dashed #b0bec5; padding-bottom: 5px;">
+                🏆 최고 기록: <span id="ui-best-wave" style="color:#e65100;">0</span> 웨이브
+            </div>
+            <div class="stat-row" style="align-items: center;">
+                <div>웨이브: <span id="ui-wave" class="highlight">1</span></div>
+                <div>타이머: <span id="ui-timer" class="highlight">60</span>초</div>
+                <div style="display:flex; gap:5px;">
+                    <button id="btn-speed" class="ingame-btn premium-dark" style="padding: 6px 10px; font-size: 11px;" onclick="toggleSpeed()">1배속</button>
+                    <button id="btn-rank-surrender" class="ingame-btn premium-red" style="padding: 6px 10px; font-size: 11px; display:none;" onclick="surrenderRankGame()">항복</button>
+                    <button id="btn-exit" class="ingame-btn premium-orange" style="padding: 6px 10px; font-size: 11px;" onclick="goToLobby()">로비로</button>
+                </div>
+            </div>
+            <button class="ingame-btn premium-blue" style="width: 100%; margin: 8px 0; padding: 10px;" onclick="openActiveSkillsModal()">⭐ 적용중인 스킬 효과 보기</button>
+            <div class="stat-row">
+                <div>몹: <span id="ui-mobs" class="danger">0 / 50</span></div>
+                <div>킬수: <span id="ui-kills">0</span></div>
+            </div>
+            <div class="resource-row">
+                <div class="meso-box"><img src="image/meso.png" alt="Meso" style="height: 16px; vertical-align: middle; margin-right: 4px;">메소 <span id="ui-meso">25</span></div>
+                <div class="mp-box"><img src="image/mepo.png" alt="Mepo" style="height: 16px; vertical-align: middle; margin-right: 4px;">메포 <span id="ui-mp">0</span></div>
+            </div>
+            <div id="early-guide" style="display:none; background: rgba(0, 0, 0, 0.7); color: #69f0ae; font-size: 13px; font-weight: bold; text-align: center; padding: 8px; border-radius: 6px; margin-top: 10px; border: 1px dashed #69f0ae;">
+                💡 가이드: 하단 [소환]을 누르고 [✨일괄합성]으로 성장하세요!
+            </div>
+        </div>
+        
+        <div id="board-area">
+            <canvas id="gameCanvas" width="500" height="500"></canvas>
+            <div id="grid-container"></div>
+            <div id="boss-skip-wrapper" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; justify-content:center; align-items:center; z-index:50;">
+                <button id="btn-skip-boss" class="ingame-btn premium-orange" style="padding: 15px 30px; font-size: 18px;" onclick="skipBossRound()">다음 라운드 시작</button>
+            </div>
+        </div>
+        
+        <div id="controls" class="maple-panel">
+            <div style="display: flex; gap: 4px; margin-bottom: 15px;">
+                <button id="btn-summon" class="ingame-btn premium-green" style="flex: 1.5; padding: 16px; font-size: 16px;" onclick="summonUnit()">소환 (10)</button>
+                <button class="ingame-btn premium-purple" style="flex: 1; font-size: 13px; padding: 0 5px;" onclick="autoMerge()">✨일괄합성</button>
+                <button id="btn-sell-single" class="ingame-btn premium-orange" style="flex: 0.8; font-size: 13px; padding: 0 5px;" onclick="sellSelectedUnit()" disabled>선택판매</button>
+                <button class="ingame-btn premium-dark" style="flex: 0.8; font-size: 13px; padding: 0 5px;" onclick="openBulkSellModal()">조건판매</button>
+            </div>
+            <div style="text-align:center; font-weight:bold; font-size:14px; color:#5a3c22; margin-bottom: 5px; border-top: 1px dashed #8b5a2b; padding-top: 5px;">
+                <img src="image/chaosscroll.png" style="height: 20px; vertical-align: middle;"> 혼돈의 주문서 강화 <img src="image/chaosscroll.png" style="height: 20px; vertical-align: middle;">
+            </div>
+            <div class="upgrade-container">
+                <div class="upgrade-box" id="upg-w-box" onclick="upgrade('전사')">
+                    <div class="job-title warrior">전사 (+<span id="upg-w-val">0</span>)</div>
+                    <div class="cost"><span id="upg-w-cost">10</span> 메포</div>
+                </div>
+                <div class="upgrade-box" id="upg-m-box" onclick="upgrade('법사')">
+                    <div class="job-title mage">법사 (+<span id="upg-m-val">0</span>)</div>
+                    <div class="cost"><span id="upg-m-cost">10</span> 메포</div>
+                </div>
+                <div class="upgrade-box" id="upg-t-box" onclick="upgrade('도적')">
+                    <div class="job-title thief">도적 (+<span id="upg-t-val">0</span>)</div>
+                    <div class="cost"><span id="upg-t-cost">10</span> 메포</div>
+                </div>
+            </div>
+            <div class="ticket-row" style="margin-top: 15px;">
+                <span>선택권: <span id="ui-tickets" class="highlight">0</span>장</span>
+                <button class="ingame-btn premium-blue" style="padding: 8px 15px;" onclick="openTicketModal()">사용하기</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="pk-game" style="display:none; flex-direction:column; width:100%; max-width:500px; height:auto; min-height:100vh; background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('image/punchkingwallpaper.png') no-repeat center center; background-size: cover; padding-bottom: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.8);">
+        <div id="pk-header" class="maple-panel" style="margin: 10px 10px 0 10px; padding: 12px; font-size: 15px; font-weight: bold; background: rgba(253, 245, 230, 0.9);">
+            <div class="stat-row">
+                <div>점수: <span id="pk-score" class="highlight">0</span></div>
+                <div>타이머: <span id="pk-time" class="highlight" style="color:#ff5252;">60</span>초</div>
+                <div style="display:flex; gap:5px;"><button id="pk-btn-speed" class="ingame-btn premium-dark" style="padding: 5px 10px; font-size: 12px;" onclick="togglePkSpeed()">1배속</button></div>
+            </div>
+        </div>
+        <div id="pk-board-area" style="position: relative; width: 100%; aspect-ratio: 1/1; background-color: rgba(55, 71, 79, 0.5); border-top: 4px solid rgba(38, 50, 56, 0.8); border-bottom: 4px solid rgba(38, 50, 56, 0.8); margin-top: 10px;">
+            <canvas id="pkCanvas" width="500" height="500" style="position:absolute; top:0; left:0; width:100%; height:100%; z-index:10; pointer-events:none;"></canvas>
+            <div style="position: absolute; top: 43%; left: 15%; width: 14%; height: 14%; background-color: rgba(220, 190, 170, 0.85); border: 2px solid rgba(120, 80, 60, 0.9); z-index: 5; border-radius: 4px; box-sizing: border-box;">
+                <div class="grid-cell glow-8" style="width: 100%; height: 100%; background: transparent; box-shadow: none; cursor:default; border:none; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+                    <div id="pk-unit-icon" style="font-size: clamp(14px, 4vw, 20px); text-shadow:1px 1px 2px rgba(0,0,0,0.5);">🗡️</div>
+                    <div id="pk-unit-name" style="color:#ffd54f; font-size: clamp(8px, 2.5vw, 10px); margin-top:2px; font-weight:800;">데스티니</div>
+                    <div style="width: 80%; background: transparent; margin-top: 2px; display:none;" id="pk-global-bar-container"><div id="pk-global-bar" style="width: 0%; height: 100%; background: #ffeb3b;"></div></div>
+                </div>
+            </div>
+        </div>
+        <div class="maple-panel" style="margin: 10px; padding: 12px; background: rgba(253, 245, 230, 0.9);">
+            <button class="ingame-btn premium-red" style="width: 100%; margin-bottom: 15px; padding: 15px;" onclick="endPkGame(true)">포기하고 로비로</button>
+            <div style="background: rgba(0,0,0,0.7); border-radius: 8px; padding: 10px;">
+                <h4 style="color: #ffeb3b; margin: 0 0 10px 0; text-align: center; font-size: 16px; font-weight:900;">🏆 펀치킹 실시간 TOP 10 🏆</h4>
+                <div id="pk-live-ranking-list" style="display:flex; flex-direction:column; gap:5px; font-size:13px; max-height: 200px; overflow-y: auto;">
+                    <div style="text-align:center; color:#ccc;">랭킹을 불러오는 중...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 월드 보스 레이드 화면 -->
+    <div id="raid-game" style="display:none; flex-direction:column; width:100%; max-width:500px; height:auto; min-height:100vh; background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.8)), url('image/wallpaper.png') no-repeat center center; background-size: cover; padding-bottom: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.8);">
+        <div id="raid-header" class="maple-panel" style="margin: 10px 10px 0 10px; padding: 12px; font-size: 15px; font-weight: bold; background: rgba(253, 245, 230, 0.9);">
+            <div class="stat-row">
+                <div>총 데미지: <span id="raid-total-dmg" class="highlight" style="color:#e65100;">0</span></div>
+                <div>타이머: <span id="raid-time" class="highlight" style="color:#ff5252;">60</span>초</div>
+            </div>
+            <!-- 🔥 월드보스 피통 UI 변경 (바 아래에 작게 숫자 표기) -->
+            <div style="margin-top: 10px; width: 100%;">
+                <div style="width: 100%; background: #333; height: 16px; border-radius: 8px; border: 2px solid #111; overflow: hidden;">
+                    <div id="raid-boss-hp-bar" style="width: 100%; height: 100%; background: linear-gradient(to right, #ef4444, #b91c1c); transition: width 0.2s ease;"></div>
+                </div>
+                <div id="raid-boss-hp-text" style="text-align: center; color: #d32f2f; font-size: 11px; margin-top: 3px; font-weight: 900;">7,000,000 / 7,000,000</div>
+            </div>
+        </div>
+        
+        <div id="raid-board-area" style="position: relative; width: 100%; aspect-ratio: 1/1; background-color: rgba(55, 71, 79, 0.5); border-top: 4px solid rgba(38, 50, 56, 0.8); border-bottom: 4px solid rgba(38, 50, 56, 0.8); margin-top: 10px;">
+            <canvas id="raidCanvas" width="500" height="500" style="position:absolute; top:0; left:0; width:100%; height:100%; z-index:10; pointer-events:none;"></canvas>
+            <div style="position: absolute; top: 15%; left: 35%; width: 30%; height: 30%; display: flex; justify-content: center; align-items: center; z-index: 5;">
+                <img src="image/worldboss.png" style="max-width: 100%; max-height: 100%; object-fit: contain; filter: drop-shadow(0px 0px 15px rgba(255, 0, 0, 0.8)); animation: mild-shake 2s infinite;" alt="월드 보스">
+            </div>
+            <div id="raid-grid-container" style="position: absolute; bottom: 15%; left: 20%; width: 60%; height: 25%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; background-color: rgba(220, 190, 170, 0.85); border: 3px solid rgba(120, 80, 60, 0.9); z-index: 5; border-radius: 8px; padding: 5px;"></div>
+            
+            <!-- 🔥 월드 보스 소환 UI 위치 상단으로 이동 -->
+            <div id="raid-prep-ui" style="display:none; position: absolute; top: 10%; left: 50%; transform: translateX(-50%); width: 85%; background: transparent; z-index: 50; flex-direction: column; align-items: center; box-sizing: border-box;">
+                <div style="background: rgba(0,0,0,0.85); padding: 15px 20px; border-radius: 12px; border: 1px solid #777; text-align: center; width: 100%; box-sizing:border-box;">
+                    <h2 style="color: #ffeb3b; font-size: 20px; margin-top: 0; margin-bottom: 5px;">전투 준비</h2>
+                    <p style="color: #fff; font-size: 14px; margin: 0 0 10px 0;">남은 시간: <span id="raid-prep-time" style="color:#ff5252; font-weight:bold; font-size:20px;">5</span>초</p>
+                    <div style="color: #eee; font-size: 14px; margin-bottom: 10px;">보유 메소: <span id="raid-meso" style="color: #ffeb3b; font-weight:bold; font-size: 18px;">30</span></div>
+                    <button class="ingame-btn premium-green" style="width: 100%; padding: 12px 24px; font-size: 16px;" onclick="summonRaidUnit()">유닛 소환 (10 메소)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 인벤토리 모달 -->
+    <div id="inventory-modal" class="maple-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:3500; width:90%; max-width:340px; background: #eceff1; border-color: #546e7a;">
+        <h3 style="color:#263238; border-bottom: 2px solid #b0bec5; padding-bottom: 8px;">🎒 내 인벤토리</h3>
+        <div style="background: #cfd8dc; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #90a4ae;">
+            <div style="font-size:12px; font-weight:bold; color:#37474f; margin-bottom: 8px; text-align: center;">장착 중인 장비</div>
+            <div style="display: flex; justify-content: space-around;">
+                <div class="equip-slot" id="slot-뱃지" onclick="unequipItem('뱃지')"></div>
+                <div class="equip-slot" id="slot-엠블럼" onclick="unequipItem('엠블럼')"></div>
+                <div class="equip-slot" id="slot-링" onclick="unequipItem('링')"></div>
+            </div>
+            <div id="equip-total-stats" style="font-size:11px; text-align:center; margin-top:10px; color:#c62828; font-weight:bold;">적용 능력치: 공 0% / 공속 0% / 크확 0%</div>
+        </div>
+        <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+            <button class="ingame-btn premium-dark" style="flex:1; padding: 8px; font-size:12px;" onclick="renderInventoryTab('consumable')">소비 / 상자</button>
+            <button class="ingame-btn premium-dark" style="flex:1; padding: 8px; font-size:12px;" onclick="renderInventoryTab('equip')">장비 아이템</button>
+        </div>
+        <div id="inventory-list" style="background: #fff; border: 1px solid #b0bec5; border-radius: 8px; height: 180px; overflow-y: auto; padding: 10px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; align-content: start;"></div>
+        <button class="ingame-btn premium-white" style="width:100%; padding: 12px; margin-top: 15px;" onclick="closeInventoryModal()">닫기</button>
+    </div>
+
+    <!-- 결과, 기타 모달 -->
+    <div id="raid-result-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:4000;"></div>
+    <div id="raid-result-modal" class="maple-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:4100; width:85%; max-width:320px;">
+        <h3 style="color:#e65100; font-size: 24px;">전투 종료!</h3>
+        <div style="background:rgba(0,0,0,0.05); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
+            <div style="font-size:14px; margin-bottom:8px;">내가 넣은 데미지: <b id="raid-result-dmg" style="color:#c62828;">0</b></div>
+            <div style="font-size:14px; margin-bottom:8px;">기여도: <b id="raid-result-percent" style="color:#1565c0;">0%</b></div>
+            <hr style="border: 0; border-top: 1px dashed #ccc; margin: 10px 0;">
+            <div style="font-size:14px; font-weight: bold;">획득 보상:</div>
+            <div id="raid-result-rewards" style="font-size:13px; color: #5a3c22; margin-top: 5px; font-weight: bold; line-height:1.4;"></div>
+        </div>
+        <button class="ingame-btn premium-blue" style="width:100%; padding: 15px;" onclick="closeRaidResult()">로비로 돌아가기</button>
+    </div>
+
+    <div id="pk-result-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:2050;"></div>
+    <div id="pk-result-modal" class="maple-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:2100; width:80%; max-width:300px;">
+        <h3 style="color:#e65100;">측정 종료!</h3>
+        <div style="font-size:16px; margin-bottom:10px; color:#5a3c22; font-weight:bold;">나의 최종 DPS 점수</div>
+        <div id="pk-final-score" style="font-size:42px; font-weight:900; color:#c62828; text-shadow:1px 1px 0 #fff; margin-bottom:20px; display:flex; flex-direction:column; align-items:center;">0</div>
+        <button id="btn-submit-pk" class="ingame-btn premium-blue" style="width:100%; margin-bottom:10px; padding:15px;" onclick="submitPkScore()">랭킹 등록하고 로비로</button>
+    </div>
+
+    <div id="rank-result-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:3000;"></div>
+    <div id="rank-result-modal" class="maple-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:3100; width:80%; max-width:300px; text-align:center;">
+        <h2 id="rank-result-title" style="margin-top:0; font-size:28px;">승리!</h2>
+        <div style="background:rgba(0,0,0,0.05); border-radius:8px; padding:15px; margin-bottom:20px; text-align:left;">
+            <div style="font-size:14px; font-weight:bold; color:#333; margin-bottom:8px; display:flex; justify-content:space-between;"><span>RP 변화</span><span id="rank-result-rp" style="color:#3b82f6;">+10</span></div>
+            <div style="font-size:14px; font-weight:bold; color:#333; display:flex; justify-content:space-between;"><span>랭크 머니 획득</span><span id="rank-result-money" style="color:#f59e0b;">+100</span></div>
+        </div>
+        <button class="ingame-btn premium-blue" style="width:100%; padding:15px;" onclick="exitRankGame()">로비로 돌아가기</button>
+    </div>
+
+    <div id="book-modal" class="maple-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:2100; width:90%; max-width:320px;">
+        <h3 style="color:#1e3a8a;">📖 몬스터 도감</h3>
+        <div id="book-total-grade" style="font-size:13px; font-weight:bold; margin-bottom:5px;"></div>
+        <div id="book-total-bonus" style="font-size:13px; font-weight:bold; color:#f57c00; margin-bottom:10px;"></div>
+        <div id="book-list" style="display:flex; flex-direction:column; gap:8px; max-height:50vh; overflow-y:auto; padding-right:5px; margin-bottom:15px;"></div>
+        <button class="ingame-btn premium-dark" style="width:100%; padding: 10px;" onclick="closeAllModals()">닫기</button>
+    </div>
+
+    <div id="shop-modal" class="maple-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:2100; width:90%; max-width:320px;">
+        <h3 style="color:#6b21a8;">🏪 스킬 상점</h3>
+        <div style="font-size:13px; font-weight:bold; margin-bottom:10px; text-align:right;">보유 코인: <span id="ui-shop-coins" style="color:#f57c00;">0</span></div>
+        <div style="display:flex; gap:5px; margin-bottom:10px;">
+            <button class="ingame-btn premium-orange" style="flex:1; padding: 8px 0; font-size: 13px;" onclick="renderShop('common')">공용</button>
+            <button class="ingame-btn premium-red" style="flex:1; padding: 8px 0; font-size: 13px;" onclick="renderShop('warrior')">전사</button>
+            <button class="ingame-btn premium-blue" style="flex:1; padding: 8px 0; font-size: 13px;" onclick="renderShop('mage')">법사</button>
+            <button class="ingame-btn premium-purple" style="flex:1; padding: 8px 0; font-size: 13px;" onclick="renderShop('thief')">도적</button>
+        </div>
+        <div id="shop-list" style="display:flex; flex-direction:column; gap:8px; max-height:45vh; overflow-y:auto; padding-right:5px; margin-bottom:15px;"></div>
+        <button class="ingame-btn premium-dark" style="width:100%; padding: 10px;" onclick="closeAllModals()">닫기</button>
+    </div>
+
+    <div id="bulk-sell-modal" class="maple-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:2100; width:90%; max-width:320px;">
+        <h3 style="color:#e65100;">💰 일괄 판매</h3>
+        <p style="font-size:13px; color:#555; margin-bottom:15px;">조건에 맞는 유닛을 모두 판매합니다.</p>
+        <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;">
+            <button class="ingame-btn premium-red" onclick="executeBulkSell('class', '전사')">전사 모두 판매</button>
+            <button class="ingame-btn premium-blue" onclick="executeBulkSell('class', '법사')">법사 모두 판매</button>
+            <button class="ingame-btn premium-purple" onclick="executeBulkSell('class', '도적')">도적 모두 판매</button>
+            <hr style="border:0; border-top:1px dashed #ccc; margin:5px 0;">
+            <button class="ingame-btn premium-white" onclick="executeBulkSell('grade', 0)">초보자 모두 판매</button>
+            <button class="ingame-btn premium-white" onclick="executeBulkSell('grade', 1)">1차 이하 모두 판매</button>
+            <button class="ingame-btn premium-white" onclick="executeBulkSell('grade', 2)">2차 이하 모두 판매</button>
+            <button class="ingame-btn premium-white" onclick="executeBulkSell('grade', 3)">3차 이하 모두 판매</button>
+        </div>
+        <button class="ingame-btn premium-dark" style="width:100%; padding: 10px;" onclick="closeAllModals()">닫기</button>
+    </div>
+
+    <div id="ticket-modal" class="maple-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:2100; width:90%; max-width:320px;">
+        <h3 style="color:#6a1b9a;">🎟️ 선택권 사용</h3>
+        <p style="font-size:13px; margin-bottom:15px;">사용할 <span id="ticket-tier" style="color:#e65100; font-weight:bold;">0</span>등급 유닛의 직업을 선택하세요.</p>
+        <div style="display:flex; gap:10px; margin-bottom:15px;">
+            <button class="ingame-btn premium-red" style="flex:1;" onclick="useTicket('전사')">전사</button>
+            <button class="ingame-btn premium-blue" style="flex:1;" onclick="useTicket('법사')">법사</button>
+            <button class="ingame-btn premium-purple" style="flex:1;" onclick="useTicket('도적')">도적</button>
+        </div>
+        <button class="ingame-btn premium-orange" style="width:100%; margin-bottom:10px;" onclick="useTicket('랜덤')">🎲 랜덤 (20% 확률로 1단계 업!)</button>
+        <button class="ingame-btn premium-dark" style="width:100%; padding: 10px;" onclick="closeAllModals()">닫기</button>
+    </div>
+
+    <div id="active-skills-modal" class="maple-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:2100; width:90%; max-width:320px;">
+        <h3 style="color:#1e3a8a;">⭐ 적용중인 스킬</h3>
+        <div id="active-skills-list" style="display:flex; flex-direction:column; gap:8px; max-height:50vh; overflow-y:auto; padding-right:5px; margin-bottom:15px;"></div>
+        <button class="ingame-btn premium-dark" style="width:100%; padding: 10px;" onclick="closeAllModals()">닫기</button>
+    </div>
+
+    <div id="gameover-modal" class="maple-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:3100; width:80%; max-width:300px; text-align:center;">
+        <h2 style="margin-top:0; font-size:28px; color:#c62828;">게임 오버</h2>
+        <p id="gameover-msg" style="font-size:16px; font-weight:bold; color:#333; margin-bottom:20px;"></p>
+        <button class="ingame-btn premium-blue" style="width:100%; padding:15px;" onclick="goToLobby()">로비로 돌아가기</button>
+    </div>
+
+    <div id="overlay" onclick="closeAllModals()"></div>
+    <div id="msg-overlay"></div>
+    <div id="summon-toast"></div>
+    <div id="boss-toast"></div>
+    
+    <script>
+        const script = document.createElement('script');
+        script.type = 'module';
+        script.src = 'script.js?v=' + new Date().getTime();
+        document.body.appendChild(script);
+    </script>
 </body>
 </html>
